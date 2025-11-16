@@ -7,6 +7,7 @@ from fastapi.openapi.utils import get_openapi  # << Swagger özelleştirme için
 from .core.config import settings
 from .core.middleware import ErrorMiddleware, DefaultSubeMiddleware
 from .core.tenant_middleware import TenantStatusMiddleware, SubscriptionLimitMiddleware
+from .core.startup_checks import validate_startup
 from .db.database import db
 from .db.schema import create_tables
 
@@ -92,6 +93,11 @@ app.add_middleware(SubscriptionLimitMiddleware)
 @app.on_event("startup")
 async def on_startup():
     import logging
+
+    # Validate environment configuration before starting
+    print("[STARTUP] Validating configuration...")
+    validate_startup()
+
     print("[STARTUP] Connecting to database...")
     await db.connect()
     print("[STARTUP] Database connected, creating tables...")
