@@ -1,0 +1,11 @@
+node_modules
+dist
+.git
+.vscode
+.idea
+Dockerfile
+docker
+*.log
+
+
+

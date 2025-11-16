@@ -1,0 +1,552 @@
+{
+  "metadata": {
+    "version": "0.1.0",
+    "description": "Müşteri asistanı için veri sözlüğü ve alan eşleştirmeleri",
+    "last_updated": "2025-11-12"
+  },
+  "domains": {
+    "menu": {
+      "table": "menu",
+      "primary_key": "id",
+      "default_filters": [
+        { "field": "aktif", "operator": "=", "value": true }
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["menu_id", "urun_id"],
+          "type": "integer",
+          "description": "Menü öğesinin benzersiz kimliği"
+        },
+        {
+          "name": "ad",
+          "aliases": ["urun", "urun_adi", "menu_item"],
+          "type": "string",
+          "description": "Menü öğesinin görünen adı"
+        },
+        {
+          "name": "kategori",
+          "aliases": ["kategori", "category", "menu_kategori"],
+          "type": "string",
+          "description": "Menü öğesinin ait olduğu kategori"
+        },
+        {
+          "name": "fiyat",
+          "aliases": ["price", "tutar", "birim_fiyat", "urun_fiyati"],
+          "type": "currency",
+          "description": "Menü öğesinin satış fiyatı (TL)",
+          "unit": "TRY"
+        },
+        {
+          "name": "aciklama",
+          "aliases": ["description", "urun_aciklama"],
+          "type": "string",
+          "description": "Ürün açıklaması"
+        },
+        {
+          "name": "gorsel_url",
+          "aliases": ["image", "image_url"],
+          "type": "string",
+          "description": "Ürünün görsel bağlantısı"
+        },
+        {
+          "name": "aktif",
+          "aliases": ["is_active", "durum"],
+          "type": "boolean",
+          "description": "Ürün menüde aktif mi"
+        },
+        {
+          "name": "created_at",
+          "aliases": ["olusturma_tarihi"],
+          "type": "datetime",
+          "description": "Öğenin menüye eklenme zamanı"
+        }
+      ]
+    },
+    "stok": {
+      "table": "stok_kalemleri",
+      "primary_key": "id",
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["stok_id"],
+          "type": "integer",
+          "description": "Stok kalemi kimliği"
+        },
+        {
+          "name": "ad",
+          "aliases": ["stok", "stok_adi", "malzeme"],
+          "type": "string",
+          "description": "Stok kaleminin adı"
+        },
+        {
+          "name": "kategori",
+          "aliases": ["stok_kategori"],
+          "type": "string",
+          "description": "Stok kaleminin kategorisi"
+        },
+        {
+          "name": "birim",
+          "aliases": ["unit"],
+          "type": "string",
+          "description": "Stok kaleminin ölçü birimi"
+        },
+        {
+          "name": "mevcut",
+          "aliases": ["stok_miktari", "adet", "kalan"],
+          "type": "quantity",
+          "description": "Mevcut stok miktarı"
+        },
+        {
+          "name": "min",
+          "aliases": ["kritik_seviye", "min_miktar"],
+          "type": "quantity",
+          "description": "Kritik seviye eşiği"
+        },
+        {
+          "name": "alis_fiyat",
+          "aliases": ["maliyet", "birim_maliyet"],
+          "type": "currency",
+          "description": "Stok kaleminin birim alış maliyeti",
+          "unit": "TRY"
+        },
+        {
+          "name": "updated_at",
+          "aliases": ["guncelleme_zamani"],
+          "type": "datetime",
+          "description": "Stok kaleminin son güncellenme zamanı"
+        }
+      ]
+    },
+    "recete": {
+      "table": "receteler",
+      "primary_key": "id",
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["recete_id"],
+          "type": "integer",
+          "description": "Reçete kaydı kimliği"
+        },
+        {
+          "name": "urun",
+          "aliases": ["menu_urun", "urun_adi"],
+          "type": "string",
+          "description": "Reçetenin bağlı olduğu menü ürünü"
+        },
+        {
+          "name": "stok",
+          "aliases": ["malzeme", "stok_adi"],
+          "type": "string",
+          "description": "Reçetede kullanılan stok kalemi"
+        },
+        {
+          "name": "miktar",
+          "aliases": ["quantity", "adet"],
+          "type": "quantity",
+          "description": "Reçetede kullanılan miktar"
+        },
+        {
+          "name": "birim",
+          "aliases": ["unit"],
+          "type": "string",
+          "description": "Reçete miktarının ölçü birimi"
+        }
+      ]
+    },
+    "satis": {
+      "table": "siparisler",
+      "primary_key": "id",
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["siparis_id"],
+          "type": "integer",
+          "description": "Sipariş kaydı kimliği"
+        },
+        {
+          "name": "sube_id",
+          "aliases": ["branch_id"],
+          "type": "integer",
+          "description": "Siparişin ait olduğu şube"
+        },
+        {
+          "name": "masa",
+          "aliases": ["masa_kodu", "table_code"],
+          "type": "string",
+          "description": "Siparişin verildiği masa"
+        },
+        {
+          "name": "adisyon_id",
+          "aliases": ["ticket_id"],
+          "type": "integer",
+          "description": "Siparişin bağlı olduğu adisyon"
+        },
+        {
+          "name": "sepet",
+          "aliases": ["items", "order_items"],
+          "type": "json",
+          "description": "Sipariş kalemlerinin JSON içeriği"
+        },
+        {
+          "name": "durum",
+          "aliases": ["status"],
+          "type": "string",
+          "description": "Siparişin mevcut durumu"
+        },
+        {
+          "name": "tutar",
+          "aliases": ["ciro", "tutar_tl", "toplam"],
+          "type": "currency",
+          "description": "Sipariş toplam tutarı",
+          "unit": "TRY"
+        },
+        {
+          "name": "created_by_username",
+          "aliases": ["personel", "kaynak_kullanici"],
+          "type": "string",
+          "description": "Siparişi oluşturan kullanıcı veya AI"
+        },
+        {
+          "name": "created_at",
+          "aliases": ["siparis_saati", "siparis_tarihi"],
+          "type": "datetime",
+          "description": "Sipariş oluşturulma zamanı"
+        }
+      ]
+    },
+    "personel": {
+      "table": "users",
+      "primary_key": "id",
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["user_id", "personel_id"],
+          "type": "integer",
+          "description": "Personel kimliği"
+        },
+        {
+          "name": "username",
+          "aliases": ["kullanici_adi", "personel_kodu"],
+          "type": "string",
+          "description": "Personelin kullanıcı adı"
+        },
+        {
+          "name": "role",
+          "aliases": ["gorev", "rol"],
+          "type": "string",
+          "description": "Kullanıcının rolü (super_admin, garson vb.)"
+        },
+        {
+          "name": "aktif",
+          "aliases": ["is_active"],
+          "type": "boolean",
+          "description": "Kullanıcının aktiflik durumu"
+        },
+        {
+          "name": "created_at",
+          "aliases": ["kayit_tarihi"],
+          "type": "datetime",
+          "description": "Hesabın oluşturulma zamanı"
+        }
+      ]
+    },
+    "kampanya": {
+      "table": "kampanyalar",
+      "primary_key": "id",
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["kampanya_id"],
+          "type": "integer",
+          "description": "Kampanya kimliği"
+        },
+        {
+          "name": "ad",
+          "aliases": ["kampanya_adi", "kampanya"],
+          "type": "string",
+          "description": "Kampanya adı"
+        },
+        {
+          "name": "baslangic_tarihi",
+          "aliases": ["start_date"],
+          "type": "date",
+          "description": "Kampanya başlangıç tarihi"
+        },
+        {
+          "name": "bitis_tarihi",
+          "aliases": ["end_date"],
+          "type": "date",
+          "description": "Kampanya bitiş tarihi"
+        },
+        {
+          "name": "indirim_orani",
+          "aliases": ["discount_rate"],
+          "type": "number",
+          "description": "İndirim yüzdesi"
+        },
+        {
+          "name": "kosullar",
+          "aliases": ["sartlar", "rules"],
+          "type": "json",
+          "description": "Kampanya koşullarını içeren JSON"
+        }
+      ]
+    },
+    "sube": {
+      "table": "subeler",
+      "primary_key": "id",
+      "fields": [
+        {
+          "name": "id",
+          "aliases": ["sube_id", "branch_id"],
+          "type": "integer",
+          "description": "Şube kimliği"
+        },
+        {
+          "name": "ad",
+          "aliases": ["sube_adi"],
+          "type": "string",
+          "description": "Şubenin adı"
+        },
+        {
+          "name": "isletme_id",
+          "aliases": ["business_id"],
+          "type": "integer",
+          "description": "Şubenin bağlı olduğu işletme"
+        },
+        {
+          "name": "adres",
+          "aliases": ["address"],
+          "type": "string",
+          "description": "Şube adresi"
+        },
+        {
+          "name": "telefon",
+          "aliases": ["phone"],
+          "type": "string",
+          "description": "Şube iletişim telefonu"
+        },
+        {
+          "name": "aktif",
+          "aliases": ["is_active"],
+          "type": "boolean",
+          "description": "Şubenin aktiflik durumu"
+        },
+        {
+          "name": "created_at",
+          "aliases": ["olusturma_tarihi"],
+          "type": "datetime",
+          "description": "Şubenin oluşturulma zamanı"
+        }
+      ]
+    }
+  },
+  "relationships": [
+    {
+      "from": { "domain": "menu", "field": "ad" },
+      "to": { "domain": "recete", "field": "urun" },
+      "type": "one_to_many",
+      "description": "Her menü ürünü birden fazla reçete satırına bağlanabilir"
+    },
+    {
+      "from": { "domain": "menu", "field": "ad" },
+      "to": { "domain": "stok", "field": "ad" },
+      "type": "reference",
+      "description": "Ürün adı stok kalemi ile eşleştirilebilir (fuzzy eşleştirme)"
+    },
+    {
+      "from": { "domain": "menu", "field": "id" },
+      "to": { "domain": "satis", "field": "sepet" },
+      "type": "json_reference",
+      "description": "Sipariş sepeti içindeki ürün referansları menu.id değerini taşıyabilir"
+    },
+    {
+      "from": { "domain": "satis", "field": "created_by_username" },
+      "to": { "domain": "personel", "field": "username" },
+      "type": "many_to_one",
+      "description": "Siparişi oluşturan kullanıcı bilgisi"
+    },
+    {
+      "from": { "domain": "satis", "field": "sube_id" },
+      "to": { "domain": "sube", "field": "id" },
+      "type": "many_to_one",
+      "description": "Siparişin bağlı olduğu şube"
+    }
+  ],
+
+  "intents": {
+    "customer_assistant": {
+      "siparis": {
+        "description": "Müşteri sipariş verme",
+        "required_entities": ["menu.ad", "quantity"],
+        "optional_entities": ["menu.kategori", "variations"],
+        "confidence_threshold": 0.8,
+        "examples": [
+          "2 çay alabilir miyim",
+          "1 latte ve 2 americano",
+          "şekersiz filtre kahve",
+          "büyük boy türk kahvesi"
+        ]
+      },
+      "soru": {
+        "description": "Menü hakkında bilgi sorma",
+        "required_entities": ["menu.kategori"],
+        "confidence_threshold": 0.7,
+        "examples": [
+          "menünüzde vegan seçenekler var mı?",
+          "hangi tatlılarınız var?",
+          "en popüler içeceğiniz nedir?",
+          "glutensiz ürün var mı?"
+        ]
+      },
+      "oneri": {
+        "description": "Ürün önerisi isteme",
+        "optional_entities": ["mood", "preference"],
+        "confidence_threshold": 0.6,
+        "examples": [
+          "bir şey önerir misiniz?",
+          "çok üzgünüm, ne içsem?",
+          "başım ağrıyor",
+          "soğuk bir şey istiyorum"
+        ]
+      },
+      "iptal": {
+        "description": "Sipariş iptal etme",
+        "required_entities": ["siparis.id"],
+        "confidence_threshold": 0.9,
+        "examples": [
+          "son siparişimi iptal et",
+          "çayı istemiyorum",
+          "vazgeçtim"
+        ]
+      },
+      "degisiklik": {
+        "description": "Sipariş değişikliği",
+        "required_entities": ["siparis.id", "change_type"],
+        "confidence_threshold": 0.85,
+        "examples": [
+          "çayı şekerli yapın",
+          "büyük boy olsun",
+          "ekstra shot ekle"
+        ]
+      }
+    },
+    "business_assistant": {
+      "ciro_raporu": {
+        "description": "Ciro ve gelir sorguları",
+        "required_entities": ["time_period"],
+        "examples": [
+          "bugünkü ciromuz ne kadar?",
+          "bu ayki toplam satışlar",
+          "geçen hafta ne kadar kazandık?"
+        ]
+      },
+      "stok_raporu": {
+        "description": "Stok durumu sorguları",
+        "optional_entities": ["stok.kategori"],
+        "examples": [
+          "hangi ürünlerin stoğu az?",
+          "kritik stoklar",
+          "alışveriş önerileri"
+        ]
+      },
+      "personel_raporu": {
+        "description": "Personel performans sorguları",
+        "optional_entities": ["time_period"],
+        "examples": [
+          "bugün personel performansı",
+          "en çok satış yapan kim?"
+        ]
+      },
+      "kar_analizi": {
+        "description": "Kar marjı ve maliyet analizleri",
+        "examples": [
+          "hangi ürünler düşük karlı?",
+          "en çok kazandıran ürünler"
+        ]
+      }
+    }
+  },
+
+  "sentiment_categories": {
+    "uzgun": {
+      "keywords": ["üzgün", "kötü", "mutsuz", "depresif", "moral bozuk", "üzülmüş"],
+      "recommended_categories": ["Sıcak İçecekler", "Tatlılar"],
+      "suggested_products": ["Sıcak Çikolata", "Türk Kahvesi", "Waffle", "Çikolatalı Kek"],
+      "tone": "empatik",
+      "response_template": "Anlıyorum, zor bir gün geçiriyorsunuz. Size {product} önerebilirim, moral verir."
+    },
+    "hasta": {
+      "keywords": ["hasta", "grip", "başım ağrı", "mide", "ateş", "soğuk algınlığı", "nezle"],
+      "recommended_categories": ["Bitki Çayları", "Çorbalar", "Sıcak İçecekler"],
+      "suggested_products": ["Ihlamur", "Papatya Çayı", "Zencefil Çayı", "Mercimek Çorbası"],
+      "tone": "şefkatli",
+      "response_template": "Geçmiş olsun. {product} size iyi gelir, hemen hazırlayalım."
+    },
+    "mutlu": {
+      "keywords": ["mutlu", "harika", "mükemmel", "güzel", "keyifli", "muhteşem"],
+      "recommended_categories": ["Özel Tatlılar", "Premium Kahveler", "Soğuk İçecekler"],
+      "suggested_products": ["Cheesecake", "Latte", "Frappuccino", "Tiramisu"],
+      "tone": "coşkulu",
+      "response_template": "Ne güzel! Bu özel anınızı {product} ile taçlandıralım mı?"
+    },
+    "stresli": {
+      "keywords": ["stresli", "yorgun", "bitkin", "gergin", "sınav", "iş", "yoğun"],
+      "recommended_categories": ["Enerjik İçecekler", "Kahve", "Pratik Atıştırmalıklar"],
+      "suggested_products": ["Espresso", "Americano", "Double Shot", "Sandviç"],
+      "tone": "destekleyici",
+      "response_template": "Zor bir gün gibi görünüyor. {product} enerjinizi yükseltir."
+    },
+    "acikti": {
+      "keywords": ["çok aç", "aç", "açım", "acıktım", "doyurucu"],
+      "recommended_categories": ["Tuzlular", "Ana Yemekler", "Doyurucu Atıştırmalıklar"],
+      "suggested_products": ["Tost", "Sandviç", "Börek", "Makarna"],
+      "tone": "hızlı_çözüm",
+      "response_template": "Hemen doyurucu bir şeyler hazırlayalım. {product} nasıl olur?"
+    },
+    "nostalji": {
+      "keywords": ["eskiden", "annem", "çocukken", "hatırlatıyor", "nostalji"],
+      "recommended_categories": ["Geleneksel", "Ev Yapımı"],
+      "suggested_products": ["Türk Kahvesi", "Sütlaç", "Baklava", "Ayran"],
+      "tone": "sıcak",
+      "response_template": "O günleri hatırlatacak {product} önerebilirim."
+    }
+  },
+
+  "product_variations": {
+    "boy": ["küçük", "orta", "büyük", "small", "medium", "large"],
+    "seker": ["şekerli", "şekersiz", "az şekerli", "bol şekerli"],
+    "sicaklik": ["sıcak", "soğuk", "ılık", "buzlu"],
+    "yogunluk": ["hafif", "orta", "koyu", "double", "single"],
+    "sut": ["sütlü", "sütsüz", "light süt", "badem sütü", "soya sütü"],
+    "sos": ["ketçaplı", "ketçapsız", "mayonezli", "mayonezsiz"],
+    "aci": ["acılı", "acısız", "az acı", "çok acı"]
+  },
+
+  "fuzzy_matching_config": {
+    "enabled": true,
+    "min_similarity": 0.7,
+    "algorithms": ["levenshtein", "token_set_ratio", "partial_ratio"],
+    "weights": {
+      "semantic": 0.7,
+      "fuzzy": 0.3
+    },
+    "normalization": {
+      "lowercase": true,
+      "remove_accents": true,
+      "remove_punctuation": true,
+      "turkish_char_map": {
+        "ç": "c",
+        "ğ": "g",
+        "ı": "i",
+        "ö": "o",
+        "ş": "s",
+        "ü": "u"
+      }
+    }
+  }
+}
+
+
+

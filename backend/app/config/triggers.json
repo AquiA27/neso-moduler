@@ -1,0 +1,55 @@
+{
+  "greeting": [
+    "merhaba",
+    "selam",
+    "selamün aleyküm",
+    "günaydın",
+    "iyi günler",
+    "hey",
+    "hi",
+    "hello",
+    "hoşgeldiniz",
+    "naber",
+    "nasılsın",
+    "slm"
+  ],
+  "siparis": [
+    "sipariş ver",
+    "sipariş vermek istiyorum",
+    "bir şey sipariş edebilir miyim",
+    "menüden bakabilir miyim",
+    "yemek istiyorum",
+    "içecek istiyorum"
+  ],
+  "siparis_cay": [
+    "çay ver",
+    "çay versene",
+    "çay var mı",
+    "bi çay",
+    "çay istiyoruz",
+    "bize çay ver",
+    "çay at",
+    "çay getir",
+    "bir çay alalım",
+    "çay",
+    "çay alalım"
+  ],
+  "oneri": [
+    "ne önerirsin",
+    "ne önerebilirsin",
+    "tavsiye",
+    "öneri",
+    "ne alsam",
+    "ne içsem",
+    "ne yesem"
+  ],
+  "soru": [
+    "ne var",
+    "menüde ne var",
+    "neler var",
+    "hangi ürünler var",
+    "fiyat ne kadar",
+    "kaç lira"
+  ]
+}
+

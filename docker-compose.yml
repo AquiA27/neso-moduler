@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: neso-db
+    environment:
+      POSTGRES_USER: neso
+      POSTGRES_PASSWORD: neso123
+      POSTGRES_DB: neso
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "54320:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U neso"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ./backend
+    container_name: neso-backend
+    env_file:
+      - ./backend/env.docker
+    volumes:
+      - media_data:/app/media
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    command: >
+      sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend-modern
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: neso-frontend
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+    environment:
+      - NODE_ENV=production
+
+volumes:
+  postgres_data:
+  media_data:
+
+
+

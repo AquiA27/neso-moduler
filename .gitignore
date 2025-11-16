@@ -10,6 +10,8 @@ Thumbs.db
 .idea/
 .vscode/
 .history/
+.claude/
+nul
 
 ############################
 # Python / Backend
@@ -26,8 +28,12 @@ coverage.xml
 
 # Local envs and secrets
 .env
+.env.*
+!.env.example
 backend/.env
 backend/env.docker
+backend/.env.*
+!backend/.env.example
 
 # Runtime/generated
 media/
@@ -42,6 +48,8 @@ frontend-modern/.env
 frontend-modern/.env.local
 frontend-modern/.env.production
 frontend-modern/.env.development
+frontend-modern/.env.*
+!frontend-modern/.env.example
 frontend-modern/npm-debug.log*
 frontend-modern/yarn-error.log*
 

@@ -1,0 +1,592 @@
+# backend/app/routers/menu.py
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from pydantic import BaseModel, Field
+from typing import List, Optional, Dict, Any, Mapping
+import csv, io, unicodedata, secrets
+from pathlib import Path
+
+from ..core.config import settings
+from ..core.deps import get_current_user, get_sube_id, require_roles
+from ..db.database import db
+
+router = APIRouter(prefix="/menu", tags=["Menu"])
+
+# ---------- Yardımcı: güvenli normalizasyon (maketrans YOK) ----------
+def normalize_name(s: str) -> str:
+    if s is None:
+        return ""
+    s = s.casefold().strip()
+    repl = {
+        "ç": "c", "ğ": "g", "ı": "i", "ö": "o", "ş": "s", "ü": "u",
+        "â": "a", "ê": "e", "î": "i", "ô": "o", "û": "u"
+    }
+    for k, v in repl.items():
+        s = s.replace(k, v)
+    s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
+    return " ".join(s.split())
+
+def row_to_menu_out(row: Mapping[str, Any]) -> Dict[str, Any]:
+    data = dict(row)
+    return {
+        "id": data["id"],
+        "ad": data["ad"],
+        "fiyat": float(data["fiyat"]) if data.get("fiyat") is not None else 0.0,
+        "kategori": data.get("kategori"),
+        "aktif": data["aktif"],
+        "aciklama": data.get("aciklama"),
+        "gorsel_url": data.get("gorsel_url"),
+    }
+
+def resolve_media_path(url: Optional[str]) -> Optional[Path]:
+    if not url:
+        return None
+    media_url = settings.MEDIA_URL.rstrip("/")
+    cleaned = url.strip()
+    if cleaned.startswith("http://") or cleaned.startswith("https://"):
+        # Sadece kendi servisimize ait relatif yolu destekliyoruz
+        if media_url in cleaned:
+            cleaned = cleaned.split(media_url, 1)[-1]
+        else:
+            return None
+    if cleaned.startswith(media_url):
+        cleaned = cleaned[len(media_url):]
+    cleaned = cleaned.lstrip("/\\")
+    return (Path(settings.MEDIA_ROOT) / cleaned).resolve()
+
+# ---------- Modeller ----------
+class MenuItemIn(BaseModel):
+    ad: str = Field(min_length=1)
+    fiyat: float = Field(ge=0)
+    kategori: str = Field(min_length=1)
+    aktif: bool = True
+    aciklama: Optional[str] = None
+
+class VaryasyonOut(BaseModel):
+    id: int
+    ad: str
+    ek_fiyat: float
+    sira: int
+
+class MenuItemOut(BaseModel):
+    id: int
+    ad: str
+    fiyat: float
+    kategori: Optional[str] = None
+    aktif: bool
+    aciklama: Optional[str] = None
+    gorsel_url: Optional[str] = None
+    varyasyonlar: Optional[List["VaryasyonOut"]] = None
+
+class MenuUpdateIn(BaseModel):
+    # Hedef kaydı bulmak için (id veya ad kullanılabilir, id önceliklidir)
+    id: Optional[int] = Field(default=None, description="Güncellenecek ürün ID'si")
+    ad: Optional[str] = Field(default=None, min_length=1, description="Güncellenecek mevcut ürün adı (id yoksa kullanılır)")
+    # Güncellenecek alanlar (opsiyonel)
+    yeni_ad: Optional[str] = None
+    fiyat: Optional[float] = Field(default=None, ge=0)
+    kategori: Optional[str] = None
+    aktif: Optional[bool] = None
+    aciklama: Optional[str] = None
+
+# ---------- Uçlar ----------
+@router.post(
+    "/ekle",
+    response_model=MenuItemOut,
+    dependencies=[Depends(require_roles({"admin", "operator", "super_admin"}))]
+)
+async def menu_ekle(
+    item: MenuItemIn,
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    # UNIQUE (sube_id, unaccent(lower(ad))) nedeniyle kopya yazımlar hata verebilir -> INSERT dene, patlarsa UPDATE
+    params = {**item.model_dump(), "sid": sube_id}
+    try:
+        row = await db.fetch_one(
+            """
+            INSERT INTO menu (sube_id, ad, fiyat, kategori, aktif, aciklama)
+            VALUES (:sid, :ad, :fiyat, :kategori, :aktif, :aciklama)
+            RETURNING id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+            """,
+            params,
+        )
+    except Exception:
+        # Aynı ürün farklı yazımla varsa (aynı şubede) UPDATE'e düş
+        row = await db.fetch_one(
+            """
+            UPDATE menu
+               SET fiyat = :fiyat,
+                   kategori = :kategori,
+                   aktif = :aktif,
+                   aciklama = COALESCE(:aciklama, aciklama)
+             WHERE sube_id = :sid
+               AND unaccent(lower(ad)) = unaccent(lower(:ad))
+         RETURNING id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+            """,
+            params,
+        )
+        if not row:
+            raise HTTPException(status_code=400, detail="Menü ekleme/güncelleme başarısız")
+    return row_to_menu_out(row)
+
+@router.get("/liste", response_model=List[MenuItemOut])
+async def menu_liste(
+    sadece_aktif: bool = Query(False, description="true ise sadece aktif ürünler"),
+    limit: int = Query(200, ge=1, le=2000),
+    varyasyonlar_dahil: bool = Query(False, description="true ise varyasyonları da getir"),
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    if varyasyonlar_dahil:
+        # N+1 query düzeltmesi: Tek JOIN sorgusu ile tüm varyasyonları getir
+        rows = await db.fetch_all(
+            """
+            SELECT 
+                m.id, m.ad, m.fiyat, m.kategori, m.aktif, m.aciklama, m.gorsel_url,
+                mv.id as var_id, mv.ad as var_ad, mv.ek_fiyat as var_ek_fiyat, mv.sira as var_sira
+            FROM menu m
+            LEFT JOIN menu_varyasyonlar mv ON m.id = mv.menu_id AND mv.aktif = TRUE
+            WHERE m.sube_id = :sid
+            """ + (" AND m.aktif = TRUE" if sadece_aktif else "") + """
+            ORDER BY m.kategori NULLS LAST, m.ad ASC, mv.sira ASC, mv.ad ASC
+            LIMIT :limit
+            """,
+            {"sid": sube_id, "limit": limit},
+        )
+        
+        # Grupla: menu_id -> variations list
+        items_dict: Dict[int, Dict[str, Any]] = {}
+        for r in rows:
+            menu_id = r["id"]
+            if menu_id not in items_dict:
+                items_dict[menu_id] = {
+                    **row_to_menu_out(r),
+                    "varyasyonlar": [],
+                }
+            if r["var_id"]:
+                items_dict[menu_id]["varyasyonlar"].append({
+                    "id": r["var_id"],
+                    "ad": r["var_ad"],
+                    "ek_fiyat": float(r["var_ek_fiyat"] or 0),
+                    "sira": r["var_sira"],
+                })
+        return list(items_dict.values())
+    else:
+        base = "SELECT id, ad, fiyat, kategori, aktif, aciklama, gorsel_url FROM menu WHERE sube_id = :sid"
+        params: Dict[str, Any] = {"limit": limit, "sid": sube_id}
+        if sadece_aktif:
+            base += " AND aktif = TRUE"
+        base += " ORDER BY ad ASC LIMIT :limit"
+        rows = await db.fetch_all(base, params)
+        return [row_to_menu_out(r) for r in rows]
+
+@router.patch(
+    "/guncelle",
+    response_model=MenuItemOut,
+    dependencies=[Depends(require_roles({"admin", "operator", "super_admin"}))]
+)
+async def menu_guncelle(
+    payload: MenuUpdateIn,
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    # id veya ad ile ürünü bul (id önceliklidir)
+    if not payload.id and not payload.ad:
+        raise HTTPException(status_code=400, detail="id veya ad belirtilmelidir")
+    
+    if payload.id:
+        # id ile bul
+        mevcut = await db.fetch_one(
+            """
+            SELECT id, ad FROM menu
+             WHERE id = :id AND sube_id = :sid
+             LIMIT 1
+            """,
+            {"id": payload.id, "sid": sube_id},
+        )
+        if not mevcut:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Ürün bulunamadı: ID={payload.id} (Şube ID: {sube_id})"
+            )
+        mevcut_ad = mevcut["ad"]
+        where_clause = "id = :id AND sube_id = :sid"
+        where_params = {"id": payload.id, "sid": sube_id}
+        
+        # Eğer id varsa ve payload.ad mevcut ad'dan farklıysa, bu yeni_ad olarak kabul edilir
+        if payload.ad and payload.ad.strip() and normalize_name(payload.ad) != normalize_name(mevcut_ad):
+            # Frontend'den gelen ad, mevcut ad'dan farklı -> yeni_ad olarak kullan
+            if payload.yeni_ad is None:
+                payload.yeni_ad = payload.ad
+    else:
+        # ad ile bul
+        mevcut = await db.fetch_one(
+            """
+            SELECT id, ad FROM menu
+             WHERE sube_id = :sid
+               AND unaccent(lower(ad)) = unaccent(lower(:ad))
+             LIMIT 1
+            """,
+            {"sid": sube_id, "ad": payload.ad},
+        )
+        if not mevcut:
+            # Şubede mevcut ürünleri kontrol et (daha iyi hata mesajı için)
+            mevcut_urunler = await db.fetch_all(
+                """
+                SELECT ad FROM menu
+                 WHERE sube_id = :sid
+                 ORDER BY ad
+                 LIMIT 10
+                """,
+                {"sid": sube_id},
+            )
+            urun_listesi = ", ".join([r["ad"] for r in mevcut_urunler]) if mevcut_urunler else "Henüz ürün yok"
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Ürün bulunamadı: '{payload.ad}' (Şube ID: {sube_id}). Mevcut ürünler: {urun_listesi}"
+            )
+        mevcut_ad = mevcut["ad"]
+        where_clause = "sube_id = :sid AND unaccent(lower(ad)) = unaccent(lower(:ad))"
+        where_params = {"sid": sube_id, "ad": payload.ad}
+
+    fields = []
+    values: Dict[str, Any] = where_params.copy()
+    if payload.yeni_ad is not None:
+        fields.append("ad = :yeni_ad")
+        values["yeni_ad"] = payload.yeni_ad
+    if payload.fiyat is not None:
+        fields.append("fiyat = :fiyat")
+        values["fiyat"] = payload.fiyat
+    if payload.kategori is not None:
+        fields.append("kategori = :kategori")
+        values["kategori"] = payload.kategori
+    if payload.aktif is not None:
+        fields.append("aktif = :aktif")
+        values["aktif"] = payload.aktif
+    if payload.aciklama is not None:
+        fields.append("aciklama = :aciklama")
+        values["aciklama"] = payload.aciklama
+
+    if not fields:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan yok")
+
+    sql = f"""
+        UPDATE menu
+           SET {', '.join(fields)}
+         WHERE {where_clause}
+    """
+    await db.execute(sql, values)
+
+    # Güncellenmiş kaydı getir
+    if payload.id:
+        # id ile getir
+        row = await db.fetch_one(
+            """
+            SELECT id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+              FROM menu
+             WHERE id = :id AND sube_id = :sid
+             LIMIT 1
+            """,
+            {"id": payload.id, "sid": sube_id},
+        )
+    else:
+        # yeni_ad varsa onu kullan, yoksa eski ad'ı kullan
+        target_ad = payload.yeni_ad or mevcut_ad
+        row = await db.fetch_one(
+            """
+            SELECT id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+              FROM menu
+             WHERE sube_id = :sid
+               AND unaccent(lower(ad)) = unaccent(lower(:target))
+             LIMIT 1
+            """,
+            {"sid": sube_id, "target": target_ad},
+        )
+    
+    if not row:
+        raise HTTPException(status_code=500, detail="Güncellenmiş kayıt bulunamadı")
+    
+    return row_to_menu_out(row)
+
+@router.post(
+    "/{menu_id}/gorsel",
+    response_model=MenuItemOut,
+    dependencies=[Depends(require_roles({"admin", "operator", "super_admin"}))]
+)
+async def menu_gorsel_yukle(
+    menu_id: int,
+    file: UploadFile = File(...),
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    allowed_types = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+    }
+    content_type = (file.content_type or "").lower()
+    extension = allowed_types.get(content_type)
+    original_suffix = Path(file.filename or "").suffix.lower()
+    if not extension:
+        if original_suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif"}:
+            extension = ".jpg" if original_suffix in {".jpg", ".jpeg"} else original_suffix
+        else:
+            raise HTTPException(status_code=400, detail="Desteklenmeyen dosya türü")
+
+    content = await file.read()
+    max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dosya boyutu çok büyük. Maksimum {settings.MAX_UPLOAD_SIZE_MB}MB yükleyebilirsiniz.",
+        )
+
+    existing = await db.fetch_one(
+        """
+        SELECT id, gorsel_url
+          FROM menu
+         WHERE id = :id AND sube_id = :sid
+         LIMIT 1
+        """,
+        {"id": menu_id, "sid": sube_id},
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="Menü ürünü bulunamadı")
+
+    media_dir = Path(settings.MEDIA_ROOT) / "menu"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"menu_{menu_id}_{secrets.token_hex(8)}{extension}"
+    file_path = (media_dir / filename).resolve()
+
+    try:
+        with open(file_path, "wb") as out_file:
+            out_file.write(content)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Görsel kaydedilemedi: {exc}") from exc
+
+    # Eski görseli sil
+    old_path = resolve_media_path(existing["gorsel_url"])
+    if old_path and old_path.exists():
+        try:
+            if old_path.is_file():
+                old_path.unlink()
+        except Exception:
+            pass
+
+    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/menu/{filename}"
+    row = await db.fetch_one(
+        """
+        UPDATE menu
+           SET gorsel_url = :url
+         WHERE id = :id AND sube_id = :sid
+     RETURNING id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+        """,
+        {"id": menu_id, "sid": sube_id, "url": relative_url},
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Menü ürünü güncellenemedi")
+
+    return row_to_menu_out(row)
+
+@router.delete(
+    "/{menu_id}/gorsel",
+    response_model=MenuItemOut,
+    dependencies=[Depends(require_roles({"admin", "operator", "super_admin"}))]
+)
+async def menu_gorsel_sil(
+    menu_id: int,
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    row = await db.fetch_one(
+        """
+        SELECT gorsel_url
+          FROM menu
+         WHERE id = :id AND sube_id = :sid
+         LIMIT 1
+        """,
+        {"id": menu_id, "sid": sube_id},
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Menü ürünü bulunamadı")
+
+    file_path = resolve_media_path(row["gorsel_url"])
+    if file_path and file_path.exists():
+        try:
+            if file_path.is_file():
+                file_path.unlink()
+        except Exception:
+            pass
+
+    updated = await db.fetch_one(
+        """
+        UPDATE menu
+           SET gorsel_url = NULL
+         WHERE id = :id AND sube_id = :sid
+     RETURNING id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+        """,
+        {"id": menu_id, "sid": sube_id},
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="Menü ürünü güncellenemedi")
+
+    return row_to_menu_out(updated)
+
+@router.delete(
+    "/sil",
+    dependencies=[Depends(require_roles({"admin", "operator", "super_admin"}))]
+)
+async def menu_sil(
+    id: Optional[int] = Query(None, description="Silinecek ürün ID'si"),
+    ad: Optional[str] = Query(None, min_length=1, description="Silinecek ürün adı (id yoksa kullanılır)"),
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    if not id and not ad:
+        raise HTTPException(status_code=400, detail="id veya ad belirtilmelidir")
+    
+    if id:
+        # id ile bul ve sil
+        row = await db.fetch_one(
+            """
+            SELECT id, ad FROM menu
+             WHERE id = :id AND sube_id = :sid
+             LIMIT 1
+            """,
+            {"id": id, "sid": sube_id},
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: ID={id} (Şube ID: {sube_id})")
+        urun_ad = row["ad"]
+        await db.execute(
+            """
+            DELETE FROM menu
+             WHERE id = :id AND sube_id = :sid
+            """,
+            {"id": id, "sid": sube_id},
+        )
+        return {"message": f"Silindi: {urun_ad} (ID: {id})"}
+    else:
+        # ad ile bul ve sil
+        row = await db.fetch_one(
+            """
+            SELECT id, ad FROM menu
+             WHERE sube_id = :sid
+               AND unaccent(lower(ad)) = unaccent(lower(:ad))
+             LIMIT 1
+            """,
+            {"sid": sube_id, "ad": ad},
+        )
+        if not row:
+            raise HTTPException(status_code=404, detail=f"Ürün bulunamadı: {ad}")
+        await db.execute(
+            """
+            DELETE FROM menu
+             WHERE sube_id = :sid
+               AND unaccent(lower(ad)) = unaccent(lower(:ad))
+            """,
+            {"sid": sube_id, "ad": ad},
+        )
+        return {"message": f"Silindi: {ad}"}
+
+@router.post(
+    "/yukle-csv",
+    dependencies=[Depends(require_roles({"admin", "operator", "super_admin"}))]
+)
+async def menu_yukle_csv(
+    file: UploadFile = File(...),
+    _: Dict[str, Any] = Depends(get_current_user),
+    sube_id: int = Depends(get_sube_id),
+):
+    """
+    CSV başlıkları: ad,fiyat,kategori,aktif
+    aktif: true/false (boşsa true kabul edilir)
+    """
+    content = await file.read()
+    text = content.decode("utf-8-sig")
+    reader = csv.DictReader(io.StringIO(text))
+
+    items: List[Dict[str, Any]] = []
+    for row in reader:
+        ad_raw = (row.get("ad") or "").strip()
+        kat = (row.get("kategori") or "").strip()
+        if not ad_raw or not kat:
+            continue
+        # rakamsal fiyat
+        try:
+            fiyat = float((row.get("fiyat") or "0").strip())
+        except ValueError:
+            continue
+        aktif_raw = (row.get("aktif") or "").strip().lower()
+        aktif = True if aktif_raw in ("", "1", "true", "t", "evet", "yes") else False
+        items.append({"ad": ad_raw, "fiyat": fiyat, "kategori": kat, "aktif": aktif})
+
+    if not items:
+        raise HTTPException(status_code=400, detail="CSV içeriği boş veya hatalı")
+
+    # DB'deki mevcut ürün isimlerini normalize ederek map'le (bu şubeye ait)
+    mevcut_rows = await db.fetch_all(
+        "SELECT ad FROM menu WHERE sube_id = :sid;",
+        {"sid": sube_id},
+    )
+    mevcut_map = {normalize_name(r["ad"]): r["ad"] for r in mevcut_rows}
+
+    insert_count = 0
+    update_count = 0
+
+    async with db.transaction():
+        for it in items:
+            key = normalize_name(it["ad"])
+            it_sube = {**it, "sid": sube_id}
+
+            # 1) Aynı ürün (normalize) bu şubede varsa doğrudan UPDATE
+            if key in mevcut_map:
+                it2 = it.copy()
+                it2.update({"ad": mevcut_map[key], "sid": sube_id})
+                await db.execute(
+                    """
+                    UPDATE menu
+                       SET fiyat = :fiyat,
+                           kategori = :kategori,
+                           aktif = :aktif
+                     WHERE sube_id = :sid
+                       AND ad = :ad
+                    """,
+                    it2,
+                )
+                update_count += 1
+                continue
+
+            # 2) Yoksa INSERT dene; UNIQUE çakışırsa (aynı şubede) UPDATE'e düş
+            try:
+                await db.execute(
+                    """
+                    INSERT INTO menu (sube_id, ad, fiyat, kategori, aktif)
+                    VALUES (:sid, :ad, :fiyat, :kategori, :aktif)
+                    """,
+                    it_sube,
+                )
+                insert_count += 1
+                mevcut_map[key] = it["ad"]
+            except Exception:
+                await db.execute(
+                    """
+                    UPDATE menu
+                       SET fiyat = :fiyat,
+                           kategori = :kategori,
+                           aktif = :aktif
+                     WHERE sube_id = :sid
+                       AND unaccent(lower(ad)) = unaccent(lower(:ad))
+                    """,
+                    it_sube,
+                )
+                update_count += 1
+
+    return {
+        "ok": True,
+        "toplam_kayit": len(items),
+        "eklenen": insert_count,
+        "guncellenen": update_count,
+    }
