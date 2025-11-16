@@ -441,7 +441,7 @@ export default function KasaPage() {
       }
 
       if (paymentResult?.tip && paymentResult.tip > 0) {
-        setPaymentFeedback(prev => `${prev ? `${prev} - ` : ''}Tip kaydedildi: ${paymentResult.tip.toFixed(2)} TL.`);
+        setPaymentFeedback(prev => `${prev ? `${prev} - ` : ''}Tip kaydedildi: ${(paymentResult.tip ?? 0).toFixed(2)} TL.`);
       }
     } catch (err) {
       console.error('Ödeme eklenemedi:', err);

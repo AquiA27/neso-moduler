@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useCache } from '../hooks/useCache';
 import { performanceUtils } from '../hooks/usePerformance';
@@ -34,39 +34,8 @@ interface PersonnelPerformance {
   performance_score: number;
 }
 
-interface CustomerBehavior {
-  total_unique_tables: number;
-  avg_check_per_table: number;
-  peak_hours: Array<{ hour: number; order_count: number }>;
-  customer_segments: Array<{
-    segment: string;
-    description: string;
-    count: number;
-    total_revenue: number;
-    avg_revenue: number;
-  }>;
-}
-
-interface CategoryAnalysis {
-  total_revenue: number;
-  categories: Array<{
-    kategori: string;
-    total_quantity: number;
-    total_revenue: number;
-    revenue_share: number;
-    avg_price: number;
-    top_products: Array<{ urun: string; quantity: number; revenue: number }>;
-  }>;
-}
-
-interface TimeAnalysis {
-  hourly_distribution: Array<{ hour: number; order_count: number; revenue: number }>;
-  daily_distribution: Array<{ date: string; order_count: number; revenue: number }>;
-  weekday_distribution: Array<{ weekday: string; order_count: number; revenue: number }>;
-}
-
 export default function AdvancedAnalyticsPage() {
-  const token = useAuthStore((state) => state.token);
+  const token = useAuthStore((state) => state.accessToken);
   const [activeTab, setActiveTab] = useState<'profitability' | 'personnel' | 'customer' | 'category' | 'time'>('profitability');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 

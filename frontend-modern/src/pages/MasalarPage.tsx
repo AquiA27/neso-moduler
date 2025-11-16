@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { masalarApi } from '../lib/api';
-import { Plus, Edit, Trash2, QrCode, MapPin } from 'lucide-react';
+import { Plus, Edit, Trash2, QrCode } from 'lucide-react';
 
 interface MasaItem {
   id: number;
