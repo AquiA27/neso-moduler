@@ -11,7 +11,6 @@ cffi==2.0.0
 charset-normalizer==3.4.4
 click==8.3.0
 colorama==0.4.6
-comtypes==1.4.13
 cryptography==46.0.3
 databases==0.8.0
 ecdsa==0.19.1
@@ -42,7 +41,10 @@ python-jose==3.3.0
 python-multipart==0.0.6
 pyttsx3==2.90
 pytz==2025.2
-pywin32==311
+# NOTE: Windows-only dependencies (pywin32, pypiwin32, comtypes) intentionally
+# excluded from base requirements to allow Linux container builds on Render/Railway.
+# For local Windows development, install extras:
+#   pip install pywin32 pypiwin32 comtypes
 PyYAML==6.0.3
 redis==5.0.1
 reportlab==4.4.4
