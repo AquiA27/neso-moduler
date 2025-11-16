@@ -44,6 +44,7 @@ backups/
 ############################
 frontend-modern/node_modules/
 frontend-modern/dist/
+frontend-modern/.vite/
 frontend-modern/.env
 frontend-modern/.env.local
 frontend-modern/.env.production
