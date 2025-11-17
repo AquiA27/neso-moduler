@@ -26,6 +26,10 @@ class DefaultSubeMiddleware(BaseHTTPMiddleware):
     ]
     
     async def dispatch(self, request: Request, call_next):
+        # OPTIONS preflight request'leri bypass (CORS için)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Public endpoint'leri bypass et
         path = request.url.path
         if any(path.startswith(public_path) for public_path in self.PUBLIC_PATHS):

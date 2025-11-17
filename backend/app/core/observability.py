@@ -30,6 +30,10 @@ class RequestIdAndRateLimitMiddleware(BaseHTTPMiddleware):
         self.hits: Dict[str, Deque[float]] = defaultdict(deque)
 
     async def dispatch(self, request: Request, call_next):
+        # OPTIONS preflight request'leri bypass (CORS için - rate limit'e dahil etme)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         start = time.perf_counter()
 
         # Request-ID
