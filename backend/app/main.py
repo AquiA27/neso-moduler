@@ -7,6 +7,7 @@ from fastapi.openapi.utils import get_openapi  # << Swagger özelleştirme için
 from .core.config import settings
 from .core.middleware import ErrorMiddleware, DefaultSubeMiddleware
 from .core.tenant_middleware import TenantStatusMiddleware, SubscriptionLimitMiddleware
+from .core.domain_middleware import DomainTenantMiddleware
 from .core.startup_checks import validate_startup
 from .db.database import db
 from .db.schema import create_tables
@@ -84,8 +85,10 @@ app.add_middleware(ErrorMiddleware)
 
 # ---- SaaS Multi-Tenancy Middleware'leri ----
 # NOT: Middleware'ler ters sırada çalışır (son eklenen ilk çalışır)
-# 1. Önce tenant durumunu kontrol et (suspended/cancelled)
-# 2. Sonra subscription limitlerini kontrol et
+# 1. Domain/subdomain'den tenant'ı tespit et
+# 2. Tenant durumunu kontrol et (suspended/cancelled)
+# 3. Subscription limitlerini kontrol et
+app.add_middleware(DomainTenantMiddleware)  # İlk çalışır - domain'den tenant'ı tespit eder
 app.add_middleware(TenantStatusMiddleware)
 app.add_middleware(SubscriptionLimitMiddleware)
 

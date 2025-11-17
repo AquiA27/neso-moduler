@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { customizationApi } from '../lib/api';
+import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
 import { Menu, Settings, LogOut } from 'lucide-react';
 import logo from '../assets/fistik-logo.svg';
 
@@ -10,9 +11,30 @@ function Layout() {
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   
-  // Tenant customization'ı yükle
+  // Tenant customization'ı yükle (tenant_id veya subdomain'den)
   useEffect(() => {
     const loadCustomization = async () => {
+      // Önce subdomain'den dene (domain-based routing)
+      const subdomain = getCurrentSubdomain();
+      if (subdomain) {
+        try {
+          const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
+          const customization = await loadTenantByDomain(subdomain, API_BASE_URL);
+          if (customization) {
+            setTenantCustomization({
+              app_name: customization.app_name,
+              logo_url: customization.logo_url,
+              primary_color: customization.primary_color,
+              secondary_color: customization.secondary_color,
+            });
+            return;
+          }
+        } catch (error) {
+          console.warn('Domain-based customization yüklenemedi:', error);
+        }
+      }
+      
+      // Subdomain yoksa veya bulunamadıysa tenant_id'den yükle
       if (!tenantId) {
         setTenantCustomization(null);
         return;
