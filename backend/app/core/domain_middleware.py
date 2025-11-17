@@ -101,6 +101,10 @@ class DomainTenantMiddleware(BaseHTTPMiddleware):
     """
     
     async def dispatch(self, request: Request, call_next):
+        # OPTIONS preflight request'leri bypass (CORS için)
+        if request.method == "OPTIONS":
+            return await call_next(request)
+        
         # Public endpoint'ler için bypass (auth/login vb.)
         path = request.url.path
         if path.startswith(("/auth/", "/public/", "/health", "/docs", "/redoc", "/openapi.json", "/", "/ping")):

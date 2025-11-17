@@ -73,6 +73,8 @@ app.mount(
 )
 
 # ---- CORS (frontend rahat bağlansın) ----
+# ÖNEMLİ: CORS middleware EN SON eklenmeli (en önce çalışmalı - OPTIONS preflight için)
+# Middleware'ler ters sırada çalışır: son eklenen ilk çalışır
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -81,17 +83,17 @@ app.add_middleware(
     allow_headers=settings.CORS_ALLOW_HEADERS,
 )
 
-# ---- Hata Yakalama Orta Katmanı ----
-app.add_middleware(ErrorMiddleware)
-
 # ---- SaaS Multi-Tenancy Middleware'leri ----
 # NOT: Middleware'ler ters sırada çalışır (son eklenen ilk çalışır)
 # 1. Domain/subdomain'den tenant'ı tespit et
 # 2. Tenant durumunu kontrol et (suspended/cancelled)
 # 3. Subscription limitlerini kontrol et
-app.add_middleware(DomainTenantMiddleware)  # İlk çalışır - domain'den tenant'ı tespit eder
-app.add_middleware(TenantStatusMiddleware)
-app.add_middleware(SubscriptionLimitMiddleware)
+app.add_middleware(DomainTenantMiddleware)  # Domain'den tenant'ı tespit eder
+app.add_middleware(TenantStatusMiddleware)  # Tenant durumunu kontrol eder
+app.add_middleware(SubscriptionLimitMiddleware)  # Subscription limitlerini kontrol eder
+
+# ---- Hata Yakalama Orta Katmanı ----
+app.add_middleware(ErrorMiddleware)
 
 # ---- DB Yaşam Döngüsü ----
 @app.on_event("startup")
