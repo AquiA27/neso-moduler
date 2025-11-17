@@ -25,13 +25,18 @@ class TenantOut(TenantIn):
 
 
 @router.get("/tenants", response_model=List[TenantOut])
-async def tenants_list(_: Dict[str, Any] = Depends(get_current_user)):
+async def tenants_list(
+    limit: int = Query(50, ge=1, le=500, description="Sayfa başına kayıt sayısı"),
+    offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
+    _: Dict[str, Any] = Depends(get_current_user),
+):
     q = """
     SELECT id, ad, vergi_no, telefon, aktif
     FROM isletmeler
     ORDER BY id DESC
+    LIMIT :limit OFFSET :offset
     """
-    return await db.fetch_all(q)
+    return await db.fetch_all(q, {"limit": limit, "offset": offset})
 
 
 @router.get("/tenants/{id}")

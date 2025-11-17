@@ -431,7 +431,11 @@ class UserUpsertIn(BaseModel):
 
 
 @router.get("/personeller")
-async def personeller_list(user: Dict[str, Any] = Depends(get_current_user)):
+async def personeller_list(
+    limit: int = Query(50, ge=1, le=500, description="Sayfa başına kayıt sayısı"),
+    offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
     """
     Personelleri listele
     - Super admin: Tüm personelleri görür
@@ -448,7 +452,9 @@ async def personeller_list(user: Dict[str, Any] = Depends(get_current_user)):
             FROM users 
             WHERE role != 'super_admin'
             ORDER BY id DESC
-            """
+            LIMIT :limit OFFSET :offset
+            """,
+            {"limit": limit, "offset": offset}
         )
     else:
         # Admin sadece kendi tenant'ına ait personelleri görebilir
@@ -459,8 +465,9 @@ async def personeller_list(user: Dict[str, Any] = Depends(get_current_user)):
                 FROM users 
                 WHERE tenant_id = :tid AND role != 'super_admin'
                 ORDER BY id DESC
+                LIMIT :limit OFFSET :offset
                 """,
-                {"tid": user_tenant_id}
+                {"tid": user_tenant_id, "limit": limit, "offset": offset}
             )
         else:
             # Tenant_id yoksa boş liste döndür

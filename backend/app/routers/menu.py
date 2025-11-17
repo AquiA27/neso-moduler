@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..core.config import settings
 from ..core.deps import get_current_user, get_sube_id, require_roles
+from ..core.cache import cache, cache_key
 from ..db.database import db
 
 router = APIRouter(prefix="/menu", tags=["Menu"])
@@ -128,31 +129,48 @@ async def menu_ekle(
         )
         if not row:
             raise HTTPException(status_code=400, detail="Menü ekleme/güncelleme başarısız")
+    
+    # Cache'i temizle (menu listesi değişti)
+    await cache.delete_pattern("menu:liste:*")
+    
     return row_to_menu_out(row)
 
 @router.get("/liste", response_model=List[MenuItemOut])
 async def menu_liste(
     sadece_aktif: bool = Query(False, description="true ise sadece aktif ürünler"),
-    limit: int = Query(200, ge=1, le=2000),
+    limit: int = Query(100, ge=1, le=500, description="Sayfa başına kayıt sayısı"),
+    offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
     varyasyonlar_dahil: bool = Query(False, description="true ise varyasyonları da getir"),
     _: Dict[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
+    # Cache key oluştur
+    cache_key_str = cache_key("menu:liste", sube_id, sadece_aktif, varyasyonlar_dahil, limit, offset)
+    
+    # Cache'den kontrol et
+    cached_result = await cache.get(cache_key_str)
+    if cached_result is not None:
+        return cached_result
     if varyasyonlar_dahil:
         # N+1 query düzeltmesi: Tek JOIN sorgusu ile tüm varyasyonları getir
+        # Önce menu'leri pagination ile al, sonra varyasyonları JOIN ile getir
         rows = await db.fetch_all(
             """
             SELECT 
                 m.id, m.ad, m.fiyat, m.kategori, m.aktif, m.aciklama, m.gorsel_url,
                 mv.id as var_id, mv.ad as var_ad, mv.ek_fiyat as var_ek_fiyat, mv.sira as var_sira
-            FROM menu m
+            FROM (
+                SELECT id, ad, fiyat, kategori, aktif, aciklama, gorsel_url
+                FROM menu
+                WHERE sube_id = :sid
+                """ + (" AND aktif = TRUE" if sadece_aktif else "") + """
+                ORDER BY kategori NULLS LAST, ad ASC
+                LIMIT :limit OFFSET :offset
+            ) m
             LEFT JOIN menu_varyasyonlar mv ON m.id = mv.menu_id AND mv.aktif = TRUE
-            WHERE m.sube_id = :sid
-            """ + (" AND m.aktif = TRUE" if sadece_aktif else "") + """
             ORDER BY m.kategori NULLS LAST, m.ad ASC, mv.sira ASC, mv.ad ASC
-            LIMIT :limit
             """,
-            {"sid": sube_id, "limit": limit},
+            {"sid": sube_id, "limit": limit, "offset": offset},
         )
         
         # Grupla: menu_id -> variations list
@@ -171,15 +189,23 @@ async def menu_liste(
                     "ek_fiyat": float(r["var_ek_fiyat"] or 0),
                     "sira": r["var_sira"],
                 })
-        return list(items_dict.values())
+        result = list(items_dict.values())
     else:
-        base = "SELECT id, ad, fiyat, kategori, aktif, aciklama, gorsel_url FROM menu WHERE sube_id = :sid"
-        params: Dict[str, Any] = {"limit": limit, "sid": sube_id}
+        base = """
+        SELECT id, ad, fiyat, kategori, aktif, aciklama, gorsel_url 
+        FROM menu 
+        WHERE sube_id = :sid
+        """
+        params: Dict[str, Any] = {"limit": limit, "offset": offset, "sid": sube_id}
         if sadece_aktif:
             base += " AND aktif = TRUE"
-        base += " ORDER BY ad ASC LIMIT :limit"
+        base += " ORDER BY ad ASC LIMIT :limit OFFSET :offset"
         rows = await db.fetch_all(base, params)
-        return [row_to_menu_out(r) for r in rows]
+        result = [row_to_menu_out(r) for r in rows]
+    
+    # Cache'e kaydet (5 dakika TTL)
+    await cache.set(cache_key_str, result, ttl=300)
+    return result
 
 @router.patch(
     "/guncelle",
@@ -277,6 +303,9 @@ async def menu_guncelle(
          WHERE {where_clause}
     """
     await db.execute(sql, values)
+    
+    # Cache'i temizle (menu listesi değişti)
+    await cache.delete_pattern("menu:liste:*")
 
     # Güncellenmiş kaydı getir
     if payload.id:
@@ -467,6 +496,8 @@ async def menu_sil(
             """,
             {"id": id, "sid": sube_id},
         )
+        # Cache'i temizle (menu listesi değişti)
+        await cache.delete_pattern("menu:liste:*")
         return {"message": f"Silindi: {urun_ad} (ID: {id})"}
     else:
         # ad ile bul ve sil
@@ -489,6 +520,8 @@ async def menu_sil(
             """,
             {"sid": sube_id, "ad": ad},
         )
+        # Cache'i temizle (menu listesi değişti)
+        await cache.delete_pattern("menu:liste:*")
         return {"message": f"Silindi: {ad}"}
 
 @router.post(

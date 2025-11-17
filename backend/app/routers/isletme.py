@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List
 from ..core.deps import get_current_user
@@ -28,9 +28,19 @@ async def olustur(payload: IsletmeIn, user=Depends(get_current_user)):
     return row
 
 @router.get("/", response_model=List[IsletmeOut])
-async def listele(user=Depends(get_current_user)):
+async def listele(
+    limit: int = Query(50, ge=1, le=500, description="Sayfa başına kayıt sayısı"),
+    offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
+    user=Depends(get_current_user),
+):
     rows = await db.fetch_all(
-        "SELECT id, ad, vergi_no, telefon, aktif FROM isletmeler ORDER BY id DESC"
+        """
+        SELECT id, ad, vergi_no, telefon, aktif 
+        FROM isletmeler 
+        ORDER BY id DESC
+        LIMIT :limit OFFSET :offset
+        """,
+        {"limit": limit, "offset": offset}
     )
     return rows
 

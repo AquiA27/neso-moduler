@@ -1,11 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { customizationApi } from '../lib/api';
 import { Menu, Settings, LogOut } from 'lucide-react';
 import logo from '../assets/fistik-logo.svg';
 
-export default function Layout() {
+function Layout() {
   const { user, logout, tenantId, tenantCustomization, setTenantCustomization } = useAuthStore();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
@@ -36,16 +36,19 @@ export default function Layout() {
     loadCustomization();
   }, [tenantId, setTenantCustomization]);
   
-  // Logo ve app name'i belirle
-  const displayLogo = tenantCustomization?.logo_url || logo;
-  const displayName = tenantCustomization?.app_name || (user?.role === 'super_admin' ? 'Neso Modüler' : 'Fıstık Kafe Yönetim Paneli');
+  // Logo ve app name'i belirle (memoize edilmiş)
+  const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
+  const displayName = useMemo(() => 
+    tenantCustomization?.app_name || (user?.role === 'super_admin' ? 'Neso Modüler' : 'Fıstık Kafe Yönetim Paneli'),
+    [tenantCustomization?.app_name, user?.role]
+  );
 
-  const handleLogout = () => {
+  const handleLogout = useCallback(() => {
     logout();
     navigate('/login');
-  };
+  }, [logout, navigate]);
 
-  const toggleNav = () => setNavOpen((prev) => !prev);
+  const toggleNav = useCallback(() => setNavOpen((prev) => !prev), []);
 
 
   const resolvePanel = (username: string, role: string): string[] => {
@@ -247,4 +250,6 @@ export default function Layout() {
     </div>
   );
 }
+
+export default memo(Layout);
 

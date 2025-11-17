@@ -140,7 +140,8 @@ async def stok_ekle(
 
 @router.get("/liste", response_model=List[StokItemOut])
 async def stok_liste(
-    limit: int = Query(200, ge=1, le=2000),
+    limit: int = Query(100, ge=1, le=500, description="Sayfa başına kayıt sayısı"),
+    offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
     _: Dict[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
@@ -150,9 +151,9 @@ async def stok_liste(
         FROM stok_kalemleri
         WHERE sube_id = :sid
         ORDER BY kategori, ad
-        LIMIT :lmt
+        LIMIT :limit OFFSET :offset
         """,
-        {"sid": sube_id, "lmt": limit},
+        {"sid": sube_id, "limit": limit, "offset": offset},
     )
     return [
         {

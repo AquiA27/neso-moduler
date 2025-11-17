@@ -326,35 +326,79 @@ CREATE TABLE IF NOT EXISTS giderler (
 """
 
 CREATE_INDEXES = """
+-- Siparisler index'leri
 CREATE INDEX IF NOT EXISTS idx_siparisler_created_at ON siparisler (created_at);
 CREATE INDEX IF NOT EXISTS idx_siparisler_durum ON siparisler (durum);
 CREATE INDEX IF NOT EXISTS idx_siparisler_masa ON siparisler (masa);
 CREATE INDEX IF NOT EXISTS idx_siparisler_adisyon ON siparisler (adisyon_id);
+CREATE INDEX IF NOT EXISTS idx_siparisler_sube ON siparisler (sube_id);
+CREATE INDEX IF NOT EXISTS idx_siparisler_sube_created ON siparisler (sube_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_siparisler_sube_durum ON siparisler (sube_id, durum);
+CREATE INDEX IF NOT EXISTS idx_siparisler_sube_durum_created ON siparisler (sube_id, durum, created_at DESC);
+
+-- Menu index'leri
 CREATE INDEX IF NOT EXISTS idx_menu_sube ON menu (sube_id);
+CREATE INDEX IF NOT EXISTS idx_menu_sube_aktif ON menu (sube_id, aktif) WHERE aktif = TRUE;
+CREATE INDEX IF NOT EXISTS idx_menu_sube_kategori ON menu (sube_id, kategori, aktif) WHERE aktif = TRUE;
 -- uq_menu_sube_ad_norm (unaccent) ayrık çalıştırılacak
+
+-- Odemeler index'leri
 CREATE INDEX IF NOT EXISTS idx_odemeler_created_at ON odemeler (created_at);
 CREATE INDEX IF NOT EXISTS idx_odemeler_sube ON odemeler (sube_id);
 CREATE INDEX IF NOT EXISTS idx_odemeler_adisyon ON odemeler (adisyon_id);
+CREATE INDEX IF NOT EXISTS idx_odemeler_sube_created ON odemeler (sube_id, created_at DESC);
+
+-- Adisyons index'leri
 CREATE INDEX IF NOT EXISTS idx_adisyons_sube_masa ON adisyons (sube_id, masa);
 CREATE INDEX IF NOT EXISTS idx_adisyons_durum ON adisyons (durum);
+CREATE INDEX IF NOT EXISTS idx_adisyons_sube_durum ON adisyons (sube_id, durum);
+
+-- İskonto kayıtları index'leri
 CREATE INDEX IF NOT EXISTS idx_iskonto_kayitlari_sube_tarih ON iskonto_kayitlari (sube_id, created_at);
+
+-- Giderler index'leri
 CREATE INDEX IF NOT EXISTS idx_giderler_sube_tarih ON giderler (sube_id, tarih);
 CREATE INDEX IF NOT EXISTS idx_giderler_kategori ON giderler (kategori);
+
+-- Menu varyasyonlar index'leri
 CREATE INDEX IF NOT EXISTS idx_menu_varyasyonlar_menu ON menu_varyasyonlar (menu_id);
+CREATE INDEX IF NOT EXISTS idx_menu_varyasyonlar_menu_aktif ON menu_varyasyonlar (menu_id, aktif) WHERE aktif = TRUE;
+
+-- Subscriptions index'leri
 CREATE INDEX IF NOT EXISTS idx_subscriptions_isletme ON subscriptions (isletme_id);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_status ON subscriptions (status);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_isletme_status ON subscriptions (isletme_id, status);
+
+-- Payments index'leri
 CREATE INDEX IF NOT EXISTS idx_payments_isletme ON payments (isletme_id);
 CREATE INDEX IF NOT EXISTS idx_payments_subscription ON payments (subscription_id);
 CREATE INDEX IF NOT EXISTS idx_payments_status ON payments (durum);
 CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments (created_at);
+
+-- Tenant customizations index'leri
 CREATE INDEX IF NOT EXISTS idx_tenant_customizations_isletme ON tenant_customizations (isletme_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_customizations_domain ON tenant_customizations (domain);
+
+-- Users index'leri
+CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_users_tenant_role ON users (tenant_id, role);
+CREATE INDEX IF NOT EXISTS idx_users_tenant_aktif ON users (tenant_id, aktif) WHERE aktif = TRUE;
+
+-- Subeler index'leri
+CREATE INDEX IF NOT EXISTS idx_subeler_isletme ON subeler (isletme_id);
+CREATE INDEX IF NOT EXISTS idx_subeler_isletme_aktif ON subeler (isletme_id, aktif) WHERE aktif = TRUE;
+
+-- Audit logs index'leri
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs (created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_username ON audit_logs (username);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_action ON audit_logs (action);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs (entity_type, entity_id);
+
+-- Stock alerts index'leri
 CREATE INDEX IF NOT EXISTS idx_stock_alerts_sube ON stock_alert_history (sube_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_stock_alerts_stok ON stock_alert_history (stok_id);
+
+-- Backup history index'leri
 CREATE INDEX IF NOT EXISTS idx_backup_history_status ON backup_history (status);
 CREATE INDEX IF NOT EXISTS idx_backup_history_created ON backup_history (started_at);
 """

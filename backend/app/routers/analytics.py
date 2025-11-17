@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Literal
 from datetime import datetime, timedelta
 from ..core.deps import get_current_user, get_sube_id, require_roles
+from ..core.cache import cache, cache_key
 from ..db.database import db
 import json
 
@@ -98,6 +99,14 @@ async def saatlik_yogunluk(
     Saatlik yoğunluk verilerini döndürür.
     period: gunluk, haftalik, aylik
     """
+    # Cache key oluştur
+    cache_key_str = cache_key("analytics:saatlik", sube_id, period, tarih)
+    
+    # Cache'den kontrol et
+    cached_result = await cache.get(cache_key_str)
+    if cached_result is not None:
+        return cached_result
+    
     try:
         if tarih:
             base_date = datetime.strptime(tarih, "%Y-%m-%d")
@@ -146,6 +155,8 @@ async def saatlik_yogunluk(
                 "toplam_tutar": hourly_map.get(hour, {}).get("toplam_tutar", 0.0),
             })
         
+        # Cache'e kaydet (2 dakika TTL)
+        await cache.set(cache_key_str, result, ttl=120)
         return result
         
     except Exception as e:
@@ -285,6 +296,14 @@ async def analytics_ozet(
     sube_id: int = Depends(get_sube_id),
 ):
     """Seçilen periyot veya özel tarih aralığı için genel analitik özeti döndürür."""
+    # Cache key oluştur
+    cache_key_str = cache_key("analytics:ozet", sube_id, period, tarih, start, end)
+    
+    # Cache'den kontrol et
+    cached_result = await cache.get(cache_key_str)
+    if cached_result is not None:
+        return cached_result
+    
     try:
         if start and end:
             start_date = datetime.strptime(start, "%Y-%m-%d")
@@ -509,6 +528,10 @@ async def analytics_ozet(
             "en_cok_ikram": en_cok_ikram,
             "top_personeller": top_personeller,
         }
+        
+        # Cache'e kaydet (2 dakika TTL - analytics verileri sık değişebilir)
+        await cache.set(cache_key_str, result, ttl=120)
+        return result
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Hata: {str(e)}")

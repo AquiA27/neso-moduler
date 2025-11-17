@@ -16,6 +16,11 @@ export default function LoginPage() {
     const u = username.toLowerCase();
     const r = role.toLowerCase();
     
+    // Super admin sadece super admin panelini görebilir
+    if (r === 'super_admin' || u === 'super') {
+      return '/superadmin';
+    }
+    
     // Mutfak kullanıcıları ve barista mutfak ekranını görebilir
     if (u === 'mutfak' || r === 'mutfak' || r === 'barista') {
       return '/mutfak';
@@ -31,8 +36,8 @@ export default function LoginPage() {
       return '/kasa';
     }
     
-    // Admin yetkileri
-    if (r === 'super_admin' || r === 'admin' || u === 'admin' || u === 'super') {
+    // Admin yetkileri (tenant admin)
+    if (r === 'admin' || u === 'admin') {
       return '/dashboard';
     }
     

@@ -2,26 +2,27 @@ import { Suspense, lazy, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/LoginPage';
-import RaporlarPage from './pages/RaporlarPage';
-import MenuPage from './pages/MenuPage';
-import MutfakPage from './pages/MutfakPage';
-import KasaPage from './pages/KasaPage';
-import StokPage from './pages/StokPage';
-import GiderlerPage from './pages/GiderlerPage';
-import MasalarPage from './pages/MasalarPage';
-import RecetePage from './pages/RecetePage';
-import AssistantPage from './pages/AssistantPage';
-import BIAssistantPage from './pages/BIAssistantPage';
-import PersonellerPage from './pages/PersonellerPage';
-import PersonelTerminalPage from './pages/PersonelTerminalPage';
-import CustomerLandingPage from './pages/CustomerLandingPage';
-import CustomerChatPage from './pages/CustomerChatPage';
-import PublicMenuPage from './pages/PublicMenuPage';
-import SuperAdminPanel from './pages/SuperAdminPanel';
-import SystemSettingsPage from './pages/SystemSettingsPage';
 import Layout from './components/Layout';
 
+// Lazy load heavy pages for better initial bundle size
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const RaporlarPage = lazy(() => import('./pages/RaporlarPage'));
+const MenuPage = lazy(() => import('./pages/MenuPage'));
+const MutfakPage = lazy(() => import('./pages/MutfakPage'));
+const KasaPage = lazy(() => import('./pages/KasaPage'));
+const StokPage = lazy(() => import('./pages/StokPage'));
+const GiderlerPage = lazy(() => import('./pages/GiderlerPage'));
+const MasalarPage = lazy(() => import('./pages/MasalarPage'));
+const RecetePage = lazy(() => import('./pages/RecetePage'));
+const AssistantPage = lazy(() => import('./pages/AssistantPage'));
+const BIAssistantPage = lazy(() => import('./pages/BIAssistantPage'));
+const PersonellerPage = lazy(() => import('./pages/PersonellerPage'));
+const PersonelTerminalPage = lazy(() => import('./pages/PersonelTerminalPage'));
+const CustomerLandingPage = lazy(() => import('./pages/CustomerLandingPage'));
+const CustomerChatPage = lazy(() => import('./pages/CustomerChatPage'));
+const PublicMenuPage = lazy(() => import('./pages/PublicMenuPage'));
+const SuperAdminPanel = lazy(() => import('./pages/SuperAdminPanel'));
+const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: ReactNode }) {

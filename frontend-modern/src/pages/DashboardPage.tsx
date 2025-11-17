@@ -73,20 +73,29 @@ export default function DashboardPage() {
   const [summaryPeriod, setSummaryPeriod] = useState<'gunluk' | 'haftalik' | 'aylik'>('gunluk');
   const queryClient = useQueryClient();
 
-  const formatCurrency = (value: number, fractionDigits = 2) =>
+  const formatCurrency = useCallback((value: number, fractionDigits = 2) =>
     value.toLocaleString('tr-TR', {
       minimumFractionDigits: fractionDigits,
       maximumFractionDigits: fractionDigits,
-    });
+    }), []);
 
-  const formatHour = (hour: number | null | undefined) =>
-    hour === null || hour === undefined ? '-' : `${hour.toString().padStart(2, '0')}:00`;
+  const formatHour = useCallback((hour: number | null | undefined) =>
+    hour === null || hour === undefined ? '-' : `${hour.toString().padStart(2, '0')}:00`, []);
 
   useEffect(() => {
-    // Yetki kontrolü - sadece admin ve super_admin erişebilir
+    // Yetki kontrolü - sadece tenant admin erişebilir (super_admin super admin panelini kullanmalı)
     if (user) {
       const role = user.role?.toLowerCase();
-      if (role !== 'admin' && role !== 'super_admin') {
+      const username = user.username?.toLowerCase();
+      
+      // Super admin dashboard'u görmemeli, super admin panelini görmeli
+      if (role === 'super_admin' || username === 'super') {
+        navigate('/superadmin');
+        return;
+      }
+      
+      // Sadece tenant admin erişebilir
+      if (role !== 'admin') {
         navigate('/login');
       }
     }
