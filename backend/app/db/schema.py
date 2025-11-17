@@ -441,12 +441,40 @@ async def create_tables(db: Database):
     
     # Migration: users tablosuna tenant_id ekle (varsa geç)
     try:
-        await db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id BIGINT REFERENCES isletmeler(id) ON DELETE SET NULL")
-        await db.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users (tenant_id)")
+        # Önce kolonun var olup olmadığını kontrol et
+        column_exists = await db.fetch_one("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'tenant_id'
+        """)
+        
+        if not column_exists:
+            # Kolon yoksa ekle
+            await db.execute("ALTER TABLE users ADD COLUMN tenant_id BIGINT")
+            # Foreign key constraint'i ayrı ekle
+            try:
+                await db.execute("""
+                    ALTER TABLE users 
+                    ADD CONSTRAINT fk_users_tenant_id 
+                    FOREIGN KEY (tenant_id) REFERENCES isletmeler(id) ON DELETE SET NULL
+                """)
+            except Exception as fk_error:
+                logging.warning(f"FK constraint already exists or error: {fk_error}")
+        
+        # Index oluştur (varsa geç)
+        try:
+            await db.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users (tenant_id)")
+        except Exception as idx_error:
+            logging.warning(f"Index already exists or error: {idx_error}")
+        
         # Super admin kullanıcıları için tenant_id = NULL
-        await db.execute("UPDATE users SET tenant_id = NULL WHERE role = 'super_admin' AND tenant_id IS NOT NULL")
+        try:
+            await db.execute("UPDATE users SET tenant_id = NULL WHERE role = 'super_admin' AND tenant_id IS NOT NULL")
+        except Exception as update_error:
+            logging.warning(f"Update error: {update_error}")
+            
     except Exception as e:
-        logging.warning(f"Migration: tenant_id column already exists or error: {e}")
+        logging.error(f"Migration: tenant_id column error: {e}", exc_info=True)
     
     await db.execute(CREATE_MENU)
     for stmt in [s.strip() for s in ALTER_MENU_COMPAT.split(';') if s.strip()]:
