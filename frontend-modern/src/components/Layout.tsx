@@ -81,8 +81,22 @@ export default function Layout() {
   const showKasa = allowedPanels.includes('kasa');
   const showMutfak = allowedPanels.includes('mutfak');
   const showTerminal = allowedPanels.includes('terminal');
-  const showPersoneller = user && (user.role?.toLowerCase() === 'super_admin' || user.username?.toLowerCase() === 'super');
-  const showSuperAdmin = user && (user.role?.toLowerCase() === 'super_admin' || user.username?.toLowerCase() === 'super');
+  
+  // Personeller sekmesi: super_admin ve admin görebilir
+  const userRole = user?.role?.toLowerCase() || '';
+  const username = user?.username?.toLowerCase() || '';
+  const showPersoneller = user && (
+    userRole === 'super_admin' || 
+    username === 'super' ||
+    userRole === 'admin'
+  );
+  
+  // Debug için console.log (production'da kaldırılabilir)
+  if (user && userRole === 'admin') {
+    console.log('[Layout] Admin user detected:', { username, role: userRole, showPersoneller });
+  }
+  
+  const showSuperAdmin = user && (userRole === 'super_admin' || username === 'super');
 
   const getNavClass = (isActive: boolean, variant: 'desktop' | 'mobile') => {
     if (variant === 'mobile') {

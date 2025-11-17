@@ -39,16 +39,25 @@ export default function PersonellerPage() {
   const [userPermissions, setUserPermissions] = useState<Record<string, boolean>>({});
   const [loadingPermissions, setLoadingPermissions] = useState(false);
 
-  const loadPersoneller = async () => {
+  const loadPersoneller = useCallback(async () => {
     try {
-      const response = await superadminApi.usersList();
+      // Super admin için superadmin endpoint'i, admin için admin endpoint'i kullan
+      const currentUser = useAuthStore.getState().user;
+      const role = currentUser?.role?.toLowerCase();
+      let response;
+      if (role === 'super_admin' || currentUser?.username?.toLowerCase() === 'super') {
+        response = await superadminApi.usersList();
+      } else {
+        // Admin için tenant bazlı personeller endpoint'i
+        response = await adminApi.personellerList();
+      }
       setPersoneller(response.data || []);
     } catch (err) {
       console.error('Personeller yüklenemedi:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const loadPerformans = useCallback(async () => {
     try {
@@ -65,27 +74,45 @@ export default function PersonellerPage() {
   }, [loadPerformans]);
 
   useEffect(() => {
-    // Yetki kontrolü - sadece super_admin erişebilir
+    // Yetki kontrolü - super_admin ve admin erişebilir
     if (user) {
       const role = user.role?.toLowerCase();
-      if (role !== 'super_admin' && user.username?.toLowerCase() !== 'super') {
+      const isSuperAdmin = role === 'super_admin' || user.username?.toLowerCase() === 'super';
+      const isAdmin = role === 'admin';
+      
+      if (!isSuperAdmin && !isAdmin) {
         navigate('/login');
         return;
       }
     }
     loadPersoneller();
     loadPerformans();
-  }, [user, navigate, loadPerformans]);
+  }, [user, navigate, loadPerformans, loadPersoneller]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await superadminApi.userUpsert({
-        username: formData.username,
-        role: formData.role,
-        aktif: formData.aktif,
-        password: formData.password || undefined,
-      });
+      // Super admin için superadmin endpoint'i, admin için admin endpoint'i kullan
+      const currentUser = useAuthStore.getState().user;
+      const role = currentUser?.role?.toLowerCase();
+      const isSuperAdmin = role === 'super_admin' || currentUser?.username?.toLowerCase() === 'super';
+      
+      if (isSuperAdmin) {
+        await superadminApi.userUpsert({
+          username: formData.username,
+          role: formData.role,
+          aktif: formData.aktif,
+          password: formData.password || undefined,
+        });
+      } else {
+        // Admin için tenant bazlı personel ekleme
+        await adminApi.personelUpsert({
+          username: formData.username,
+          role: formData.role,
+          aktif: formData.aktif,
+          password: formData.password || undefined,
+        });
+      }
       resetForm();
       loadPersoneller();
     } catch (err) {

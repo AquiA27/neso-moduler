@@ -233,6 +233,15 @@ export const adminApi = {
   personelAnaliz: async (gunSay: number = 30, limit: number = 20) => {
     return apiClient.get(`/admin/personel-analiz?gun_say=${gunSay}&limit=${limit}`);
   },
+  
+  // Personeller
+  personellerList: async () => {
+    return apiClient.get('/admin/personeller');
+  },
+  
+  personelUpsert: async (data: { username: string; role: string; aktif: boolean; password?: string }) => {
+    return apiClient.post('/admin/personeller/upsert', data);
+  },
 };
 
 // SuperAdmin API

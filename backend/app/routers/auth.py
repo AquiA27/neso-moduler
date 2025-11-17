@@ -266,7 +266,15 @@ async def me(info: Dict[str, Any] = Depends(get_current_user_and_role)):
             detail="User not found"
         )
 
-    return UserResponse(**user)
+    # Record objesini dictionary'ye çevir
+    user_dict = dict(user) if hasattr(user, 'keys') else user
+    
+    return UserResponse(
+        id=int(user_dict.get("id")),
+        username=str(user_dict.get("username")),
+        role=str(user_dict.get("role")),
+        aktif=bool(user_dict.get("aktif")),
+    )
 
 
 @router.get("/pong")
