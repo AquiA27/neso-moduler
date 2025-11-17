@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { superadminApi, subscriptionApi, paymentApi, customizationApi } from '../lib/api';
 import { 
-  Building2, CreditCard, Settings, Plus, Search, Edit, Trash2, 
+  Building2, CreditCard, Settings, Plus, Search, 
   BarChart3, Users, AlertCircle, CheckCircle,
-  DollarSign, Package, ArrowLeft, Phone, Mail, Calendar
+  DollarSign, Package, ArrowLeft, Phone, Calendar
 } from 'lucide-react';
 
 interface Tenant {
@@ -215,7 +215,6 @@ export default function SuperAdminPanel() {
           {!loading && activeTab === 'tenants' && (
             selectedTenantId ? (
               <TenantDetailTab 
-                tenantId={selectedTenantId}
                 tenantDetail={tenantDetail}
                 onBack={() => {
                   setSelectedTenantId(null);
@@ -481,12 +480,10 @@ function TenantsTab({
 
 // Tenant Detail Tab
 function TenantDetailTab({
-  tenantId,
   tenantDetail,
   onBack,
   onRefresh
 }: {
-  tenantId: number;
   tenantDetail: TenantDetail | null;
   onBack: () => void;
   onRefresh: () => void;
