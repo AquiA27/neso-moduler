@@ -38,6 +38,7 @@ backend/.env.*
 # Runtime/generated
 media/
 backups/
+backend/exports/
 
 ############################
 # Node / Frontend
