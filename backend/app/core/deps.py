@@ -32,7 +32,7 @@ def decode_token(token: str) -> Dict[str, Any]:
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> Mapping[str, Any]:
     """
     JWT 'sub' içinden kullanıcıyı DB'den çeker ve aktifliğini doğrular.
-    Dönüş: {"id": ..., "username": ..., "role": ..., "aktif": ...}
+    Dönüş: {"id": ..., "username": ..., "role": ..., "aktif": ..., "tenant_id": ...}
     """
     payload = decode_token(token)
     sub = payload.get("sub")
@@ -42,12 +42,15 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Mapping[str, 
             detail="Invalid token (no sub)",
         )
 
+    # Token'dan tenant_id al (super_admin için None olabilir)
+    token_tenant_id = payload.get("tenant_id")
+
     # sub'u senin yapına göre yorumla:
     # - eğer 'sub' username ise username ile çek
     # - eğer 'sub' user_id ise id ile çek
     # Burada username varsaydım. Gerekirse id tabanlı sorguya çeviririz.
     row = await db.fetch_one(
-        "SELECT id, username, role, aktif FROM users WHERE username = :u",
+        "SELECT id, username, role, aktif, tenant_id FROM users WHERE username = :u",
         {"u": sub},
     )
     if not row or row["aktif"] is False:
@@ -56,7 +59,13 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Mapping[str, 
             detail="User not found or inactive",
         )
 
-    return dict(row)
+    user_dict = dict(row) if hasattr(row, 'keys') else row
+    
+    # Tenant_id'yi token'dan veya DB'den al
+    tenant_id = user_dict.get("tenant_id") or token_tenant_id
+    user_dict["tenant_id"] = tenant_id
+    
+    return user_dict
 
 
 async def get_current_user_and_role(token: str = Depends(oauth2_scheme)) -> Mapping[str, Any]:

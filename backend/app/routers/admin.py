@@ -431,44 +431,111 @@ class UserUpsertIn(BaseModel):
 
 
 @router.get("/personeller")
-async def personeller_list(_: Dict[str, Any] = Depends(get_current_user)):
-    """Personelleri listele"""
-    rows = await db.fetch_all("SELECT id, username, role, aktif, created_at FROM users ORDER BY id DESC")
-    return [dict(r) for r in rows]
+async def personeller_list(user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Personelleri listele
+    - Super admin: Tüm personelleri görür
+    - Admin: Sadece kendi işletmesine (tenant_id) ait personelleri görür
+    """
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    
+    # Super admin tüm personelleri görebilir
+    if user_role == "super_admin":
+        rows = await db.fetch_all(
+            """
+            SELECT id, username, role, aktif, tenant_id, created_at 
+            FROM users 
+            WHERE role != 'super_admin'
+            ORDER BY id DESC
+            """
+        )
+    else:
+        # Admin sadece kendi tenant'ına ait personelleri görebilir
+        if user_tenant_id:
+            rows = await db.fetch_all(
+                """
+                SELECT id, username, role, aktif, tenant_id, created_at 
+                FROM users 
+                WHERE tenant_id = :tid AND role != 'super_admin'
+                ORDER BY id DESC
+                """,
+                {"tid": user_tenant_id}
+            )
+        else:
+            # Tenant_id yoksa boş liste döndür
+            rows = []
+    
+    return [dict(r) if hasattr(r, 'keys') else r for r in rows]
 
 
 @router.post("/personeller/upsert")
-async def personeller_upsert(payload: UserUpsertIn, _: Dict[str, Any] = Depends(get_current_user)):
-    """Personel ekle/güncelle"""
+async def personeller_upsert(payload: UserUpsertIn, user: Dict[str, Any] = Depends(get_current_user)):
+    """
+    Personel ekle/güncelle
+    - Super admin: Herhangi bir tenant'a personel ekleyebilir
+    - Admin: Sadece kendi işletmesine (tenant_id) personel ekleyebilir
+    """
     from ..core.security import hash_password
+    
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    
+    # Admin sadece kendi tenant'ına personel ekleyebilir
+    # Super admin için tenant_id None olabilir (isterse belirtir)
+    tenant_id = user_tenant_id if user_role != "super_admin" else None
+    
+    # Eğer mevcut kullanıcı varsa ve farklı tenant'a aitse, hata ver
+    if user_role != "super_admin":
+        existing_user = await db.fetch_one(
+            "SELECT tenant_id FROM users WHERE username = :u",
+            {"u": payload.username}
+        )
+        if existing_user:
+            existing_tenant_id = dict(existing_user).get("tenant_id") if hasattr(existing_user, 'keys') else existing_user.get("tenant_id")
+            if existing_tenant_id != user_tenant_id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Bu personel başka bir işletmeye ait. Sadece kendi işletmenize ait personelleri düzenleyebilirsiniz."
+                )
     
     params = {
         "u": payload.username,
         "r": payload.role,
         "a": payload.aktif,
+        "tid": tenant_id,
     }
+    
+    # Super admin rolü atanmasını engelle
+    if payload.role == "super_admin" and user_role != "super_admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Super admin rolü atanamaz"
+        )
     
     if payload.password:
         params["h"] = hash_password(payload.password)
         await db.execute(
             """
-            INSERT INTO users (username, sifre_hash, role, aktif)
-            VALUES (:u, :h, :r, :a)
+            INSERT INTO users (username, sifre_hash, role, aktif, tenant_id)
+            VALUES (:u, :h, :r, :a, :tid)
             ON CONFLICT (username) DO UPDATE
                SET role = EXCLUDED.role,
                    aktif = EXCLUDED.aktif,
-                   sifre_hash = EXCLUDED.sifre_hash
+                   sifre_hash = EXCLUDED.sifre_hash,
+                   tenant_id = COALESCE(EXCLUDED.tenant_id, users.tenant_id)
             """,
             params,
         )
     else:
         await db.execute(
             """
-            INSERT INTO users (username, role, aktif)
-            VALUES (:u, :r, :a)
+            INSERT INTO users (username, role, aktif, tenant_id)
+            VALUES (:u, :r, :a, :tid)
             ON CONFLICT (username) DO UPDATE
                SET role = EXCLUDED.role,
-                   aktif = EXCLUDED.aktif
+                   aktif = EXCLUDED.aktif,
+                   tenant_id = COALESCE(EXCLUDED.tenant_id, users.tenant_id)
             """,
             params,
         )

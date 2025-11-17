@@ -3,7 +3,7 @@ import { superadminApi, subscriptionApi, paymentApi, customizationApi } from '..
 import { 
   Building2, CreditCard, Settings, Plus, Search, Edit, Trash2, 
   BarChart3, Users, AlertCircle, CheckCircle,
-  DollarSign, Package
+  DollarSign, Package, ArrowLeft, Phone, Mail, Calendar
 } from 'lucide-react';
 
 interface Tenant {
@@ -49,6 +49,61 @@ interface DashboardStats {
   };
 }
 
+interface TenantDetail {
+  isletme: {
+    id: number;
+    ad: string;
+    vergi_no?: string;
+    telefon?: string;
+    aktif: boolean;
+    created_at: string;
+  };
+  subscription?: {
+    id: number;
+    plan_type: string;
+    status: string;
+    max_subeler: number;
+    max_kullanicilar: number;
+    max_menu_items: number;
+    ayllik_fiyat: number;
+    trial_baslangic?: string;
+    trial_bitis?: string;
+    baslangic_tarihi: string;
+    bitis_tarihi?: string;
+    otomatik_yenileme: boolean;
+  };
+  subeler: Array<{
+    id: number;
+    ad: string;
+    adres?: string;
+    telefon?: string;
+    aktif: boolean;
+    created_at: string;
+  }>;
+  kullanicilar: Array<{
+    id: number;
+    username: string;
+    role: string;
+    aktif: boolean;
+    created_at: string;
+  }>;
+  customization?: {
+    domain?: string;
+    app_name?: string;
+    logo_url?: string;
+    primary_color?: string;
+    secondary_color?: string;
+  };
+  istatistikler: {
+    siparis_sayisi: number;
+    toplam_gelir: number;
+    menu_item_sayisi: number;
+    kullanici_sayisi: number;
+    sube_sayisi: number;
+    son_siparis_tarihi?: string;
+  };
+}
+
 export default function SuperAdminPanel() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup'>('dashboard');
   const [loading, setLoading] = useState(false);
@@ -57,6 +112,8 @@ export default function SuperAdminPanel() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTenantId, setSelectedTenantId] = useState<number | null>(null);
+  const [tenantDetail, setTenantDetail] = useState<TenantDetail | null>(null);
 
   useEffect(() => {
     loadData();
@@ -156,11 +213,45 @@ export default function SuperAdminPanel() {
           )}
 
           {!loading && activeTab === 'tenants' && (
-            <TenantsTab 
-              tenants={filteredTenants}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-            />
+            selectedTenantId ? (
+              <TenantDetailTab 
+                tenantId={selectedTenantId}
+                tenantDetail={tenantDetail}
+                onBack={() => {
+                  setSelectedTenantId(null);
+                  setTenantDetail(null);
+                }}
+                onRefresh={async () => {
+                  try {
+                    const response = await superadminApi.tenantDetail(selectedTenantId);
+                    setTenantDetail(response.data);
+                  } catch (error) {
+                    console.error('Error loading tenant detail:', error);
+                    alert('Tenant detayı yüklenirken hata oluştu');
+                  }
+                }}
+              />
+            ) : (
+              <TenantsTab 
+                tenants={filteredTenants}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+                onTenantClick={async (tenantId: number) => {
+                  setSelectedTenantId(tenantId);
+                  setLoading(true);
+                  try {
+                    const response = await superadminApi.tenantDetail(tenantId);
+                    setTenantDetail(response.data);
+                  } catch (error) {
+                    console.error('Error loading tenant detail:', error);
+                    alert('Tenant detayı yüklenirken hata oluştu');
+                    setSelectedTenantId(null);
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+              />
+            )
           )}
 
           {!loading && activeTab === 'subscriptions' && (
@@ -282,7 +373,7 @@ function StatCard({
   color 
 }: { 
   title: string; 
-  value: number; 
+  value: number | string; 
   subtitle?: string; 
   icon: any; 
   color: string;
@@ -314,11 +405,13 @@ function StatCard({
 function TenantsTab({ 
   tenants, 
   searchTerm, 
-  onSearchChange 
+  onSearchChange,
+  onTenantClick
 }: { 
   tenants: Tenant[]; 
   searchTerm: string; 
   onSearchChange: (value: string) => void;
+  onTenantClick: (tenantId: number) => void;
 }) {
   return (
     <div>
@@ -369,11 +462,12 @@ function TenantsTab({
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-4">
-                    <Edit className="w-4 h-4" />
-                  </button>
-                  <button className="text-red-600 hover:text-red-900">
-                    <Trash2 className="w-4 h-4" />
+                  <button 
+                    onClick={() => onTenantClick(tenant.id)}
+                    className="text-blue-600 hover:text-blue-900 mr-4"
+                    title="Detayları Gör"
+                  >
+                    Detay
                   </button>
                 </td>
               </tr>
@@ -381,6 +475,308 @@ function TenantsTab({
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// Tenant Detail Tab
+function TenantDetailTab({
+  tenantId,
+  tenantDetail,
+  onBack,
+  onRefresh
+}: {
+  tenantId: number;
+  tenantDetail: TenantDetail | null;
+  onBack: () => void;
+  onRefresh: () => void;
+}) {
+  if (!tenantDetail) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-2 text-gray-600">Yükleniyor...</p>
+      </div>
+    );
+  }
+
+  const { isletme, subscription, subeler, kullanicilar, customization, istatistikler } = tenantDetail;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={onBack}
+            className="text-gray-600 hover:text-gray-900"
+            title="Geri"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
+          <h2 className="text-2xl font-bold">{isletme.ad}</h2>
+          {isletme.aktif ? (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              Aktif
+            </span>
+          ) : (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              Pasif
+            </span>
+          )}
+        </div>
+        <button
+          onClick={onRefresh}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+        >
+          Yenile
+        </button>
+      </div>
+
+      {/* İşletme Bilgileri */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+            İşletme Bilgileri
+          </h3>
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm text-gray-600">İşletme ID</p>
+              <p className="font-medium">{isletme.id}</p>
+            </div>
+            <div>
+              <p className="text-sm text-gray-600">İşletme Adı</p>
+              <p className="font-medium">{isletme.ad}</p>
+            </div>
+            {isletme.vergi_no && (
+              <div>
+                <p className="text-sm text-gray-600">Vergi No</p>
+                <p className="font-medium">{isletme.vergi_no}</p>
+              </div>
+            )}
+            {isletme.telefon && (
+              <div>
+                <p className="text-sm text-gray-600">Telefon</p>
+                <p className="font-medium flex items-center">
+                  <Phone className="w-4 h-4 mr-1" />
+                  {isletme.telefon}
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-gray-600">Oluşturulma Tarihi</p>
+              <p className="font-medium flex items-center">
+                <Calendar className="w-4 h-4 mr-1" />
+                {new Date(isletme.created_at).toLocaleDateString('tr-TR')}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Abonelik Bilgileri */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Package className="w-5 h-5 mr-2 text-green-600" />
+            Abonelik Bilgileri
+          </h3>
+          {subscription ? (
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm text-gray-600">Plan Tipi</p>
+                <p className="font-medium capitalize">{subscription.plan_type}</p>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Durum</p>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                  subscription.status === 'active' ? 'bg-green-100 text-green-800' :
+                  subscription.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {subscription.status}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm text-gray-600">Aylık Fiyat</p>
+                <p className="font-medium text-lg">₺{subscription.ayllik_fiyat.toFixed(2)}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-200">
+                <div>
+                  <p className="text-xs text-gray-500">Max Şube</p>
+                  <p className="font-medium">{subscription.max_subeler}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Max Kullanıcı</p>
+                  <p className="font-medium">{subscription.max_kullanicilar}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Max Menü</p>
+                  <p className="font-medium">{subscription.max_menu_items}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Otomatik Yenileme</p>
+                  <p className="font-medium">{subscription.otomatik_yenileme ? 'Evet' : 'Hayır'}</p>
+                </div>
+              </div>
+              {subscription.bitis_tarihi && (
+                <div>
+                  <p className="text-sm text-gray-600">Bitiş Tarihi</p>
+                  <p className="font-medium">{new Date(subscription.bitis_tarihi).toLocaleDateString('tr-TR')}</p>
+                </div>
+              )}
+              {subscription.trial_bitis && (
+                <div>
+                  <p className="text-sm text-gray-600">Trial Bitiş</p>
+                  <p className="font-medium">{new Date(subscription.trial_bitis).toLocaleDateString('tr-TR')}</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">Abonelik bulunamadı</p>
+          )}
+        </div>
+      </div>
+
+      {/* İstatistikler */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
+          İstatistikler
+        </h3>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <StatCard title="Sipariş Sayısı" value={istatistikler.siparis_sayisi} color="blue" icon={BarChart3} />
+          <StatCard title="Toplam Gelir" value={`₺${istatistikler.toplam_gelir.toFixed(2)}`} color="green" icon={DollarSign} />
+          <StatCard title="Menü Sayısı" value={istatistikler.menu_item_sayisi} color="orange" icon={Package} />
+          <StatCard title="Kullanıcı" value={istatistikler.kullanici_sayisi} color="purple" icon={Users} />
+          <StatCard title="Şube" value={istatistikler.sube_sayisi} color="blue" icon={Building2} />
+          {istatistikler.son_siparis_tarihi && (
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-xs text-gray-600">Son Sipariş</p>
+              <p className="font-medium text-sm mt-1">{new Date(istatistikler.son_siparis_tarihi).toLocaleDateString('tr-TR')}</p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {/* Şubeler */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Building2 className="w-5 h-5 mr-2 text-indigo-600" />
+            Şubeler ({subeler.length})
+          </h3>
+          {subeler.length > 0 ? (
+            <div className="space-y-3">
+              {subeler.map((sube) => (
+                <div key={sube.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium">{sube.ad}</p>
+                    {sube.aktif ? (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Aktif
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Pasif
+                      </span>
+                    )}
+                  </div>
+                  {sube.adres && (
+                    <p className="text-sm text-gray-600">{sube.adres}</p>
+                  )}
+                  {sube.telefon && (
+                    <p className="text-sm text-gray-600 flex items-center mt-1">
+                      <Phone className="w-3 h-3 mr-1" />
+                      {sube.telefon}
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">Şube bulunamadı</p>
+          )}
+        </div>
+
+        {/* Kullanıcılar */}
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Users className="w-5 h-5 mr-2 text-purple-600" />
+            Kullanıcılar ({kullanicilar.length})
+          </h3>
+          {kullanicilar.length > 0 ? (
+            <div className="space-y-3">
+              {kullanicilar.map((user) => (
+                <div key={user.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="font-medium">{user.username}</p>
+                    <div className="flex items-center space-x-2">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
+                        {user.role}
+                      </span>
+                      {user.aktif ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Aktif
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                          Pasif
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    {new Date(user.created_at).toLocaleDateString('tr-TR')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-sm">Kullanıcı bulunamadı</p>
+          )}
+        </div>
+      </div>
+
+      {/* Customization */}
+      {customization && (
+        <div className="bg-white border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-semibold mb-4 flex items-center">
+            <Settings className="w-5 h-5 mr-2 text-yellow-600" />
+            Özelleştirme
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {customization.app_name && (
+              <div>
+                <p className="text-sm text-gray-600">App Adı</p>
+                <p className="font-medium">{customization.app_name}</p>
+              </div>
+            )}
+            {customization.domain && (
+              <div>
+                <p className="text-sm text-gray-600">Domain</p>
+                <p className="font-medium">{customization.domain}</p>
+              </div>
+            )}
+            {customization.logo_url && (
+              <div>
+                <p className="text-sm text-gray-600">Logo URL</p>
+                <p className="font-medium break-all">{customization.logo_url}</p>
+              </div>
+            )}
+            {customization.primary_color && (
+              <div>
+                <p className="text-sm text-gray-600">Ana Renk</p>
+                <div className="flex items-center space-x-2">
+                  <div 
+                    className="w-8 h-8 rounded border border-gray-300"
+                    style={{ backgroundColor: customization.primary_color }}
+                  />
+                  <p className="font-medium">{customization.primary_color}</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

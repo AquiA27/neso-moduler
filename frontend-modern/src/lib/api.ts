@@ -242,6 +242,10 @@ export const superadminApi = {
     return apiClient.get('/superadmin/tenants');
   },
   
+  tenantDetail: async (id: number) => {
+    return apiClient.get(`/superadmin/tenants/${id}`);
+  },
+  
   tenantCreate: async (data: { ad: string; vergi_no?: string; telefon?: string; aktif?: boolean }) => {
     return apiClient.post('/superadmin/tenants', data);
   },

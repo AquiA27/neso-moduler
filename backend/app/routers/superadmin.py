@@ -34,6 +34,137 @@ async def tenants_list(_: Dict[str, Any] = Depends(get_current_user)):
     return await db.fetch_all(q)
 
 
+@router.get("/tenants/{id}")
+async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
+    """Tenant (işletme) detay bilgileri: genel bilgiler, abonelik, kullanıcılar, şubeler, customization, istatistikler"""
+    
+    # 1. İşletme bilgileri
+    isletme = await db.fetch_one(
+        """
+        SELECT id, ad, vergi_no, telefon, aktif, created_at
+        FROM isletmeler
+        WHERE id = :id
+        """,
+        {"id": id}
+    )
+    
+    if not isletme:
+        raise HTTPException(404, "İşletme bulunamadı")
+    
+    # 2. Abonelik bilgileri
+    subscription = await db.fetch_one(
+        """
+        SELECT 
+            id, plan_type, status, max_subeler, max_kullanicilar, max_menu_items,
+            ayllik_fiyat, trial_baslangic, trial_bitis, baslangic_tarihi, bitis_tarihi,
+            otomatik_yenileme
+        FROM subscriptions
+        WHERE isletme_id = :id
+        ORDER BY id DESC
+        LIMIT 1
+        """,
+        {"id": id}
+    )
+    
+    # 3. Şubeler
+    subeler = await db.fetch_all(
+        """
+        SELECT id, ad, adres, telefon, aktif, created_at
+        FROM subeler
+        WHERE isletme_id = :id
+        ORDER BY id
+        """,
+        {"id": id}
+    )
+    
+    # 4. Kullanıcılar (bu işletmeye ait)
+    users = await db.fetch_all(
+        """
+        SELECT id, username, role, aktif, created_at
+        FROM users
+        WHERE tenant_id = :id
+        ORDER BY created_at DESC
+        """,
+        {"id": id}
+    )
+    
+    # 5. Customization
+    customization = await db.fetch_one(
+        """
+        SELECT domain, app_name, logo_url, primary_color, secondary_color
+        FROM tenant_customizations
+        WHERE isletme_id = :id
+        """,
+        {"id": id}
+    )
+    
+    # 6. İstatistikler
+    # Toplam sipariş sayısı
+    siparis_count = await db.fetch_one(
+        """
+        SELECT COUNT(*) as count
+        FROM siparisler s
+        JOIN subeler sub ON s.sube_id = sub.id
+        WHERE sub.isletme_id = :id
+        """,
+        {"id": id}
+    )
+    
+    # Toplam gelir
+    revenue = await db.fetch_one(
+        """
+        SELECT COALESCE(SUM(tutar), 0) as total
+        FROM odemeler o
+        JOIN adisyons a ON o.adisyon_id = a.id
+        JOIN subeler sub ON a.sube_id = sub.id
+        WHERE sub.isletme_id = :id
+          AND o.durum = 'tamamlandi'
+        """,
+        {"id": id}
+    )
+    
+    # Toplam menu item sayısı
+    menu_count = await db.fetch_one(
+        """
+        SELECT COUNT(*) as count
+        FROM menu m
+        JOIN subeler sub ON m.sube_id = sub.id
+        WHERE sub.isletme_id = :id AND m.aktif = TRUE
+        """,
+        {"id": id}
+    )
+    
+    # Son sipariş tarihi
+    last_order = await db.fetch_one(
+        """
+        SELECT MAX(created_at) as last_order_date
+        FROM siparisler s
+        JOIN subeler sub ON s.sube_id = sub.id
+        WHERE sub.isletme_id = :id
+        """,
+        {"id": id}
+    )
+    
+    # Result hazırla
+    result = {
+        "isletme": dict(isletme) if isletme else None,
+        "subscription": dict(subscription) if subscription else None,
+        "subeler": [dict(s) for s in subeler],
+        "kullanicilar": [dict(u) for u in users],
+        "customization": dict(customization) if customization else None,
+        "istatistikler": {
+            "siparis_sayisi": int(siparis_count["count"]) if siparis_count else 0,
+            "toplam_gelir": float(revenue["total"]) if revenue else 0.0,
+            "menu_item_sayisi": int(menu_count["count"]) if menu_count else 0,
+            "kullanici_sayisi": len(users),
+            "sube_sayisi": len(subeler),
+            "son_siparis_tarihi": last_order["last_order_date"].isoformat() if last_order and last_order["last_order_date"] else None,
+        }
+    }
+    
+    return result
+
+
 @router.post("/tenants", response_model=TenantOut)
 async def tenant_create(payload: TenantIn, _: Dict[str, Any] = Depends(get_current_user)):
     row = await db.fetch_one(
