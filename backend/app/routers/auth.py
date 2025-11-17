@@ -69,15 +69,18 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    # Record objesini dictionary'ye çevir (PostgreSQL Record objesi .get() metoduna sahip değil)
+    user_dict = dict(user) if hasattr(user, 'keys') else user
+
     # Check if user is active
-    if not user["aktif"]:
+    if not user_dict.get("aktif"):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated"
         )
 
     # Verify password
-    if not verify_password(form_data.password, user["sifre_hash"]):
+    if not verify_password(form_data.password, user_dict.get("sifre_hash", "")):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -86,12 +89,12 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 
     # Create tokens (tenant_id dahil)
     token_data = {
-        "sub": user["username"],
-        "role": user["role"],
-        "tenant_id": user.get("tenant_id"),  # Super admin için None olabilir
+        "sub": user_dict.get("username"),
+        "role": user_dict.get("role"),
+        "tenant_id": user_dict.get("tenant_id"),  # Super admin için None olabilir
     }
     access_token = create_access_token(token_data)
-    refresh_token = create_refresh_token({"sub": user["username"]})
+    refresh_token = create_refresh_token({"sub": user_dict.get("username")})
 
     return TokenOut(
         access_token=access_token,
