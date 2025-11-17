@@ -10,8 +10,27 @@ class DefaultSubeMiddleware(BaseHTTPMiddleware):
     """
     DEV ortamında: X-Sube-Id yoksa 1 olarak enjekte eder.
     PROD ortamında: X-Sube-Id yoksa 400 döner (yanlış konfigürasyonu erken yakalar).
+    
+    Public endpoint'ler (auth, public, health, docs) için bypass edilir.
     """
+    # Public endpoint'ler - X-Sube-Id gerektirmez
+    PUBLIC_PATHS = [
+        "/auth/",
+        "/public/",
+        "/health",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/",
+        "/ping",
+    ]
+    
     async def dispatch(self, request: Request, call_next):
+        # Public endpoint'leri bypass et
+        path = request.url.path
+        if any(path.startswith(public_path) for public_path in self.PUBLIC_PATHS):
+            return await call_next(request)
+        
         headers = dict(request.headers)
         has_sube = "x-sube-id" in headers
 

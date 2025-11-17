@@ -97,6 +97,10 @@ async def on_startup():
     # Validate environment configuration before starting
     print("[STARTUP] Validating configuration...")
     validate_startup()
+    
+    # Debug: CORS ayarlarını logla
+    print(f"[STARTUP] CORS_ORIGINS: {settings.CORS_ORIGINS}")
+    print(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
 
     print("[STARTUP] Connecting to database...")
     await db.connect()
