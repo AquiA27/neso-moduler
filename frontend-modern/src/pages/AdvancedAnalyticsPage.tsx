@@ -15,6 +15,29 @@ import {
   Download,
 } from 'lucide-react';
 
+// API URL'ini normalize et (protokol eksikse veya yanlışsa düzelt)
+const normalizeApiUrl = (url: string | undefined): string => {
+  if (!url) {
+    return 'http://localhost:8000';
+  }
+  
+  url = url.trim();
+  
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (url.startsWith('ttps://')) {
+      url = 'https://' + url.substring(7);
+    } else {
+      url = 'https://' + url;
+    }
+  }
+  
+  url = url.replace(/\/$/, '');
+  
+  return url;
+};
+
+const API_BASE_URL = normalizeApiUrl(import.meta.env?.VITE_API_URL as string);
+
 interface ProductProfitability {
   urun: string;
   total_quantity: number;
@@ -47,7 +70,7 @@ export default function AdvancedAnalyticsPage() {
 
     return performanceUtils.measure('fetch_profitability', async () => {
       const response = await fetch(
-        `http://localhost:8000/analytics/advanced/product-profitability?${params}`,
+        `${API_BASE_URL}/analytics/advanced/product-profitability?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('Failed to fetch profitability data');
@@ -62,7 +85,7 @@ export default function AdvancedAnalyticsPage() {
 
     return performanceUtils.measure('fetch_personnel', async () => {
       const response = await fetch(
-        `http://localhost:8000/analytics/advanced/personnel-performance?${params}`,
+        `${API_BASE_URL}/analytics/advanced/personnel-performance?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('Failed to fetch personnel data');
@@ -77,7 +100,7 @@ export default function AdvancedAnalyticsPage() {
 
     return performanceUtils.measure('fetch_customer', async () => {
       const response = await fetch(
-        `http://localhost:8000/analytics/advanced/customer-behavior?${params}`,
+        `${API_BASE_URL}/analytics/advanced/customer-behavior?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('Failed to fetch customer data');
@@ -92,7 +115,7 @@ export default function AdvancedAnalyticsPage() {
 
     return performanceUtils.measure('fetch_category', async () => {
       const response = await fetch(
-        `http://localhost:8000/analytics/advanced/category-analysis?${params}`,
+        `${API_BASE_URL}/analytics/advanced/category-analysis?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('Failed to fetch category data');
@@ -107,7 +130,7 @@ export default function AdvancedAnalyticsPage() {
 
     return performanceUtils.measure('fetch_time', async () => {
       const response = await fetch(
-        `http://localhost:8000/analytics/advanced/time-based-analysis?${params}`,
+        `${API_BASE_URL}/analytics/advanced/time-based-analysis?${params}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (!response.ok) throw new Error('Failed to fetch time data');

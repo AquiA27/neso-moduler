@@ -56,9 +56,9 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     Login with username and password.
     Returns access token and refresh token.
     """
-    # Fetch user from database
+    # Fetch user from database (tenant_id dahil)
     user = await db.fetch_one(
-        "SELECT id, username, sifre_hash, role, aktif FROM users WHERE username = :u",
+        "SELECT id, username, sifre_hash, role, tenant_id, aktif FROM users WHERE username = :u",
         {"u": form_data.username}
     )
 
@@ -84,8 +84,12 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Create tokens
-    token_data = {"sub": user["username"], "role": user["role"]}
+    # Create tokens (tenant_id dahil)
+    token_data = {
+        "sub": user["username"],
+        "role": user["role"],
+        "tenant_id": user.get("tenant_id"),  # Super admin için None olabilir
+    }
     access_token = create_access_token(token_data)
     refresh_token = create_refresh_token({"sub": user["username"]})
 

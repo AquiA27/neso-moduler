@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT UNIQUE NOT NULL,
     sifre_hash TEXT,
     role TEXT,
+    tenant_id BIGINT REFERENCES isletmeler(id) ON DELETE SET NULL,
     aktif BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -437,6 +438,16 @@ async def create_tables(db: Database):
     await db.execute(CREATE_ISLETMELER)
     await db.execute(CREATE_SUBELER)
     await db.execute(CREATE_USERS)
+    
+    # Migration: users tablosuna tenant_id ekle (varsa geç)
+    try:
+        await db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS tenant_id BIGINT REFERENCES isletmeler(id) ON DELETE SET NULL")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users (tenant_id)")
+        # Super admin kullanıcıları için tenant_id = NULL
+        await db.execute("UPDATE users SET tenant_id = NULL WHERE role = 'super_admin' AND tenant_id IS NOT NULL")
+    except Exception as e:
+        logging.warning(f"Migration: tenant_id column already exists or error: {e}")
+    
     await db.execute(CREATE_MENU)
     for stmt in [s.strip() for s in ALTER_MENU_COMPAT.split(';') if s.strip()]:
         try:

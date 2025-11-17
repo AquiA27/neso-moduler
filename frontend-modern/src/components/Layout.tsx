@@ -1,13 +1,44 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
+import { customizationApi } from '../lib/api';
 import { Menu, Settings, LogOut } from 'lucide-react';
 import logo from '../assets/fistik-logo.svg';
 
 export default function Layout() {
-  const { user, logout } = useAuthStore();
+  const { user, logout, tenantId, tenantCustomization, setTenantCustomization } = useAuthStore();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
+  
+  // Tenant customization'ı yükle
+  useEffect(() => {
+    const loadCustomization = async () => {
+      if (!tenantId) {
+        setTenantCustomization(null);
+        return;
+      }
+      
+      try {
+        const response = await customizationApi.get(tenantId);
+        const customization = response.data;
+        setTenantCustomization({
+          app_name: customization.app_name,
+          logo_url: customization.logo_url,
+          primary_color: customization.primary_color,
+          secondary_color: customization.secondary_color,
+        });
+      } catch (error) {
+        console.warn('Tenant customization yüklenemedi:', error);
+        setTenantCustomization(null);
+      }
+    };
+    
+    loadCustomization();
+  }, [tenantId, setTenantCustomization]);
+  
+  // Logo ve app name'i belirle
+  const displayLogo = tenantCustomization?.logo_url || logo;
+  const displayName = tenantCustomization?.app_name || (user?.role === 'super_admin' ? 'Neso Modüler' : 'Fıstık Kafe Yönetim Paneli');
 
   const handleLogout = () => {
     logout();
@@ -108,13 +139,19 @@ export default function Layout() {
           <div className="flex flex-wrap items-center gap-4 md:gap-6">
             <div className="flex flex-1 flex-col items-center gap-3 text-center min-w-[260px]">
               <img
-                src={logo}
-                alt="Fıstık Kafe"
+                src={displayLogo}
+                alt={displayName}
                 className="h-20 w-20 md:h-24 md:w-24 object-contain drop-shadow-[0_18px_28px_rgba(45,212,191,0.35)]"
+                onError={(e) => {
+                  // Logo yüklenemezse varsayılan logo'yu göster
+                  if (e.currentTarget.src !== logo) {
+                    e.currentTarget.src = logo;
+                  }
+                }}
               />
               <div className="space-y-1">
                 <h1 className="text-3xl md:text-4xl font-extrabold tracking-wide bg-gradient-to-r from-amber-100 via-lime-200 to-emerald-200 bg-clip-text text-transparent">
-                  Fıstık Kafe Yönetim Paneli
+                  {displayName}
                 </h1>
                 <p className="text-sm md:text-base text-white/70">
                   Hoş geldiniz!

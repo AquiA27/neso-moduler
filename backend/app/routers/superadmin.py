@@ -444,20 +444,22 @@ async def quick_setup(
         )
         sube_id = sube["id"]
         
-        # 3. Admin kullanıcı oluştur
+        # 3. Admin kullanıcı oluştur (tenant_id ile)
         sifre_hash = hash_password(payload.admin_password)
         await db.execute(
             """
-            INSERT INTO users (username, sifre_hash, role, aktif)
-            VALUES (:username, :sifre_hash, 'admin', TRUE)
+            INSERT INTO users (username, sifre_hash, role, tenant_id, aktif)
+            VALUES (:username, :sifre_hash, 'admin', :tenant_id, TRUE)
             ON CONFLICT (username) DO UPDATE
                SET sifre_hash = EXCLUDED.sifre_hash,
                    role = EXCLUDED.role,
+                   tenant_id = EXCLUDED.tenant_id,
                    aktif = TRUE
             """,
             {
                 "username": payload.admin_username,
                 "sifre_hash": sifre_hash,
+                "tenant_id": isletme_id,
             },
         )
         

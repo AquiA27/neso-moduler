@@ -1,6 +1,32 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
-const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+// API URL'ini normalize et (protokol eksikse veya yanlışsa düzelt)
+const normalizeApiUrl = (url: string | undefined): string => {
+  if (!url) {
+    return 'http://localhost:8000';
+  }
+  
+  // Başındaki/sonundaki boşlukları temizle
+  url = url.trim();
+  
+  // Protokol yoksa veya yanlışsa düzelt
+  if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    // Eğer 'ttps://' gibi bir hata varsa düzelt
+    if (url.startsWith('ttps://')) {
+      url = 'https://' + url.substring(7);
+    } else {
+      // Protokol yoksa https ekle (production için)
+      url = 'https://' + url;
+    }
+  }
+  
+  // Sonundaki / işaretini kaldır
+  url = url.replace(/\/$/, '');
+  
+  return url;
+};
+
+const API_BASE_URL = normalizeApiUrl(import.meta.env?.VITE_API_URL as string);
 
 // Axios instance oluştur
 const apiClient: AxiosInstance = axios.create({
