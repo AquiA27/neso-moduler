@@ -107,7 +107,10 @@ async def on_startup():
     print(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
 
     print("[STARTUP] Connecting to database...")
-    print(f"[STARTUP] Connection pool: min={settings.DB_POOL_MIN_SIZE}, max={settings.DB_POOL_MAX_SIZE}, timeout={settings.DB_COMMAND_TIMEOUT}s")
+    # min_size ve max_size validasyonu (min_size max_size'tan küçük veya eşit olmalı)
+    min_size = min(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
+    max_size = max(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
+    print(f"[STARTUP] Connection pool: min={min_size}, max={max_size}, timeout={settings.DB_COMMAND_TIMEOUT}s")
     await db.connect()
     print("[STARTUP] Database connected, creating tables...")
     try:
