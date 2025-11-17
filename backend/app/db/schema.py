@@ -387,6 +387,45 @@ async def _ensure_ai_views(db: Database) -> None:
                 logging.error("Failed to create AI view %s: %s", filename, exc)
 
 
+async def _ensure_super_admin(db: Database) -> None:
+    """Eğer hiç super_admin kullanıcısı yoksa, default super admin oluştur."""
+    try:
+        # Super admin kullanıcısı var mı kontrol et
+        existing = await db.fetch_one(
+            "SELECT id FROM users WHERE role = 'super_admin' LIMIT 1"
+        )
+        
+        if existing:
+            logging.info("Super admin user already exists, skipping creation")
+            return
+        
+        # Super admin yoksa oluştur
+        from ..core.security import hash_password
+        
+        username = "super"
+        password = "super123"
+        hashed = hash_password(password)
+        
+        await db.execute(
+            """
+            INSERT INTO users (username, sifre_hash, role, aktif)
+            VALUES (:u, :h, 'super_admin', TRUE)
+            ON CONFLICT (username) DO UPDATE
+               SET sifre_hash = EXCLUDED.sifre_hash,
+                   role = 'super_admin',
+                   aktif = TRUE
+            """,
+            {"u": username, "h": hashed}
+        )
+        
+        logging.info(f"[STARTUP] Created default super admin user: {username}")
+        print(f"[STARTUP] ✅ Created default super admin user: {username} / {password}")
+        
+    except Exception as e:
+        logging.error(f"Failed to ensure super admin user: {e}", exc_info=True)
+        print(f"[STARTUP] ⚠️ Warning: Could not create super admin user: {e}")
+
+
 async def create_tables(db: Database):
     # Unaccent eklentisi (varsa geç)
     try:
@@ -559,6 +598,9 @@ async def create_tables(db: Database):
         pass
 
     await _ensure_ai_views(db)
+    
+    # Eğer hiç super_admin kullanıcısı yoksa, default super admin oluştur
+    await _ensure_super_admin(db)
 
 
 async def ensure_demo_seed(db: Database):
