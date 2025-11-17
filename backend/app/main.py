@@ -1,4 +1,5 @@
 # backend/app/main.py
+import os
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -106,6 +107,7 @@ async def on_startup():
     print(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
 
     print("[STARTUP] Connecting to database...")
+    print(f"[STARTUP] Connection pool: min={settings.DB_POOL_MIN_SIZE}, max={settings.DB_POOL_MAX_SIZE}, timeout={settings.DB_COMMAND_TIMEOUT}s")
     await db.connect()
     print("[STARTUP] Database connected, creating tables...")
     try:

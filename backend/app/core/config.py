@@ -62,6 +62,13 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "postgresql+asyncpg://neso:neso123@localhost:5432/neso"
     # Tek DB kullanıyorsan MENU_DATABASE_URL boş kalabilir.
     MENU_DATABASE_URL: Optional[str] = None
+    
+    # ---------- Database Connection Pool ----------
+    # Cross-region latency için optimize edilmiş ayarlar
+    DB_POOL_MIN_SIZE: int = 5  # Minimum connection sayısı (persistent connections)
+    DB_POOL_MAX_SIZE: int = 20  # Maximum connection sayısı (traffic spikes için)
+    DB_COMMAND_TIMEOUT: int = 10  # Query timeout (saniye) - cross-region için artırıldı
+    DB_POOL_MAX_INACTIVE_CONNECTION_LIFETIME: float = 300.0  # Inactive connection lifetime (saniye)
 
     # ---------- CORS ----------
     CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:5173", "http://localhost:3000"]

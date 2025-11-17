@@ -36,17 +36,47 @@ const apiClient: AxiosInstance = axios.create({
   },
 });
 
-// Request interceptor - her istekte token ve şube ID ekle
+// Request interceptor - her istekte token, şube ID ve tenant ID ekle
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     const token = localStorage.getItem('neso.accessToken') || sessionStorage.getItem('neso.token');
     const subeId = Number(localStorage.getItem('neso.subeId') || sessionStorage.getItem('neso.subeId') || '1');
+    const selectedTenantId = localStorage.getItem('neso.selectedTenantId');
+    const userStr = localStorage.getItem('neso-auth-storage');
+    
+    // Super admin mi kontrol et
+    let isSuperAdmin = false;
+    try {
+      if (userStr) {
+        const authData = JSON.parse(userStr);
+        const user = authData.state?.user;
+        if (user) {
+          const role = user.role?.toLowerCase();
+          const username = user.username?.toLowerCase();
+          isSuperAdmin = role === 'super_admin' || username === 'super';
+        }
+      }
+    } catch (e) {
+      console.warn('Auth data parse error:', e);
+    }
     
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     if (subeId) {
       config.headers['X-Sube-Id'] = String(subeId);
+    }
+    
+    // Super admin için selectedTenantId'yi query parameter veya header olarak ekle
+    if (isSuperAdmin && selectedTenantId) {
+      // Query parameter olarak ekle
+      if (config.params) {
+        config.params.tenant_id = selectedTenantId;
+      } else {
+        config.params = { tenant_id: selectedTenantId };
+      }
+      // Header olarak da ekle (backend her iki yöntemi de destekliyor)
+      config.headers['X-Tenant-Id'] = selectedTenantId;
     }
 
     if (config.data instanceof FormData) {

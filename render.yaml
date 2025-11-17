@@ -1,60 +1,71 @@
+# Render.com configuration file
+# Bu dosyayı proje root'unda tut (backend/ değil, root'ta)
+# https://render.com/docs/yaml-spec
+
 services:
   - type: web
-    name: neso-backend
+    name: neso-moduler-backend
     env: python
-    region: frankfurt
-    plan: starter
-    buildCommand: |
-      cd backend
-      pip install --upgrade pip
-      pip install -r requirements.txt
-    startCommand: |
-      cd backend
-      alembic upgrade head
-      uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
-    healthCheckPath: /health
+    region: frankfurt  # Frankfurt (EU Central) - Türkiye için en iyi
+    plan: starter  # veya free (test için), professional (production için)
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
+      # Database - Render PostgreSQL connection string
+      # Format: postgresql+asyncpg://user:pass@host:port/db
       - key: DATABASE_URL
-        fromDatabase:
-          name: neso-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          name: neso-redis
-          type: redis
-          property: connectionString
+        sync: false  # Manuel olarak ayarla (Render database URL'ini kullan)
+      
+      # JWT Secret
       - key: SECRET_KEY
-        generateValue: true
+        generateValue: true  # Render otomatik oluşturur
+      
+      # Environment
       - key: ENV
-        value: production
-      - key: RATE_LIMIT_PER_MINUTE
-        value: 60
+        value: prod
+      
+      # CORS Origins (Vercel frontend URL'leri)
       - key: CORS_ORIGINS
-        value: https://neso-frontend.vercel.app,https://*.vercel.app
-      - key: MEDIA_ROOT
-        value: /opt/render/project/src/backend/media
-      - key: BACKUP_DIR
-        value: /opt/render/project/src/backend/backups
+        value: https://neso-moduler.vercel.app,https://www.neso-moduler.vercel.app
+      
+      # Database Connection Pool (Cross-region optimization)
+      - key: DB_POOL_MIN_SIZE
+        value: 5
+      - key: DB_POOL_MAX_SIZE
+        value: 20
+      - key: DB_COMMAND_TIMEOUT
+        value: 10
+      
+      # Cache
+      - key: CACHE_TTL_SHORT
+        value: 60
+      - key: CACHE_TTL_MEDIUM
+        value: 300
+      - key: CACHE_TTL_LONG
+        value: 1800
+      
+      # Redis (Opsiyonel - eğer Redis service ekleyeceksen)
+      - key: REDIS_ENABLED
+        value: false
+      
+      # Backup (Opsiyonel)
+      - key: BACKUP_ENABLED
+        value: false
+      
+      # OpenAI (Opsiyonel)
       - key: OPENAI_API_KEY
-        sync: false
-      - key: TTS_PROVIDER
-        value: google
-      - key: GOOGLE_TTS_API_KEY
-        sync: false
+        sync: false  # Manuel olarak ayarla (varsa)
 
-databases:
-  - name: neso-db
-    databaseName: neso
-    user: neso
-    plan: starter
-    region: frankfurt
+# Database service (Opsiyonel - eğer yeni database kurmak istiyorsan)
+# database:
+#   name: neso-moduler-db
+#   databaseName: neso
+#   user: neso
+#   plan: starter  # veya free (test için), professional (production için)
+#   region: frankfurt  # Frankfurt (EU Central) - Backend ile aynı region olmalı!
 
-  - type: redis
-    name: neso-redis
-    plan: starter
-    region: frankfurt
-    maxmemoryPolicy: allkeys-lru
-
-
+# Redis service (Opsiyonel - eğer caching için Redis kullanacaksan)
+# redis:
+#   name: neso-moduler-redis
+#   plan: starter
+#   region: frankfurt  # Frankfurt (EU Central) - Backend ile aynı region olmalı!

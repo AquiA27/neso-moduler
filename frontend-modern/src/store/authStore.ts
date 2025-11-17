@@ -21,6 +21,7 @@ interface AuthState {
   refreshToken: string | null;
   subeId: number;
   tenantId: number | null;
+  selectedTenantId: number | null;  // Super admin için seçilen tenant (impersonate mode)
   tenantCustomization: TenantCustomization | null;
   theme: 'light' | 'dark';
   isAuthenticated: boolean;
@@ -30,6 +31,8 @@ interface AuthState {
   setTokens: (accessToken: string, refreshToken?: string) => void;
   setSubeId: (subeId: number) => void;
   setTenantId: (tenantId: number | null) => void;
+  setSelectedTenantId: (tenantId: number | null) => void;  // Super admin için tenant seç
+  clearImpersonation: () => void;  // Impersonate'i temizle
   setTenantCustomization: (customization: TenantCustomization | null) => void;
   setTheme: (theme: 'light' | 'dark') => void;
   logout: () => void;
@@ -43,6 +46,7 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       subeId: 1,
       tenantId: null,
+      selectedTenantId: null,  // Super admin için seçilen tenant
       tenantCustomization: null,
       theme: 'dark',
       isAuthenticated: false,
@@ -87,6 +91,20 @@ export const useAuthStore = create<AuthState>()(
         }
       },
       
+      setSelectedTenantId: (tenantId) => {
+        set({ selectedTenantId: tenantId });
+        if (tenantId) {
+          localStorage.setItem('neso.selectedTenantId', String(tenantId));
+        } else {
+          localStorage.removeItem('neso.selectedTenantId');
+        }
+      },
+      
+      clearImpersonation: () => {
+        set({ selectedTenantId: null });
+        localStorage.removeItem('neso.selectedTenantId');
+      },
+      
       setTenantCustomization: (customization) => {
         set({ tenantCustomization: customization });
         if (customization?.primary_color && typeof document !== 'undefined') {
@@ -109,6 +127,7 @@ export const useAuthStore = create<AuthState>()(
           accessToken: null,
           refreshToken: null,
           tenantId: null,
+          selectedTenantId: null,
           tenantCustomization: null,
           theme: 'dark',
           isAuthenticated: false,
@@ -117,6 +136,7 @@ export const useAuthStore = create<AuthState>()(
         localStorage.removeItem('neso.refreshToken');
         localStorage.removeItem('neso.subeId');
         localStorage.removeItem('neso.tenantId');
+        localStorage.removeItem('neso.selectedTenantId');
         localStorage.removeItem('neso.theme');
         sessionStorage.removeItem('neso.token');
         sessionStorage.removeItem('neso.subeId');
@@ -136,6 +156,7 @@ export const useAuthStore = create<AuthState>()(
         refreshToken: state.refreshToken,
         subeId: state.subeId,
         tenantId: state.tenantId,
+        selectedTenantId: state.selectedTenantId,
         theme: state.theme,
         isAuthenticated: state.isAuthenticated,
       }),

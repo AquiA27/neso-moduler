@@ -1,8 +1,9 @@
 # backend/app/core/deps.py
 from typing import Dict, Any, Mapping, Optional, Set
 
-from fastapi import Depends, HTTPException, status, Header, Query
+from fastapi import Depends, HTTPException, status, Header, Query, Request
 from fastapi.security import OAuth2PasswordBearer
+from starlette.requests import Request as StarletteRequest
 from jose import jwt, JWTError
 
 from ..db.database import db
@@ -29,10 +30,14 @@ def decode_token(token: str) -> Dict[str, Any]:
 # ---------------------------
 # Kimlik ve Rol
 # ---------------------------
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> Mapping[str, Any]:
+async def get_current_user(
+    request: StarletteRequest,
+    token: str = Depends(oauth2_scheme),
+) -> Mapping[str, Any]:
     """
     JWT 'sub' içinden kullanıcıyı DB'den çeker ve aktifliğini doğrular.
-    Dönüş: {"id": ..., "username": ..., "role": ..., "aktif": ..., "tenant_id": ...}
+    Super admin için X-Tenant-Id header'ını veya tenant_id query parameter'ını kontrol eder (tenant switching).
+    Dönüş: {"id": ..., "username": ..., "role": ..., "aktif": ..., "tenant_id": ..., "switched_tenant_id": ...}
     """
     payload = decode_token(token)
     sub = payload.get("sub")
@@ -64,6 +69,38 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> Mapping[str, 
     # Tenant_id'yi token'dan veya DB'den al
     tenant_id = user_dict.get("tenant_id") or token_tenant_id
     user_dict["tenant_id"] = tenant_id
+    
+    # Super admin için X-Tenant-Id header'ını veya tenant_id query parameter'ını kontrol et (tenant switching)
+    switched_tenant_id = None
+    if user_dict.get("role") == "super_admin" and request:
+        # Önce query parameter'ı kontrol et (frontend'den gelen)
+        query_params = dict(request.query_params) if hasattr(request, 'query_params') else {}
+        tenant_id_param = query_params.get("tenant_id")
+        
+        # Sonra header'ı kontrol et (alternatif yöntem)
+        x_tenant_id = request.headers.get("X-Tenant-Id")
+        
+        # Query parameter öncelikli, yoksa header
+        tenant_id_value = tenant_id_param or x_tenant_id
+        
+        if tenant_id_value:
+            try:
+                switched_tenant_id = int(tenant_id_value)
+                # Tenant'ın var olduğunu ve aktif olduğunu kontrol et
+                tenant_check = await db.fetch_one(
+                    "SELECT id, aktif FROM isletmeler WHERE id = :tid",
+                    {"tid": switched_tenant_id},
+                )
+                if not tenant_check or not tenant_check.get("aktif"):
+                    # Tenant yoksa veya pasifse, switched_tenant_id'yi None yap
+                    switched_tenant_id = None
+                else:
+                    # Super admin'in bu tenant'ın context'inde çalışması için tenant_id'yi geçici olarak değiştir
+                    user_dict["switched_tenant_id"] = switched_tenant_id
+                    user_dict["tenant_id"] = switched_tenant_id  # Geçici olarak switched tenant'ın context'i
+            except (ValueError, TypeError):
+                # Geçersiz tenant_id, görmezden gel
+                switched_tenant_id = None
     
     return user_dict
 

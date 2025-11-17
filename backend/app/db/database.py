@@ -1,13 +1,29 @@
 # backend/app/db/database.py
 from databases import Database
 from ..core.config import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Ana DB (PostgreSQL)
-db = Database(settings.DATABASE_URL, min_size=1, max_size=5)
+# Cross-region latency için optimize edilmiş connection pool
+# Daha fazla persistent connection = daha az connection overhead
+db = Database(
+    settings.DATABASE_URL,
+    min_size=settings.DB_POOL_MIN_SIZE,
+    max_size=settings.DB_POOL_MAX_SIZE,
+    # Command timeout - cross-region latency için artırıldı (saniye)
+    command_timeout=settings.DB_COMMAND_TIMEOUT,
+)
 
 # İsteğe bağlı ikinci DB (örn. ayrı menü DB'si kullanacaksan)
 _menu_url = getattr(settings, "MENU_DATABASE_URL", None) or settings.DATABASE_URL
-menu_db = Database(_menu_url, min_size=1, max_size=5)
+menu_db = Database(
+    _menu_url,
+    min_size=settings.DB_POOL_MIN_SIZE,
+    max_size=settings.DB_POOL_MAX_SIZE,
+    command_timeout=settings.DB_COMMAND_TIMEOUT,
+)
 
 async def connect_all():
     if not db.is_connected:

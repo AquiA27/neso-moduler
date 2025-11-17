@@ -5,6 +5,7 @@ import { customizationApi } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
 import { Menu, Settings, LogOut } from 'lucide-react';
 import logo from '../assets/fistik-logo.svg';
+import TenantSwitcher from './TenantSwitcher';
 
 function Layout() {
   const { user, logout, tenantId, tenantCustomization, setTenantCustomization } = useAuthStore();
@@ -219,6 +220,7 @@ function Layout() {
               <nav className="flex flex-wrap items-center gap-2">
                 {renderNavLinks('desktop')}
               </nav>
+              {showSuperAdmin && <TenantSwitcher />}
               <button
                 onClick={() => navigate('/system')}
                 className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-white/80 transition hover:bg-white/10"
