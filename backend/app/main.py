@@ -75,9 +75,19 @@ app.mount(
 # ---- CORS (frontend rahat bağlansın) ----
 # ÖNEMLİ: CORS middleware EN SON eklenmeli (en önce çalışmalı - OPTIONS preflight için)
 # Middleware'ler ters sırada çalışır: son eklenen ilk çalışır
+
+# CORS_ORIGINS'in list olduğundan emin ol (field_validator parse ediyor ama yine de kontrol edelim)
+cors_origins_list = settings.CORS_ORIGINS
+if isinstance(cors_origins_list, str):
+    # Eğer hala string ise parse et
+    from ..core.config import _parse_list
+    cors_origins_list = _parse_list(cors_origins_list)
+elif not isinstance(cors_origins_list, list):
+    cors_origins_list = []
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
+    allow_origins=cors_origins_list,  # List[str] olmalı
     allow_credentials=settings.CORS_ALLOW_CREDENTIALS,
     allow_methods=settings.CORS_ALLOW_METHODS,
     allow_headers=settings.CORS_ALLOW_HEADERS,
@@ -105,8 +115,12 @@ async def on_startup():
     validate_startup()
     
     # Debug: CORS ayarlarını logla
-    print(f"[STARTUP] CORS_ORIGINS: {settings.CORS_ORIGINS}")
+    print(f"[STARTUP] CORS_ORIGINS (raw): {settings.CORS_ORIGINS}")
+    print(f"[STARTUP] CORS_ORIGINS (type): {type(settings.CORS_ORIGINS)}")
+    print(f"[STARTUP] CORS_ORIGINS (parsed): {cors_origins_list}")
     print(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
+    print(f"[STARTUP] CORS_ALLOW_METHODS: {settings.CORS_ALLOW_METHODS}")
+    print(f"[STARTUP] CORS_ALLOW_HEADERS: {settings.CORS_ALLOW_HEADERS}")
 
     print("[STARTUP] Connecting to database...")
     # min_size ve max_size validasyonu (min_size max_size'tan küçük veya eşit olmalı)
