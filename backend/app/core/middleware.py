@@ -59,6 +59,7 @@ class ErrorMiddleware(BaseHTTPMiddleware):
     """
     Tüm beklenmeyen hataları tek biçimde döndürür.
     DEV: stack izini de ekler.
+    CORS header'larını manuel olarak ekler (exception durumunda CORS middleware çalışmayabilir).
     """
     async def dispatch(self, request: Request, call_next):
         try:
@@ -77,4 +78,23 @@ class ErrorMiddleware(BaseHTTPMiddleware):
             }
             if settings.ENV != "prod":
                 payload["stack"] = traceback.format_exc()
-            return JSONResponse(payload, status_code=500)
+            
+            # CORS header'larını manuel olarak ekle (exception durumunda CORS middleware çalışmayabilir)
+            headers = {}
+            origin = request.headers.get("origin")
+            if origin:
+                # CORS_ORIGINS listesini kontrol et
+                from .config import _parse_list
+                cors_origins = _parse_list(settings.CORS_ORIGINS)
+                if origin in cors_origins or "*" in cors_origins:
+                    headers["Access-Control-Allow-Origin"] = origin
+                    if settings.CORS_ALLOW_CREDENTIALS:
+                        headers["Access-Control-Allow-Credentials"] = "true"
+            
+            # OPTIONS preflight için ek header'lar
+            if request.method == "OPTIONS":
+                headers["Access-Control-Allow-Methods"] = ", ".join(settings.CORS_ALLOW_METHODS) if isinstance(settings.CORS_ALLOW_METHODS, list) else "*"
+                headers["Access-Control-Allow-Headers"] = ", ".join(settings.CORS_ALLOW_HEADERS) if isinstance(settings.CORS_ALLOW_HEADERS, list) else "*"
+                headers["Access-Control-Max-Age"] = "86400"  # 24 saat
+            
+            return JSONResponse(payload, status_code=500, headers=headers)

@@ -70,13 +70,35 @@ class RequestIdAndRateLimitMiddleware(BaseHTTPMiddleware):
             # Hata durumunda da Request-ID header'ı basalım
             duration_ms = int((time.perf_counter() - start) * 1000)
             logger.exception(f"[ERR] {req_id} {request.method} {request.url.path} {type(e).__name__}: {e}")
+            
+            # CORS header'larını manuel olarak ekle (exception durumunda CORS middleware çalışmayabilir)
+            headers = {}
+            if settings.ADD_REQUEST_ID_HEADER:
+                headers["X-Request-ID"] = req_id
+            
+            origin = request.headers.get("origin")
+            if origin:
+                # CORS_ORIGINS listesini kontrol et
+                from ..core.config import _parse_list
+                cors_origins = _parse_list(settings.CORS_ORIGINS)
+                if origin in cors_origins or "*" in cors_origins:
+                    headers["Access-Control-Allow-Origin"] = origin
+                    if settings.CORS_ALLOW_CREDENTIALS:
+                        headers["Access-Control-Allow-Credentials"] = "true"
+            
+            # OPTIONS preflight için ek header'lar
+            if request.method == "OPTIONS":
+                headers["Access-Control-Allow-Methods"] = ", ".join(settings.CORS_ALLOW_METHODS) if isinstance(settings.CORS_ALLOW_METHODS, list) else "*"
+                headers["Access-Control-Allow-Headers"] = ", ".join(settings.CORS_ALLOW_HEADERS) if isinstance(settings.CORS_ALLOW_HEADERS, list) else "*"
+                headers["Access-Control-Max-Age"] = "86400"  # 24 saat
+            
             return JSONResponse(
                 status_code=500,
                 content={
                     "detail": "Internal Server Error",
                     "request_id": req_id,
                 },
-                headers={"X-Request-ID": req_id} if settings.ADD_REQUEST_ID_HEADER else None,
+                headers=headers if headers else None,
             )
 
         # Response'a Request-ID ekle
