@@ -77,10 +77,11 @@ app.mount(
 # Middleware'ler ters sırada çalışır: son eklenen ilk çalışır
 
 # CORS_ORIGINS'in list olduğundan emin ol (field_validator parse ediyor ama yine de kontrol edelim)
+from .core.config import _parse_list
+
 cors_origins_list = settings.CORS_ORIGINS
 if isinstance(cors_origins_list, str):
     # Eğer hala string ise parse et
-    from ..core.config import _parse_list
     cors_origins_list = _parse_list(cors_origins_list)
 elif not isinstance(cors_origins_list, list):
     cors_origins_list = []
