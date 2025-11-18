@@ -105,12 +105,15 @@ async def get_current_user(
     return user_dict
 
 
-async def get_current_user_and_role(token: str = Depends(oauth2_scheme)) -> Mapping[str, Any]:
+async def get_current_user_and_role(
+    request: StarletteRequest,
+    token: str = Depends(oauth2_scheme)
+) -> Mapping[str, Any]:
     """
     Rolü token'dan **değil**, DB'den okur (güncel yetki için daha güvenli).
     """
     import logging
-    user = await get_current_user(token)
+    user = await get_current_user(request, token)
     logging.info(f"get_current_user_and_role: user={user}")
     return {"username": user["username"], "role": user["role"], "id": user["id"]}
 
