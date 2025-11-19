@@ -214,49 +214,61 @@ def _match_voice(engine: pyttsx3.Engine, language: str) -> bool:
 
 def _synthesize_system_sync(text: str, language: Optional[str], rate: Optional[int]) -> bytes:
     """Blocking synthesis helper executed outside the event loop."""
-    co_initialized = False
-    if pythoncom is not None:
-        try:
-            pythoncom.CoInitialize()
-            co_initialized = True
-        except Exception:  # pragma: no cover - defensive
-            logging.debug("TTS: pythoncom.CoInitialize failed", exc_info=True)
-
-    engine = pyttsx3.init()
     try:
-        if language:
-            matched = _match_voice(engine, language)
-            if not matched:
-                logging.debug("TTS: no dedicated voice for language '%s'; using default", language)
-
-        if rate:
+        co_initialized = False
+        if pythoncom is not None:
             try:
-                engine.setProperty("rate", rate)
+                pythoncom.CoInitialize()
+                co_initialized = True
             except Exception:  # pragma: no cover - defensive
-                logging.debug("TTS: unable to set rate=%s", rate, exc_info=True)
+                logging.debug("TTS: pythoncom.CoInitialize failed", exc_info=True)
 
-        fd, path = tempfile.mkstemp(suffix=".wav")
-        os.close(fd)
+        engine = pyttsx3.init()
         try:
-            engine.save_to_file(text, path)
-            engine.runAndWait()
-            with open(path, "rb") as handle:
-                return handle.read()
+            if language:
+                matched = _match_voice(engine, language)
+                if not matched:
+                    logging.debug("TTS: no dedicated voice for language '%s'; using default", language)
+
+            if rate:
+                try:
+                    engine.setProperty("rate", rate)
+                except Exception:  # pragma: no cover - defensive
+                    logging.debug("TTS: unable to set rate=%s", rate, exc_info=True)
+
+            fd, path = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)
+            try:
+                engine.save_to_file(text, path)
+                engine.runAndWait()
+                with open(path, "rb") as handle:
+                    return handle.read()
+            finally:
+                try:
+                    os.remove(path)
+                except FileNotFoundError:
+                    pass
         finally:
             try:
-                os.remove(path)
-            except FileNotFoundError:
+                engine.stop()
+            except Exception:
                 pass
-    finally:
-        try:
-            engine.stop()
-        except Exception:
-            pass
-        if co_initialized:
-            try:
-                pythoncom.CoUninitialize()
-            except Exception:  # pragma: no cover - defensive
-                logging.debug("TTS: pythoncom.CoUninitialize failed", exc_info=True)
+            if co_initialized:
+                try:
+                    pythoncom.CoUninitialize()
+                except Exception:  # pragma: no cover - defensive
+                    logging.debug("TTS: pythoncom.CoUninitialize failed", exc_info=True)
+    except OSError as e:
+        # libespeak.so.1 veya benzer sistem kütüphanesi eksik
+        logging.warning(f"TTS system library not available: {e}. Falling back to silent audio.")
+        # Sessiz bir WAV dosyası döndür (44 bytes - minimal WAV header)
+        silent_wav = b'RIFF$\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00D\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00'
+        return silent_wav
+    except Exception as e:
+        # Diğer hatalar için de sessiz audio döndür
+        logging.warning(f"TTS synthesis failed: {e}. Falling back to silent audio.", exc_info=True)
+        silent_wav = b'RIFF$\x00\x00\x00WAVEfmt \x10\x00\x00\x00\x01\x00\x01\x00D\xac\x00\x00\x88X\x01\x00\x02\x00\x10\x00data\x00\x00\x00\x00'
+        return silent_wav
 
 
 async def _synthesize_google(text: str, language: Optional[str], voice_id: Optional[str], speech_rate: Optional[float] = None) -> bytes:

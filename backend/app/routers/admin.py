@@ -664,12 +664,42 @@ async def personel_analiz(
     logging.info(f"personel_analiz called: user={user['username']}, gun_say={gun_say}, limit={limit}, effective_tenant_id={effective_tenant_id}")
     
     try:
-        sube_id = await resolve_sube_id_or_none(
-            tum_subeler=tum_subeler,
-            username=user["username"],
-            x_sube_id=x_sube_id,
-            sube_id_q=sube_id_q,
-        )
+        # Super admin tenant switching yapıyorsa ve sube_id belirtilmemişse, o tenant'ın ilk şubesini bul
+        if effective_tenant_id and (not x_sube_id and not sube_id_q):
+            # Önce tenant'ın şubelerini kontrol et
+            tenant_sube = await db.fetch_one(
+                """
+                SELECT id FROM subeler 
+                WHERE isletme_id = :tid AND aktif = TRUE 
+                ORDER BY id ASC 
+                LIMIT 1
+                """,
+                {"tid": effective_tenant_id},
+            )
+            if tenant_sube:
+                tenant_sube_dict = dict(tenant_sube) if hasattr(tenant_sube, 'keys') else tenant_sube
+                tenant_sube_id = tenant_sube_dict.get("id") if isinstance(tenant_sube_dict, dict) else (getattr(tenant_sube, "id", None) if tenant_sube else None)
+                if tenant_sube_id:
+                    # Tenant'ın şubesi varsa, otomatik olarak onu kullan
+                    sube_id_q = tenant_sube_id
+                    logging.info(f"[PERSONEL_ANALIZ] Using tenant {effective_tenant_id}'s first branch: {tenant_sube_id}")
+        
+        try:
+            sube_id = await resolve_sube_id_or_none(
+                tum_subeler=tum_subeler,
+                username=user["username"],
+                x_sube_id=x_sube_id,
+                sube_id_q=sube_id_q,
+            )
+        except HTTPException as sube_error:
+            # Şube bulunamadı veya pasif - sadece tenant filtresi ile devam et (sube_id olmadan)
+            if effective_tenant_id:
+                sube_id = None
+                logging.warning(f"[PERSONEL_ANALIZ] Sube not found/active, continuing with tenant filter only (tenant_id={effective_tenant_id})")
+            else:
+                # Tenant ID de yoksa hata döndür
+                logging.error(f"[PERSONEL_ANALIZ] Sube not found/active and no tenant_id available")
+                raise
         
         # Tarih aralığı hesapla
         end_date = datetime.now().replace(hour=23, minute=59, second=59, microsecond=999999)
