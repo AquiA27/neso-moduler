@@ -218,7 +218,11 @@ async def tenant_delete(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     if not isletme:
         raise HTTPException(status_code=404, detail="İşletme bulunamadı")
     
-    logging.info(f"[TENANT_DELETE] İşletme siliniyor: id={id}, ad={isletme.get('ad')}")
+    # Record objesini dictionary'ye çevir
+    isletme_dict = dict(isletme) if hasattr(isletme, 'keys') else isletme
+    isletme_ad = isletme_dict.get('ad') if isinstance(isletme_dict, dict) else getattr(isletme, 'ad', 'Bilinmeyen')
+    
+    logging.info(f"[TENANT_DELETE] İşletme siliniyor: id={id}, ad={isletme_ad}")
     
     # Transaction içinde cascade delete
     # Foreign key'ler ON DELETE CASCADE olduğu için otomatik silinir:
@@ -231,7 +235,7 @@ async def tenant_delete(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     await db.execute("DELETE FROM isletmeler WHERE id = :id", {"id": id})
     
     logging.info(f"[TENANT_DELETE] İşletme ve ilişkili veriler silindi: id={id}")
-    return {"ok": True, "message": f"İşletme '{isletme.get('ad')}' ve tüm ilişkili veriler silindi"}
+    return {"ok": True, "message": f"İşletme '{isletme_ad}' ve tüm ilişkili veriler silindi"}
 
 
 # ---- Kullanıcılar ----
