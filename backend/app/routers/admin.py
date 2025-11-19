@@ -666,6 +666,229 @@ async def personeller_upsert(payload: UserUpsertIn, user: Dict[str, Any] = Depen
     return {"ok": True}
 
 
+# ---- Personel İzin Yönetimi ----
+# Permission constants (superadmin'dan import et veya buraya kopyala)
+PERMISSION_KEYS = {
+    "menu_ekle": "Menü Ekleme",
+    "menu_guncelle": "Menü Güncelleme",
+    "menu_sil": "Menü Silme",
+    "menu_varyasyon_yonet": "Menü Varyasyon Yönetimi",
+    "stok_ekle": "Stok Ekleme",
+    "stok_guncelle": "Stok Güncelleme",
+    "stok_sil": "Stok Silme",
+    "stok_goruntule": "Stok Görüntüleme",
+    "siparis_ekle": "Sipariş Ekleme",
+    "siparis_guncelle": "Sipariş Güncelleme",
+    "siparis_sil": "Sipariş Silme",
+    "siparis_goruntule": "Sipariş Görüntüleme",
+    "odeme_ekle": "Ödeme Ekleme",
+    "odeme_iptal": "Ödeme İptal",
+    "odeme_goruntule": "Ödeme Görüntüleme",
+    "hesap_kapat": "Hesap Kapatma",
+    "adisyon_yonet": "Adisyon Yönetimi",
+    "mutfak_yonet": "Mutfak Yönetimi",
+    "masa_yonet": "Masa Yönetimi",
+    "gider_ekle": "Gider Ekleme",
+    "gider_guncelle": "Gider Güncelleme",
+    "gider_sil": "Gider Silme",
+    "gider_goruntule": "Gider Görüntüleme",
+    "rapor_goruntule": "Rapor Görüntüleme",
+    "rapor_export": "Rapor Export (Excel/PDF)",
+    "personel_yonet": "Personel Yönetimi",
+    "personel_goruntule": "Personel Görüntüleme",
+    "analytics_goruntule": "Analitik Görüntüleme",
+    "bi_assistant": "İşletme Asistanı",
+    "ayarlar_yonet": "Ayarlar Yönetimi",
+}
+
+DEFAULT_PERMISSIONS_BY_ROLE = {
+    "admin": [
+        "menu_ekle", "menu_guncelle", "menu_sil", "menu_varyasyon_yonet",
+        "stok_ekle", "stok_guncelle", "stok_sil", "stok_goruntule",
+        "siparis_ekle", "siparis_guncelle", "siparis_goruntule",
+        "odeme_ekle", "odeme_goruntule", "hesap_kapat", "adisyon_yonet",
+        "mutfak_yonet", "masa_yonet",
+        "gider_ekle", "gider_guncelle", "gider_sil", "gider_goruntule",
+        "rapor_goruntule", "rapor_export",
+        "personel_goruntule", "analytics_goruntule", "bi_assistant",
+    ],
+    "operator": [
+        "menu_goruntule", "stok_goruntule",
+        "siparis_ekle", "siparis_guncelle", "siparis_goruntule",
+        "odeme_ekle", "odeme_goruntule", "hesap_kapat", "adisyon_yonet",
+        "mutfak_yonet", "masa_yonet",
+        "rapor_goruntule",
+    ],
+    "barista": [
+        "menu_goruntule", "stok_goruntule",
+        "siparis_ekle", "siparis_goruntule",
+        "odeme_ekle", "odeme_goruntule",
+        "mutfak_yonet",
+    ],
+    "waiter": [
+        "menu_goruntule",
+        "siparis_ekle", "siparis_goruntule",
+        "masa_yonet",
+    ],
+}
+
+class UserPermissionIn(BaseModel):
+    username: str
+    permissions: Dict[str, bool] = Field(
+        default_factory=dict,
+        description="İzin anahtarları ve aktif/pasif durumları"
+    )
+
+class UserPermissionOut(BaseModel):
+    username: str
+    permissions: Dict[str, bool]
+    available_permissions: Dict[str, str]
+
+
+@router.get("/users/{username}/permissions", response_model=UserPermissionOut)
+async def get_user_permissions(
+    username: str,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Kullanıcının mevcut izinlerini getir"""
+    import logging
+    
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+    
+    # Normal admin sadece kendi tenant'ındaki kullanıcıların yetkilerini görebilir
+    if user_role != "super_admin":
+        # Hedef kullanıcının tenant_id'sini kontrol et
+        target_user = await db.fetch_one(
+            "SELECT tenant_id FROM users WHERE username = :u",
+            {"u": username},
+        )
+        if not target_user:
+            raise HTTPException(status_code=404, detail=f"Kullanıcı bulunamadı: {username}")
+        
+        target_user_dict = dict(target_user) if hasattr(target_user, 'keys') else target_user
+        target_tenant_id = target_user_dict.get("tenant_id") if isinstance(target_user_dict, dict) else (getattr(target_user, "tenant_id", None) if target_user else None)
+        
+        # Normal admin sadece kendi tenant'ındaki kullanıcıları görebilir
+        if target_tenant_id != effective_tenant_id:
+            logging.warning(f"[GET_USER_PERMISSIONS] Admin {user.get('username')} tried to access permissions for user {username} from different tenant: {target_tenant_id} != {effective_tenant_id}")
+            raise HTTPException(
+                status_code=403,
+                detail="Bu kullanıcının yetkilerini görüntüleyemezsiniz. Sadece kendi işletmenizdeki kullanıcıların yetkilerini görebilirsiniz."
+            )
+    
+    # Kullanıcının mevcut izinlerini al
+    rows = await db.fetch_all(
+        """
+        SELECT permission_key, enabled
+        FROM user_permissions
+        WHERE username = :u
+        """,
+        {"u": username},
+    )
+    
+    permissions = {r["permission_key"]: r["enabled"] for r in rows}
+    
+    # Eğer kullanıcının hiç izni yoksa, rolüne göre varsayılan izinleri kontrol et
+    if not permissions:
+        user_row = await db.fetch_one(
+            "SELECT role FROM users WHERE username = :u",
+            {"u": username},
+        )
+        if user_row:
+            role = user_row["role"]
+            default_perms = DEFAULT_PERMISSIONS_BY_ROLE.get(role, [])
+            permissions = {perm: True for perm in default_perms}
+    
+    return {
+        "username": username,
+        "permissions": permissions,
+        "available_permissions": PERMISSION_KEYS,
+    }
+
+
+@router.put("/users/{username}/permissions", response_model=UserPermissionOut)
+async def update_user_permissions(
+    username: str,
+    payload: UserPermissionIn,
+    user: Dict[str, Any] = Depends(get_current_user)
+):
+    """Kullanıcının izinlerini güncelle"""
+    import logging
+    
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+    
+    # Kullanıcının var olduğunu kontrol et
+    user_row = await db.fetch_one(
+        "SELECT id, role, tenant_id FROM users WHERE username = :u",
+        {"u": username},
+    )
+    if not user_row:
+        raise HTTPException(status_code=404, detail=f"Kullanıcı bulunamadı: {username}")
+    
+    # Normal admin sadece kendi tenant'ındaki kullanıcıların yetkilerini güncelleyebilir
+    if user_role != "super_admin":
+        user_row_dict = dict(user_row) if hasattr(user_row, 'keys') else user_row
+        target_tenant_id = user_row_dict.get("tenant_id") if isinstance(user_row_dict, dict) else (getattr(user_row, "tenant_id", None) if user_row else None)
+        
+        # Normal admin sadece kendi tenant'ındaki kullanıcıları güncelleyebilir
+        if target_tenant_id != effective_tenant_id:
+            logging.warning(f"[UPDATE_USER_PERMISSIONS] Admin {user.get('username')} tried to update permissions for user {username} from different tenant: {target_tenant_id} != {effective_tenant_id}")
+            raise HTTPException(
+                status_code=403,
+                detail="Bu kullanıcının yetkilerini güncelleyemezsiniz. Sadece kendi işletmenizdeki kullanıcıların yetkilerini güncelleyebilirsiniz."
+            )
+    
+    # Mevcut izinleri sil
+    await db.execute(
+        "DELETE FROM user_permissions WHERE username = :u",
+        {"u": username},
+    )
+    
+    # Yeni izinleri ekle (sadece enabled=True olanları ekle)
+    if payload.permissions:
+        for perm_key, enabled in payload.permissions.items():
+            if perm_key in PERMISSION_KEYS and enabled:
+                await db.execute(
+                    """
+                    INSERT INTO user_permissions (username, permission_key, enabled)
+                    VALUES (:u, :key, :enabled)
+                    ON CONFLICT (username, permission_key) DO UPDATE
+                       SET enabled = EXCLUDED.enabled
+                    """,
+                    {"u": username, "key": perm_key, "enabled": True},
+                )
+    
+    # Güncellenmiş izinleri döndür
+    rows = await db.fetch_all(
+        """
+        SELECT permission_key, enabled
+        FROM user_permissions
+        WHERE username = :u
+        """,
+        {"u": username},
+    )
+    
+    permissions = {r["permission_key"]: r["enabled"] for r in rows}
+    
+    return {
+        "username": username,
+        "permissions": permissions,
+        "available_permissions": PERMISSION_KEYS,
+    }
+
+
+@router.get("/permissions/available", response_model=Dict[str, str])
+async def get_available_permissions(_: Dict[str, Any] = Depends(get_current_user)):
+    """Tüm mevcut izin anahtarlarını listele"""
+    return PERMISSION_KEYS
+
+
 # ---- Personel Satış Analizi ----
 @router.get("/personel-analiz")
 async def personel_analiz(
