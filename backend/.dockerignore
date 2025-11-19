@@ -1,19 +1,118 @@
+# Python
 __pycache__/
 *.py[cod]
-*.log
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Virtual environments
 .venv/
 venv/
 env/
+ENV/
+
+# Testing
 .pytest_cache/
 .mypy_cache/
+.coverage
+coverage.xml
+htmlcov/
+.tox/
+.hypothesis/
+
+# IDEs
 .idea/
 .vscode/
+*.swp
+*.swo
+*.swn
+.history/
+
+# Logs
+*.log
+uvicorn.log
+install.log
+
+# Media & Exports
 media/
+exports/
+backups/
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.mp3
+*.wav
+
+# Test files
+test_*.py
+*_test.py
+tests/
+
+# Script files (not needed in production)
+scripts/
+check_*.py
+create_*.py
+fix_*.py
+add_*.py
+generate_*.py
+migrate_*.py
+init_*.py
+create_views.py
+
+# Alembic cache
 alembic/versions/__pycache__/
+
+# Super admin panel (if not used)
+super-admin-panel/
 super-admin-panel/node_modules/
 super-admin-panel/dist/
+
+# Node modules (if any)
 node_modules/
+
+# Database
 *.sqlite3
+*.db
+*.sql
+*.sql.gz
+*.dump
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Docs
+*.md
+!README.md
+
+# Env files
+.env
+.env.*
+env.docker
+
+# Misc
+*.tmp
+*.bak
+*.swp
+=1.0.0
+nul
 
 
 
