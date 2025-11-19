@@ -23,6 +23,8 @@ class CustomizationIn(BaseModel):
     email: Optional[str] = None
     telefon: Optional[str] = None
     adres: Optional[str] = None
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API anahtarı (işletme bazında)")
+    openai_model: Optional[str] = Field(default="gpt-4o-mini", description="OpenAI model (varsayılan: gpt-4o-mini)")
     meta_settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 
@@ -41,7 +43,8 @@ async def get_customization(
     row = await db.fetch_one(
         """
         SELECT id, isletme_id, domain, app_name, logo_url, primary_color,
-               secondary_color, footer_text, email, telefon, adres, meta_settings,
+               secondary_color, footer_text, email, telefon, adres, 
+               openai_api_key, openai_model, meta_settings,
                created_at, updated_at
         FROM tenant_customizations
         WHERE isletme_id = :id
@@ -62,6 +65,8 @@ async def get_customization(
             "email": None,
             "telefon": None,
             "adres": None,
+            "openai_api_key": None,
+            "openai_model": "gpt-4o-mini",
             "meta_settings": {},
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
@@ -117,14 +122,17 @@ async def create_customization(
         """
         INSERT INTO tenant_customizations (
             isletme_id, domain, app_name, logo_url, primary_color,
-            secondary_color, footer_text, email, telefon, adres, meta_settings
+            secondary_color, footer_text, email, telefon, adres, 
+            openai_api_key, openai_model, meta_settings
         )
         VALUES (
             :isletme_id, :domain, :app_name, :logo_url, :primary_color,
-            :secondary_color, :footer_text, :email, :telefon, :adres, CAST(:meta_settings AS JSONB)
+            :secondary_color, :footer_text, :email, :telefon, :adres, 
+            :openai_api_key, :openai_model, CAST(:meta_settings AS JSONB)
         )
         RETURNING id, isletme_id, domain, app_name, logo_url, primary_color,
-                  secondary_color, footer_text, email, telefon, adres, meta_settings,
+                  secondary_color, footer_text, email, telefon, adres, 
+                  openai_api_key, openai_model, meta_settings,
                   created_at, updated_at
         """,
         data,
@@ -174,17 +182,17 @@ async def update_customization(
     update_values = {"isletme_id": isletme_id, "updated_at": data["updated_at"]}
     
     for field in ["domain", "app_name", "logo_url", "primary_color", "secondary_color",
-                  "footer_text", "email", "telefon", "adres", "meta_settings"]:
+                  "footer_text", "email", "telefon", "adres", "openai_api_key", "openai_model", "meta_settings"]:
         if field in data and data[field] is not None:
             # Boş string'leri None'a çevir (opsiyonel alanlar için)
-            if field in ["domain", "app_name", "logo_url", "footer_text", "email", "telefon", "adres"]:
+            if field in ["domain", "app_name", "logo_url", "footer_text", "email", "telefon", "adres", "openai_api_key"]:
                 if data[field] == "":
                     update_fields.append(f"{field} = NULL")
                 else:
                     update_fields.append(f"{field} = :{field}")
                     update_values[field] = data[field]
             else:
-                # primary_color, secondary_color, meta_settings her zaman güncellenmeli
+                # primary_color, secondary_color, openai_model, meta_settings her zaman güncellenmeli
                 update_fields.append(f"{field} = :{field}")
                 update_values[field] = data[field]
     
@@ -196,7 +204,8 @@ async def update_customization(
         SET {', '.join(update_fields)}, updated_at = :updated_at
         WHERE isletme_id = :isletme_id
         RETURNING id, isletme_id, domain, app_name, logo_url, primary_color,
-                  secondary_color, footer_text, email, telefon, adres, meta_settings,
+                  secondary_color, footer_text, email, telefon, adres, 
+                  openai_api_key, openai_model, meta_settings,
                   created_at, updated_at
     """
     
@@ -216,7 +225,8 @@ async def get_customization_by_domain(
     row = await db.fetch_one(
         """
         SELECT id, isletme_id, domain, app_name, logo_url, primary_color,
-               secondary_color, footer_text, email, telefon, adres, meta_settings,
+               secondary_color, footer_text, email, telefon, adres, 
+               openai_api_key, openai_model, meta_settings,
                created_at, updated_at
         FROM tenant_customizations
         WHERE domain = :domain

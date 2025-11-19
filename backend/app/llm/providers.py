@@ -84,9 +84,18 @@ class OpenAIProvider(LLMProvider):
                         # Ignore malformed chunks
                         continue
 
-    async def chat(self, messages: List[Dict[str, str]], task_type: str = "general") -> str:
+    async def chat(self, messages: List[Dict[str, str]], task_type: str = "general") -> tuple[str, Optional[Dict[str, Any]]]:
+        """
+        OpenAI API'ye mesaj gönder ve yanıt al.
+        
+        Returns:
+            tuple[str, Optional[Dict]]: (response_text, usage_info)
+            usage_info: {"prompt_tokens": int, "completion_tokens": int, "total_tokens": int, "cost_usd": float}
+        """
         import httpx
         import json
+        import time
+        from typing import Optional
 
         # Task-specific parameters
         if task_type == "bi_analysis":
@@ -114,6 +123,10 @@ class OpenAIProvider(LLMProvider):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        
+        start_time = time.time()
+        usage_info = None
+        
         async with httpx.AsyncClient(timeout=60) as client:
             resp = await client.post(
                 "https://api.openai.com/v1/chat/completions",
@@ -122,26 +135,95 @@ class OpenAIProvider(LLMProvider):
             )
             resp.raise_for_status()
             data = resp.json()
+        
+        response_time_ms = int((time.time() - start_time) * 1000)
+        
         try:
-            return data["choices"][0]["message"]["content"]
+            response_text = data["choices"][0]["message"]["content"]
+            
+            # Usage bilgisini çıkar
+            if "usage" in data:
+                usage = data["usage"]
+                prompt_tokens = usage.get("prompt_tokens", 0)
+                completion_tokens = usage.get("completion_tokens", 0)
+                total_tokens = usage.get("total_tokens", 0)
+                
+                # Model bazında maliyet hesapla (USD)
+                # gpt-4o-mini: $0.15 / 1M input tokens, $0.60 / 1M output tokens
+                # gpt-4o: $2.50 / 1M input tokens, $10.00 / 1M output tokens
+                cost_per_1m_input = 0.15 if "gpt-4o-mini" in self.model.lower() else 2.50
+                cost_per_1m_output = 0.60 if "gpt-4o-mini" in self.model.lower() else 10.00
+                cost_usd = (prompt_tokens / 1_000_000 * cost_per_1m_input) + (completion_tokens / 1_000_000 * cost_per_1m_output)
+                
+                usage_info = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                    "cost_usd": round(cost_usd, 6),
+                    "response_time_ms": response_time_ms,
+                }
+            
+            return response_text, usage_info
         except Exception as e:
             import logging
             logging.error(f"OpenAI API error: {e}, response: {data if 'data' in locals() else 'no data'}")
-            return ""
+            return "", None
 
 
-def get_llm_provider() -> LLMProvider:
+async def get_llm_provider(tenant_id: Optional[int] = None) -> LLMProvider:
+    """
+    Tenant-specific veya global API key ile LLM provider döndürür.
+    
+    Args:
+        tenant_id: İşletme ID'si (opsiyonel). Varsa tenant-specific API key kullanılır.
+    
+    Returns:
+        LLMProvider: OpenAIProvider veya RuleBasedProvider
+    """
     import logging
-    # API key kontrolü ve loglama
-    has_api_key = bool(settings.OPENAI_API_KEY and settings.OPENAI_API_KEY.strip())
+    from ..db.database import db
+    
+    api_key = None
+    model = settings.OPENAI_MODEL or "gpt-4o-mini"
+    
+    # Önce tenant-specific API key'i kontrol et
+    if tenant_id:
+        try:
+            customization = await db.fetch_one(
+                """
+                SELECT openai_api_key, openai_model
+                FROM tenant_customizations
+                WHERE isletme_id = :id AND openai_api_key IS NOT NULL AND openai_api_key != ''
+                """,
+                {"id": tenant_id}
+            )
+            if customization:
+                customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
+                tenant_api_key = customization_dict.get("openai_api_key")
+                tenant_model = customization_dict.get("openai_model")
+                if tenant_api_key and tenant_api_key.strip():
+                    api_key = tenant_api_key.strip()
+                    if tenant_model:
+                        model = tenant_model
+                    logging.info(f"[LLM_PROVIDER] Using tenant-specific API key for tenant_id={tenant_id}, model={model}")
+        except Exception as e:
+            logging.warning(f"[LLM_PROVIDER] Failed to fetch tenant API key for tenant_id={tenant_id}: {e}")
+    
+    # Tenant-specific key yoksa global key'i kontrol et
+    if not api_key:
+        api_key = settings.OPENAI_API_KEY
+        if api_key:
+            api_key = api_key.strip()
+            logging.info(f"[LLM_PROVIDER] Using global API key, model={model}")
+    
+    has_api_key = bool(api_key)
     is_llm_enabled = settings.ASSISTANT_ENABLE_LLM
     
-    logging.info(f"[LLM_PROVIDER] ASSISTANT_ENABLE_LLM={is_llm_enabled}, HAS_API_KEY={has_api_key}")
+    logging.info(f"[LLM_PROVIDER] ASSISTANT_ENABLE_LLM={is_llm_enabled}, HAS_API_KEY={has_api_key}, tenant_id={tenant_id}")
     
     if is_llm_enabled and has_api_key:
         try:
-            model = settings.OPENAI_MODEL or "gpt-4o-mini"
-            provider = OpenAIProvider(settings.OPENAI_API_KEY, model)
+            provider = OpenAIProvider(api_key, model)
             logging.info(f"[LLM_PROVIDER] Using OpenAI provider with model: {model}")
             return provider
         except Exception as e:
@@ -151,7 +233,7 @@ def get_llm_provider() -> LLMProvider:
         if not is_llm_enabled:
             logging.warning("[LLM_PROVIDER] LLM disabled in settings")
         if not has_api_key:
-            logging.warning("[LLM_PROVIDER] OpenAI API key not found in environment")
+            logging.warning(f"[LLM_PROVIDER] OpenAI API key not found (tenant_id={tenant_id})")
     
     logging.warning("[LLM_PROVIDER] Falling back to RuleBasedProvider")
     return RuleBasedProvider()

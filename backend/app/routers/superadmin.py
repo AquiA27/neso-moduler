@@ -101,12 +101,24 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     # 5. Customization
     customization = await db.fetch_one(
         """
-        SELECT domain, app_name, logo_url, primary_color, secondary_color
+        SELECT domain, app_name, logo_url, primary_color, secondary_color,
+               openai_api_key, openai_model
         FROM tenant_customizations
         WHERE isletme_id = :id
         """,
         {"id": id}
     )
+    
+    # API key'i kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
+    if customization:
+        customization_dict = dict(customization)
+        if customization_dict.get("openai_api_key"):
+            api_key = customization_dict["openai_api_key"]
+            if len(api_key) > 12:
+                customization_dict["openai_api_key"] = f"{api_key[:8]}...{api_key[-4:]}"
+            else:
+                customization_dict["openai_api_key"] = "***"
+        customization = customization_dict
     
     # 6. İstatistikler
     # Toplam sipariş sayısı
@@ -554,6 +566,37 @@ async def get_role_default_permissions(
     return DEFAULT_PERMISSIONS_BY_ROLE.get(role, [])
 
 
+# ---- API Kullanım İstatistikleri ----
+@router.get("/api-usage")
+async def get_api_usage_stats(
+    isletme_id: Optional[int] = Query(None, description="İşletme ID (opsiyonel, belirtilmezse tüm işletmeler)"),
+    days: int = Query(30, ge=1, le=365, description="Gün sayısı (varsayılan: 30)"),
+    api_type: Optional[str] = Query(None, description="API türü (örn: 'openai')"),
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """API kullanım istatistiklerini getir"""
+    from ..services.api_usage_tracker import get_api_usage_stats as get_stats
+    
+    stats = await get_stats(
+        isletme_id=isletme_id,
+        days=days,
+        api_type=api_type,
+    )
+    
+    # İşletme adlarını ekle
+    for stat in stats:
+        if stat.get("isletme_id"):
+            isletme_row = await db.fetch_one(
+                "SELECT ad FROM isletmeler WHERE id = :id",
+                {"id": stat["isletme_id"]}
+            )
+            if isletme_row:
+                isletme_dict = dict(isletme_row) if hasattr(isletme_row, 'keys') else isletme_row
+                stat["isletme_ad"] = isletme_dict.get("ad")
+    
+    return stats
+
+
 # ---- Hızlı İşletme Kurulumu ----
 class QuickSetupIn(BaseModel):
     isletme_ad: str = Field(min_length=1)
@@ -569,6 +612,8 @@ class QuickSetupIn(BaseModel):
     logo_url: Optional[str] = None
     theme: Optional[str] = Field(default="green")  # green, blue, purple, rose
     odeme_turu: Optional[str] = Field(default="odeme_sistemi")  # odeme_sistemi, nakit, havale, kredi_karti
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API anahtarı (işletme bazında)")
+    openai_model: Optional[str] = Field(default="gpt-4o-mini", description="OpenAI model")
 
 
 @router.post("/quick-setup")
@@ -671,19 +716,23 @@ async def quick_setup(
         theme = payload.theme or "green"
         theme_color = theme_colors.get(theme, theme_colors["green"])
         
-        if payload.domain or payload.app_name or payload.logo_url or theme:
+        if payload.domain or payload.app_name or payload.logo_url or theme or payload.openai_api_key:
             await db.execute(
                 """
                 INSERT INTO tenant_customizations (
-                    isletme_id, domain, app_name, logo_url, primary_color, secondary_color
+                    isletme_id, domain, app_name, logo_url, primary_color, secondary_color,
+                    openai_api_key, openai_model
                 )
-                VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color)
+                VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color,
+                        :openai_api_key, :openai_model)
                 ON CONFLICT (isletme_id) DO UPDATE
                    SET domain = EXCLUDED.domain,
                        app_name = EXCLUDED.app_name,
                        logo_url = EXCLUDED.logo_url,
                        primary_color = EXCLUDED.primary_color,
                        secondary_color = EXCLUDED.secondary_color,
+                       openai_api_key = EXCLUDED.openai_api_key,
+                       openai_model = EXCLUDED.openai_model,
                        updated_at = NOW()
                 """,
                 {
@@ -693,6 +742,8 @@ async def quick_setup(
                     "logo_url": payload.logo_url,
                     "primary_color": theme_color["primary"],
                     "secondary_color": theme_color["secondary"],
+                    "openai_api_key": payload.openai_api_key,
+                    "openai_model": payload.openai_model or "gpt-4o-mini",
                 },
             )
         

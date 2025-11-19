@@ -652,7 +652,7 @@ async def _sse(gen: AsyncIterator[str]):
 
 @router.post("/chat_stream")
 async def chat_stream(payload: ChatIn):
-    provider = get_llm_provider()
+    provider = await get_llm_provider(tenant_id=None)  # Public endpoint, tenant_id yok
     gen = provider.stream(payload.text, system=payload.system)
     return StreamingResponse(_sse(gen), media_type="text/event-stream")
 
@@ -3671,7 +3671,18 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
 
     system_parts = [system_prompt]
 
-    provider = get_llm_provider()
+    # Tenant ID'yi al (sube_id'den)
+    tenant_id = None
+    if payload.sube_id:
+        sube_row = await db.fetch_one(
+            "SELECT isletme_id FROM subeler WHERE id = :id",
+            {"id": payload.sube_id}
+        )
+        if sube_row:
+            sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+            tenant_id = sube_dict.get("isletme_id")
+    
+    provider = await get_llm_provider(tenant_id=tenant_id)
     messages_for_llm: List[Dict[str, str]] = [{"role": "system", "content": "\n".join(system_parts)}]
     messages_for_llm.extend(history_snapshot)
     messages_for_llm.append({"role": "user", "content": text})
@@ -3703,7 +3714,38 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
             import logging
             logging.info(f"[LLM] Calling LLM provider for text: '{text[:50]}...'")
             
-            reply_text = await provider.chat(messages_for_llm)
+            # OpenAIProvider tuple döndürür (text, usage_info), diğerleri string
+            result = await provider.chat(messages_for_llm)
+            if isinstance(result, tuple):
+                reply_text, usage_info = result
+            else:
+                reply_text, usage_info = result, None
+            
+            # API kullanımını logla (tenant_id varsa)
+            if usage_info and tenant_id:
+                from ..services.api_usage_tracker import log_api_usage
+                customization_row = await db.fetch_one(
+                    "SELECT openai_model FROM tenant_customizations WHERE isletme_id = :id",
+                    {"id": tenant_id}
+                )
+                model = "gpt-4o-mini"
+                if customization_row:
+                    customization_dict = dict(customization_row) if hasattr(customization_row, 'keys') else customization_row
+                    model = customization_dict.get("openai_model") or "gpt-4o-mini"
+                
+                await log_api_usage(
+                    isletme_id=tenant_id,
+                    api_type="openai",
+                    model=model,
+                    endpoint="/v1/chat/completions",
+                    prompt_tokens=usage_info.get("prompt_tokens", 0),
+                    completion_tokens=usage_info.get("completion_tokens", 0),
+                    total_tokens=usage_info.get("total_tokens", 0),
+                    cost_usd=usage_info.get("cost_usd", 0.0),
+                    response_time_ms=usage_info.get("response_time_ms"),
+                    status="success",
+                )
+            
             logging.info(f"[LLM] Received reply (length: {len(reply_text) if reply_text else 0})")
             
             if not reply_text or len(reply_text.strip()) == 0:

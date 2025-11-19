@@ -1343,7 +1343,20 @@ async def bi_query(
         else:
             # ⚡ YENİ: Gelişmiş akıllı LLM analizi
             try:
-                provider = get_llm_provider()
+                # Tenant ID'yi al (super admin için switched_tenant_id, normal kullanıcı için tenant_id)
+                tenant_id = user.get("switched_tenant_id") or user.get("tenant_id")
+                
+                # Şube'den işletme ID'sini al (super admin için gerekli)
+                if not tenant_id and target_sube_id:
+                    sube_row = await db.fetch_one(
+                        "SELECT isletme_id FROM subeler WHERE id = :id",
+                        {"id": target_sube_id}
+                    )
+                    if sube_row:
+                        sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+                        tenant_id = sube_dict.get("isletme_id")
+                
+                provider = await get_llm_provider(tenant_id=tenant_id)
 
                 revenue_info = await load_data("revenue_30", lambda: get_revenue_data(target_sube_id))
                 expense_info = await load_data("expense_30", lambda: get_expense_data(target_sube_id))
@@ -1398,9 +1411,40 @@ async def bi_query(
                     import inspect
                     sig = inspect.signature(provider.chat)
                     if 'task_type' in sig.parameters:
-                        llm_reply = await provider.chat([{"role": "user", "content": smart_prompt}], task_type="bi_analysis")
+                        result = await provider.chat([{"role": "user", "content": smart_prompt}], task_type="bi_analysis")
                     else:
-                        llm_reply = await provider.chat([{"role": "user", "content": smart_prompt}])
+                        result = await provider.chat([{"role": "user", "content": smart_prompt}])
+                    
+                    # OpenAIProvider tuple döndürür (text, usage_info), diğerleri string
+                    if isinstance(result, tuple):
+                        llm_reply, usage_info = result
+                    else:
+                        llm_reply, usage_info = result, None
+                    
+                    # API kullanımını logla (tenant_id varsa)
+                    if usage_info and tenant_id:
+                        from ..services.api_usage_tracker import log_api_usage
+                        customization_row = await db.fetch_one(
+                            "SELECT openai_model FROM tenant_customizations WHERE isletme_id = :id",
+                            {"id": tenant_id}
+                        )
+                        model = "gpt-4o-mini"
+                        if customization_row:
+                            customization_dict = dict(customization_row) if hasattr(customization_row, 'keys') else customization_row
+                            model = customization_dict.get("openai_model") or "gpt-4o-mini"
+                        
+                        await log_api_usage(
+                            isletme_id=tenant_id,
+                            api_type="openai",
+                            model=model,
+                            endpoint="/v1/chat/completions",
+                            prompt_tokens=usage_info.get("prompt_tokens", 0),
+                            completion_tokens=usage_info.get("completion_tokens", 0),
+                            total_tokens=usage_info.get("total_tokens", 0),
+                            cost_usd=usage_info.get("cost_usd", 0.0),
+                            response_time_ms=usage_info.get("response_time_ms"),
+                            status="success",
+                        )
                 else:
                     llm_reply = ""
 

@@ -340,6 +340,10 @@ export const superadminApi = {
     app_name?: string;
     logo_url?: string;
     primary_color?: string;
+    theme?: string;
+    odeme_turu?: string;
+    openai_api_key?: string;
+    openai_model?: string;
   }) => {
     return apiClient.post('/superadmin/quick-setup', data);
   },
@@ -347,6 +351,15 @@ export const superadminApi = {
   // Dashboard Stats
   dashboardStats: async () => {
     return apiClient.get('/superadmin/dashboard/stats');
+  },
+  
+  // API Usage Stats
+  apiUsage: async (params?: { isletme_id?: number; days?: number; api_type?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.isletme_id) searchParams.append('isletme_id', String(params.isletme_id));
+    if (params?.days) searchParams.append('days', String(params.days));
+    if (params?.api_type) searchParams.append('api_type', params.api_type);
+    return apiClient.get(`/superadmin/api-usage?${searchParams.toString()}`);
   },
 };
 

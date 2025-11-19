@@ -227,6 +227,26 @@ CREATE TABLE IF NOT EXISTS notification_history (
 );
 """
 
+CREATE_API_USAGE_LOGS = """
+CREATE TABLE IF NOT EXISTS api_usage_logs (
+    id BIGSERIAL PRIMARY KEY,
+    isletme_id BIGINT NOT NULL REFERENCES isletmeler(id) ON DELETE CASCADE,
+    api_type TEXT NOT NULL, -- 'openai', 'google', 'azure', vb.
+    model TEXT, -- Model adı (örn: 'gpt-4o-mini')
+    endpoint TEXT, -- API endpoint (örn: '/v1/chat/completions')
+    prompt_tokens INT DEFAULT 0, -- Girdi token sayısı
+    completion_tokens INT DEFAULT 0, -- Çıktı token sayısı
+    total_tokens INT DEFAULT 0, -- Toplam token sayısı
+    cost_usd NUMERIC(10,6) DEFAULT 0, -- Maliyet (USD)
+    request_count INT DEFAULT 1, -- İstek sayısı
+    response_time_ms INT, -- Yanıt süresi (milisaniye)
+    status TEXT DEFAULT 'success', -- 'success', 'error', 'rate_limited'
+    error_message TEXT, -- Hata mesajı (varsa)
+    metadata JSONB DEFAULT '{}'::jsonb, -- Ek metadata
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+"""
+
 CREATE_USER_SUBE_IZIN = """
 CREATE TABLE IF NOT EXISTS user_sube_izinleri (
     username TEXT NOT NULL,
@@ -304,6 +324,8 @@ CREATE TABLE IF NOT EXISTS tenant_customizations (
     email TEXT,
     telefon TEXT,
     adres TEXT,
+    openai_api_key TEXT, -- OpenAI API anahtarı (işletme bazında)
+    openai_model TEXT DEFAULT 'gpt-4o-mini', -- OpenAI model (varsayılan: gpt-4o-mini)
     meta_settings JSONB DEFAULT '{}'::jsonb, -- Ek özelleştirme ayarları
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW(),
@@ -378,6 +400,13 @@ CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments (created_at);
 -- Tenant customizations index'leri
 CREATE INDEX IF NOT EXISTS idx_tenant_customizations_isletme ON tenant_customizations (isletme_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_customizations_domain ON tenant_customizations (domain);
+
+-- API usage logs index'leri
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_isletme ON api_usage_logs (isletme_id);
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_isletme_created ON api_usage_logs (isletme_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_api_type ON api_usage_logs (api_type);
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_status ON api_usage_logs (status);
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_created_at ON api_usage_logs (created_at DESC);
 
 -- Users index'leri
 CREATE INDEX IF NOT EXISTS idx_users_tenant_id ON users (tenant_id);
@@ -560,6 +589,7 @@ async def create_tables(db: Database):
     await db.execute(CREATE_BACKUP_HISTORY)
     await db.execute(CREATE_PUSH_SUBSCRIPTIONS)
     await db.execute(CREATE_NOTIFICATION_HISTORY)
+    await db.execute(CREATE_API_USAGE_LOGS)
     # İndeksler (parça parça, hata yutsa da devam)
     for stmt in [s.strip() for s in CREATE_INDEXES.split(';') if s.strip()]:
         try:
@@ -653,6 +683,14 @@ async def create_tables(db: Database):
         # Push notification indexes
         await db.execute("CREATE INDEX IF NOT EXISTS idx_push_subscriptions_tenant ON push_subscriptions (tenant_id, is_active) WHERE is_active = true;")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_notification_history_tenant_time ON notification_history (tenant_id, created_at DESC);")
+        
+        # Tenant customizations'a OpenAI API key kolonları ekle (varsa atla)
+        try:
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS openai_api_key TEXT;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS openai_model TEXT DEFAULT 'gpt-4o-mini';")
+        except Exception:
+            pass
+        
         # Eski kolonları yeni kolonlara migrate et
         await db.execute("ALTER TABLE stok_kalemleri ADD COLUMN IF NOT EXISTS kategori TEXT;")
         await db.execute("ALTER TABLE stok_kalemleri ADD COLUMN IF NOT EXISTS min NUMERIC(12,3) DEFAULT 0;")

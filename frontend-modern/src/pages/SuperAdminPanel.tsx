@@ -7,7 +7,7 @@ import {
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
-  Trash2
+  Trash2, Activity
 } from 'lucide-react';
 
 interface Tenant {
@@ -115,7 +115,7 @@ interface TenantDetail {
 }
 
 export default function SuperAdminPanel() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup' | 'api-usage'>('dashboard');
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -192,6 +192,7 @@ export default function SuperAdminPanel() {
                 { id: 'subscriptions', label: 'Abonelikler', icon: Package },
                 { id: 'payments', label: 'Ödemeler', icon: CreditCard },
                 { id: 'customizations', label: 'Özelleştirmeler', icon: Settings },
+                { id: 'api-usage', label: 'API Kullanım', icon: Activity },
                 { id: 'quick-setup', label: 'Hızlı Kurulum', icon: Plus },
               ].map(({ id, label, icon: Icon }) => (
                 <button
@@ -283,6 +284,10 @@ export default function SuperAdminPanel() {
 
           {!loading && activeTab === 'customizations' && (
             <CustomizationsTab tenants={tenants} onRefresh={loadData} />
+          )}
+
+          {!loading && activeTab === 'api-usage' && (
+            <ApiUsageTab />
           )}
 
           {!loading && activeTab === 'quick-setup' && (
@@ -1286,6 +1291,8 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
     email: '',
     telefon: '',
     adres: '',
+    openai_api_key: '',
+    openai_model: 'gpt-4o-mini',
   });
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1304,6 +1311,8 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       email: '',
       telefon: '',
       adres: '',
+      openai_api_key: '',
+      openai_model: 'gpt-4o-mini',
     });
     setExists(false);
     setError(null);
@@ -1330,6 +1339,12 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         const response = await customizationApi.get(selectedTenant);
         const primary = response.data.primary_color || themePresets.green.primary;
         const secondary = response.data.secondary_color || themePresets.green.secondary;
+        // API key'i maskelenmiş olarak göster (sadece ilk 8 ve son 4 karakter)
+        const apiKey = response.data.openai_api_key || '';
+        const maskedApiKey = apiKey && apiKey.length > 12 
+          ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`
+          : apiKey || '';
+        
         setFormData({
           domain: response.data.domain || '',
           app_name: response.data.app_name || '',
@@ -1339,6 +1354,8 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
           email: response.data.email || '',
           telefon: response.data.telefon || '',
           adres: response.data.adres || '',
+          openai_api_key: maskedApiKey,
+          openai_model: response.data.openai_model || 'gpt-4o-mini',
         });
         setExists(true);
       } catch (err: any) {
@@ -1376,6 +1393,10 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         email: formData.email || undefined,
         telefon: formData.telefon || undefined,
         adres: formData.adres || undefined,
+        openai_api_key: formData.openai_api_key && !formData.openai_api_key.includes('...') 
+          ? formData.openai_api_key 
+          : undefined,
+        openai_model: formData.openai_model || 'gpt-4o-mini',
       };
 
       if (exists) {
@@ -1391,16 +1412,24 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       const response = await customizationApi.get(selectedTenant);
       const primary = response.data.primary_color || themePresets.green.primary;
       const secondary = response.data.secondary_color || themePresets.green.secondary;
-      setFormData({
-        domain: response.data.domain || '',
-        app_name: response.data.app_name || '',
-        logo_url: response.data.logo_url || '',
-        theme: getThemeFromColors(primary, secondary),
-        footer_text: response.data.footer_text || '',
-        email: response.data.email || '',
-        telefon: response.data.telefon || '',
-        adres: response.data.adres || '',
-      });
+        // API key'i maskelenmiş olarak göster
+        const apiKey = response.data.openai_api_key || '';
+        const maskedApiKey = apiKey && apiKey.length > 12 
+          ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`
+          : apiKey || '';
+        
+        setFormData({
+          domain: response.data.domain || '',
+          app_name: response.data.app_name || '',
+          logo_url: response.data.logo_url || '',
+          theme: getThemeFromColors(primary, secondary),
+          footer_text: response.data.footer_text || '',
+          email: response.data.email || '',
+          telefon: response.data.telefon || '',
+          adres: response.data.adres || '',
+          openai_api_key: maskedApiKey,
+          openai_model: response.data.openai_model || 'gpt-4o-mini',
+        });
       
       onRefresh();
     } catch (err: any) {
@@ -1548,12 +1577,202 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                 placeholder="Rıhtım Cad. No: 12 Kadıköy / İstanbul"
               />
             </div>
+            
+            {/* OpenAI API Ayarları */}
+            <div className="border-t pt-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">OpenAI API Ayarları</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Field
+                  label="OpenAI API Key"
+                  type="password"
+                  value={formData.openai_api_key}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, openai_api_key: value }))}
+                  placeholder="sk-..."
+                  helpText="İşletme bazında OpenAI API anahtarı. Boş bırakılırsa global API key kullanılır."
+                />
+                <Field
+                  label="OpenAI Model"
+                  value={formData.openai_model}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, openai_model: value }))}
+                  placeholder="gpt-4o-mini"
+                  helpText="Kullanılacak OpenAI model (örn: gpt-4o-mini, gpt-4o)"
+                />
+              </div>
+            </div>
           </section>
         </div>
       ) : (
         <div className="h-48 flex items-center justify-center text-gray-500 text-sm">
           Özelleştirme yapmak için bir işletme seçin.
         </div>
+      )}
+    </div>
+  );
+}
+
+// API Usage Tab
+function ApiUsageTab() {
+  const [stats, setStats] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [days, setDays] = useState(30);
+  const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+
+  useEffect(() => {
+    loadTenants();
+    loadStats();
+  }, [days, selectedTenant]);
+
+  const loadTenants = async () => {
+    try {
+      const response = await superadminApi.tenantsList();
+      setTenants(response.data);
+    } catch (error) {
+      console.error('Error loading tenants:', error);
+    }
+  };
+
+  const loadStats = async () => {
+    setLoading(true);
+    try {
+      const response = await superadminApi.apiUsage({
+        isletme_id: selectedTenant || undefined,
+        days,
+        api_type: 'openai',
+      });
+      setStats(response.data);
+    } catch (error) {
+      console.error('Error loading API usage stats:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const totalCost = stats.reduce((sum, stat) => sum + (parseFloat(stat.total_cost_usd) || 0), 0);
+  const totalTokens = stats.reduce((sum, stat) => sum + (parseInt(stat.total_tokens) || 0), 0);
+  const totalRequests = stats.reduce((sum, stat) => sum + (parseInt(stat.total_requests) || 0), 0);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">API Kullanım İstatistikleri</h2>
+        <div className="flex items-center gap-4">
+          <select
+            value={selectedTenant || ''}
+            onChange={(e) => setSelectedTenant(e.target.value ? parseInt(e.target.value) : null)}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value="">Tüm İşletmeler</option>
+            {tenants.map((tenant) => (
+              <option key={tenant.id} value={tenant.id}>
+                {tenant.ad}
+              </option>
+            ))}
+          </select>
+          <select
+            value={days}
+            onChange={(e) => setDays(parseInt(e.target.value))}
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          >
+            <option value={7}>Son 7 Gün</option>
+            <option value={30}>Son 30 Gün</option>
+            <option value={90}>Son 90 Gün</option>
+            <option value={365}>Son 1 Yıl</option>
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+          <p className="mt-2 text-gray-600">Yükleniyor...</p>
+        </div>
+      ) : (
+        <>
+          {/* Özet Kartlar */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-blue-600">Toplam Maliyet</p>
+                  <p className="text-2xl font-bold text-blue-900 mt-1">${totalCost.toFixed(4)}</p>
+                </div>
+                <DollarSign className="w-8 h-8 text-blue-500" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-green-600">Toplam Token</p>
+                  <p className="text-2xl font-bold text-green-900 mt-1">{totalTokens.toLocaleString()}</p>
+                </div>
+                <Activity className="w-8 h-8 text-green-500" />
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border border-purple-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-purple-600">Toplam İstek</p>
+                  <p className="text-2xl font-bold text-purple-900 mt-1">{totalRequests.toLocaleString()}</p>
+                </div>
+                <BarChart3 className="w-8 h-8 text-purple-500" />
+              </div>
+            </div>
+          </div>
+
+          {/* Detaylı Liste */}
+          {stats.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Bu dönemde API kullanım kaydı bulunamadı.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-lg shadow overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşletme</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (Prompt)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (Completion)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Token</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Maliyet (USD)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İstek Sayısı</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ort. Yanıt Süresi</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {stats.map((stat, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {stat.isletme_ad || `İşletme #${stat.isletme_id}`}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{stat.model || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {parseInt(stat.total_prompt_tokens || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {parseInt(stat.total_completion_tokens || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {parseInt(stat.total_tokens || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
+                        ${parseFloat(stat.total_cost_usd || 0).toFixed(4)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {parseInt(stat.total_requests || 0).toLocaleString()}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                        {stat.avg_response_time_ms ? `${Math.round(stat.avg_response_time_ms)}ms` : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1621,6 +1840,8 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
     logo_url: '',
     theme: 'green' as keyof typeof themePresets,
     odeme_turu: 'odeme_sistemi' as 'odeme_sistemi' | 'nakit' | 'havale' | 'kredi_karti',
+    openai_api_key: '',
+    openai_model: 'gpt-4o-mini',
   };
 
   const [formData, setFormData] = useState(initialForm);
@@ -1963,6 +2184,28 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
               </div>
             </div>
           </div>
+          
+          {/* OpenAI API Ayarları */}
+          <div className="border-t pt-6 mt-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">OpenAI API Ayarları</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <Field
+                label="OpenAI API Key"
+                type="password"
+                value={formData.openai_api_key}
+                onChange={(value) => handleChange('openai_api_key', value)}
+                placeholder="sk-..."
+                helpText="İşletme bazında OpenAI API anahtarı (opsiyonel)"
+              />
+              <Field
+                label="OpenAI Model"
+                value={formData.openai_model}
+                onChange={(value) => handleChange('openai_model', value)}
+                placeholder="gpt-4o-mini"
+                helpText="Kullanılacak OpenAI model"
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end">
@@ -1989,6 +2232,7 @@ function Field({
   type = 'text',
   min,
   step,
+  helpText,
 }: {
   label: string;
   value: any;
@@ -1999,6 +2243,7 @@ function Field({
   type?: string;
   min?: number;
   step?: number | string;
+  helpText?: string;
 }) {
   return (
     <div className="flex flex-col">
@@ -2018,6 +2263,7 @@ function Field({
         }`}
       />
       {error && <span className="text-xs text-red-500 mt-1">{error}</span>}
+      {helpText && !error && <span className="text-xs text-gray-500 mt-1">{helpText}</span>}
     </div>
   );
 }
