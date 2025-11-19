@@ -572,12 +572,25 @@ async def personeller_upsert(payload: UserUpsertIn, user: Dict[str, Any] = Depen
     """
     from ..core.security import hash_password
     
+    import logging
     user_role = user.get("role")
     user_tenant_id = user.get("tenant_id")
     
+    # Super admin tenant switching yapıyorsa, effective_tenant_id'yi al
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+    
     # Admin sadece kendi tenant'ına personel ekleyebilir
     # Super admin için tenant_id None olabilir (isterse belirtir)
-    tenant_id = user_tenant_id if user_role != "super_admin" else None
+    # Ama super admin tenant switching yapıyorsa, switched_tenant_id kullanılmalı
+    if user_role == "super_admin" and switched_tenant_id:
+        tenant_id = switched_tenant_id
+    elif user_role == "super_admin":
+        tenant_id = None  # Super admin tüm işletmeler modunda
+    else:
+        tenant_id = effective_tenant_id  # Normal admin için effective_tenant_id
+    
+    logging.info(f"[PERSONELLER_UPSERT] user_role={user_role}, user_tenant_id={user_tenant_id}, switched_tenant_id={switched_tenant_id}, effective_tenant_id={effective_tenant_id}, tenant_id={tenant_id}")
     
     # Eğer mevcut kullanıcı varsa ve farklı tenant'a aitse, hata ver
     if user_role != "super_admin":
@@ -586,8 +599,15 @@ async def personeller_upsert(payload: UserUpsertIn, user: Dict[str, Any] = Depen
             {"u": payload.username}
         )
         if existing_user:
-            existing_tenant_id = dict(existing_user).get("tenant_id") if hasattr(existing_user, 'keys') else existing_user.get("tenant_id")
-            if existing_tenant_id != user_tenant_id:
+            existing_tenant_dict = dict(existing_user) if hasattr(existing_user, 'keys') else existing_user
+            existing_tenant_id = existing_tenant_dict.get("tenant_id") if isinstance(existing_tenant_dict, dict) else (getattr(existing_user, "tenant_id", None) if existing_user else None)
+            
+            logging.info(f"[PERSONELLER_UPSERT] Existing user found: username={payload.username}, existing_tenant_id={existing_tenant_id}, effective_tenant_id={effective_tenant_id}")
+            
+            # Eğer mevcut kullanıcı varsa ve farklı tenant'a aitse, hata ver
+            # Ama eğer mevcut kullanıcının tenant_id'si NULL ise, yeni tenant'a atanabilir
+            if existing_tenant_id is not None and existing_tenant_id != effective_tenant_id:
+                logging.warning(f"[PERSONELLER_UPSERT] User {payload.username} belongs to different tenant: {existing_tenant_id} != {effective_tenant_id}")
                 raise HTTPException(
                     status_code=status.HTTP_403_FORBIDDEN,
                     detail="Bu personel başka bir işletmeye ait. Sadece kendi işletmenize ait personelleri düzenleyebilirsiniz."
