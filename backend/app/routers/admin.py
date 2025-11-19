@@ -593,6 +593,7 @@ async def personeller_upsert(payload: UserUpsertIn, user: Dict[str, Any] = Depen
     logging.info(f"[PERSONELLER_UPSERT] user_role={user_role}, user_tenant_id={user_tenant_id}, switched_tenant_id={switched_tenant_id}, effective_tenant_id={effective_tenant_id}, tenant_id={tenant_id}")
     
     # Eğer mevcut kullanıcı varsa ve farklı tenant'a aitse, hata ver
+    # Ancak, yeni kullanıcı eklenirken (password varsa veya kullanıcı yoksa) tenant_id atanabilir
     if user_role != "super_admin":
         existing_user = await db.fetch_one(
             "SELECT tenant_id FROM users WHERE username = :u",
@@ -604,14 +605,22 @@ async def personeller_upsert(payload: UserUpsertIn, user: Dict[str, Any] = Depen
             
             logging.info(f"[PERSONELLER_UPSERT] Existing user found: username={payload.username}, existing_tenant_id={existing_tenant_id}, effective_tenant_id={effective_tenant_id}")
             
-            # Eğer mevcut kullanıcı varsa ve farklı tenant'a aitse, hata ver
-            # Ama eğer mevcut kullanıcının tenant_id'si NULL ise, yeni tenant'a atanabilir
+            # Eğer mevcut kullanıcı varsa:
+            # 1. Eğer mevcut tenant_id NULL ise, yeni tenant'a atanabilir (zaten yukarıda tenant_id atanacak)
+            # 2. Eğer mevcut tenant_id farklı bir tenant'a aitse VE password yoksa (güncelleme işlemi), hata ver
+            # 3. Eğer password varsa (yeni kullanıcı ekleme), tenant_id güncellenebilir (admin kendi tenant'ına ekleyebilir)
             if existing_tenant_id is not None and existing_tenant_id != effective_tenant_id:
-                logging.warning(f"[PERSONELLER_UPSERT] User {payload.username} belongs to different tenant: {existing_tenant_id} != {effective_tenant_id}")
-                raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
-                    detail="Bu personel başka bir işletmeye ait. Sadece kendi işletmenize ait personelleri düzenleyebilirsiniz."
-                )
+                # Password varsa (yeni kullanıcı ekleme), tenant_id'yi güncelle (admin kendi tenant'ına ekliyor)
+                if payload.password:
+                    logging.info(f"[PERSONELLER_UPSERT] Password provided, updating tenant_id from {existing_tenant_id} to {effective_tenant_id} for user {payload.username}")
+                    # tenant_id zaten effective_tenant_id olarak ayarlandı, devam et
+                else:
+                    # Password yoksa (güncelleme işlemi), farklı tenant'a ait kullanıcıyı güncelleyemez
+                    logging.warning(f"[PERSONELLER_UPSERT] User {payload.username} belongs to different tenant: {existing_tenant_id} != {effective_tenant_id} (no password provided)")
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Bu personel başka bir işletmeye ait. Sadece kendi işletmenize ait personelleri düzenleyebilirsiniz."
+                    )
     
     params = {
         "u": payload.username,
