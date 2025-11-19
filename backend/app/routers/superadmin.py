@@ -102,24 +102,53 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
         )
         
         # 5. Customization
-        customization = await db.fetch_one(
+        # Önce kolonların varlığını kontrol et
+        column_check = await db.fetch_one(
             """
-            SELECT domain, app_name, logo_url, primary_color, secondary_color,
-                   openai_api_key, openai_model
-            FROM tenant_customizations
-            WHERE isletme_id = :id
-            """,
-            {"id": id}
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'tenant_customizations' 
+            AND column_name IN ('openai_api_key', 'openai_model')
+            """
         )
+        
+        has_openai_columns = column_check is not None
+        
+        # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları çek
+        if has_openai_columns:
+            customization = await db.fetch_one(
+                """
+                SELECT domain, app_name, logo_url, primary_color, secondary_color,
+                       openai_api_key, openai_model
+                FROM tenant_customizations
+                WHERE isletme_id = :id
+                """,
+                {"id": id}
+            )
+        else:
+            customization = await db.fetch_one(
+                """
+                SELECT domain, app_name, logo_url, primary_color, secondary_color
+                FROM tenant_customizations
+                WHERE isletme_id = :id
+                """,
+                {"id": id}
+            )
+            # Kolonlar yoksa None olarak ekle
+            if customization:
+                customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
+                customization_dict["openai_api_key"] = None
+                customization_dict["openai_model"] = None
+                customization = customization_dict
         
         # API key'i kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
         if customization:
             customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
             if customization_dict.get("openai_api_key"):
                 api_key = str(customization_dict["openai_api_key"])
-                if api_key and len(api_key) > 12:
+                if api_key and api_key != "None" and len(api_key) > 12:
                     customization_dict["openai_api_key"] = f"{api_key[:8]}...{api_key[-4:]}"
-                elif api_key:
+                elif api_key and api_key != "None":
                     customization_dict["openai_api_key"] = "***"
             customization = customization_dict
         
