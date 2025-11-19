@@ -313,14 +313,16 @@ export const superadminApi = {
   },
   
   updateUserPermissions: async (username: string, permissions: Record<string, boolean>) => {
-    return apiClient.put(`/superadmin/users/${username}/permissions`, {
+    // Admin'ler için /admin/users/{username}/permissions endpoint'ini kullan
+    return apiClient.put(`/admin/users/${username}/permissions`, {
       username,
       permissions,
     });
   },
   
   getAvailablePermissions: async () => {
-    return apiClient.get('/superadmin/permissions/available');
+    // Admin'ler için /admin/permissions/available endpoint'ini kullan
+    return apiClient.get('/admin/permissions/available');
   },
   
   getRoleDefaultPermissions: async (role: string) => {
