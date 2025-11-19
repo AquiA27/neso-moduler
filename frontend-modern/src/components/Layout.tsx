@@ -7,14 +7,25 @@ import { Menu, Settings, LogOut } from 'lucide-react';
 import logo from '../assets/fistik-logo.svg';
 import TenantSwitcher from './TenantSwitcher';
 
+// Hex renk kodunu rgba'ya çevir
+const hexToRgba = (hex: string, alpha: number = 0.9): string => {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+};
+
 function Layout() {
-  const { user, logout, tenantId, tenantCustomization, setTenantCustomization } = useAuthStore();
+  const { user, logout, tenantId, tenantCustomization, setTenantCustomization, selectedTenantId } = useAuthStore();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
   
   // Tenant customization'ı yükle (tenant_id veya subdomain'den)
   useEffect(() => {
     const loadCustomization = async () => {
+      // Super admin tenant değiştirdiğinde selectedTenantId'yi kullan
+      const effectiveTenantId = selectedTenantId || tenantId;
+      
       // Önce subdomain'den dene (domain-based routing)
       const subdomain = getCurrentSubdomain();
       if (subdomain) {
@@ -36,13 +47,13 @@ function Layout() {
       }
       
       // Subdomain yoksa veya bulunamadıysa tenant_id'den yükle
-      if (!tenantId) {
+      if (!effectiveTenantId) {
         setTenantCustomization(null);
         return;
       }
       
       try {
-        const response = await customizationApi.get(tenantId);
+        const response = await customizationApi.get(effectiveTenantId);
         const customization = response.data;
         setTenantCustomization({
           app_name: customization.app_name,
@@ -57,7 +68,7 @@ function Layout() {
     };
     
     loadCustomization();
-  }, [tenantId, setTenantCustomization]);
+  }, [tenantId, selectedTenantId, setTenantCustomization]);
   
   // Logo ve app name'i belirle (memoize edilmiş)
   const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
@@ -65,6 +76,26 @@ function Layout() {
     tenantCustomization?.app_name || (user?.role === 'super_admin' ? 'Neso Modüler' : 'Fıstık Kafe Yönetim Paneli'),
     [tenantCustomization?.app_name, user?.role]
   );
+  
+  // Header arka plan rengini hesapla
+  const headerBackground = useMemo(() => {
+    if (tenantCustomization?.primary_color) {
+      const primary = hexToRgba(tenantCustomization.primary_color, 0.9);
+      const secondary = tenantCustomization.secondary_color 
+        ? hexToRgba(tenantCustomization.secondary_color, 0.9)
+        : primary;
+      return `linear-gradient(to right, ${primary}, ${secondary})`;
+    }
+    return 'linear-gradient(to right, rgb(6 78 59 / 0.9), rgb(5 46 22 / 0.9))';
+  }, [tenantCustomization?.primary_color, tenantCustomization?.secondary_color]);
+  
+  const headerShadow = useMemo(() => {
+    if (tenantCustomization?.primary_color) {
+      const shadowColor = hexToRgba(tenantCustomization.primary_color, 0.25);
+      return `0 10px 15px -3px ${shadowColor}, 0 4px 6px -2px ${shadowColor}`;
+    }
+    return '0 10px 15px -3px rgb(5 46 22 / 0.4), 0 4px 6px -2px rgb(5 46 22 / 0.2)';
+  }, [tenantCustomization?.primary_color]);
 
   const handleLogout = useCallback(() => {
     logout();
@@ -123,6 +154,11 @@ function Layout() {
   }
   
   const showSuperAdmin = user && (userRole === 'super_admin' || username === 'super');
+  
+  // Super admin "Tüm İşletmeler" modundayken sadece Super Admin paneli gösterilmeli
+  // Diğer veri sayfaları (raporlar, menü, stok, vb.) sadece tenant seçildiğinde gösterilmeli
+  const isSuperAdminInAllTenantsMode = showSuperAdmin && selectedTenantId === null;
+  const showTenantDataPages = !isSuperAdminInAllTenantsMode; // Tenant seçilmediyse veri sayfalarını gizle
 
   const getNavClass = (isActive: boolean, variant: 'desktop' | 'mobile') => {
     if (variant === 'mobile') {
@@ -148,7 +184,8 @@ function Layout() {
 
   const renderNavLinks = (variant: 'desktop' | 'mobile') => (
     <>
-      {showAdmin && (
+      {/* Veri sayfaları sadece tenant seçildiğinde gösterilmeli */}
+      {showAdmin && showTenantDataPages && (
         <>
           {renderLink('/dashboard', 'Ana Sayfa', variant)}
           {renderLink('/raporlar', 'Raporlar', variant)}
@@ -161,18 +198,27 @@ function Layout() {
           {renderLink('/isletme-asistani', 'İşletme Asistanı', variant)}
         </>
       )}
-      {showPersoneller && renderLink('/personeller', 'Personeller', variant)}
+      {/* Personeller sadece tenant seçildiğinde gösterilmeli */}
+      {showPersoneller && showTenantDataPages && renderLink('/personeller', 'Personeller', variant)}
+      {/* Super Admin paneli her zaman gösterilmeli */}
       {showSuperAdmin && renderLink('/superadmin', 'Super Admin', variant)}
-      {showKasa && renderLink('/kasa', 'Kasa', variant)}
-      {showMutfak && renderLink('/mutfak', 'Mutfak', variant)}
-      {showTerminal && renderLink('/terminal', 'El Terminali', variant)}
+      {/* Kasa, Mutfak, Terminal sadece tenant seçildiğinde gösterilmeli */}
+      {showKasa && showTenantDataPages && renderLink('/kasa', 'Kasa', variant)}
+      {showMutfak && showTenantDataPages && renderLink('/mutfak', 'Mutfak', variant)}
+      {showTerminal && showTenantDataPages && renderLink('/terminal', 'El Terminali', variant)}
     </>
   );
 
   return (
     <div className="min-h-screen flex flex-col">
       {/* Header */}
-      <header className="relative sticky top-0 z-50 border-b border-white/15 bg-gradient-to-r from-emerald-900/90 via-primary-900 to-primary-900 shadow-lg shadow-primary-950/40 backdrop-blur-md">
+      <header 
+        className="relative sticky top-0 z-50 border-b border-white/15 shadow-lg backdrop-blur-md"
+        style={{
+          background: headerBackground,
+          boxShadow: headerShadow,
+        }}
+      >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),_transparent_55%)]" aria-hidden="true" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(163,230,53,0.12),_transparent_65%)]" aria-hidden="true" />
         <div className="relative container mx-auto px-4 py-4">

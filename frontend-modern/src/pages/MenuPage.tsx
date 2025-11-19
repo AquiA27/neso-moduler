@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useEffect, useState, useRef } from 'react';
 import { menuApi, menuVaryasyonlarApi } from '../lib/api';
+import { useAuthStore } from '../store/authStore';
 import { Plus, Edit, Trash2, Settings, X, ChevronDown, Search, Tag, Image, Loader2, MinusCircle } from 'lucide-react';
 
 interface MenuItem {
@@ -55,9 +56,11 @@ export default function MenuPage() {
     return `${formattedBase}${formattedPath}`;
   };
 
+  const { selectedTenantId } = useAuthStore();
+  
   useEffect(() => {
     loadMenu();
-  }, []);
+  }, [selectedTenantId]); // Tenant değiştiğinde menu'yi yeniden yükle
 
   // Kategori dropdown dışına tıklandığında kapat
   useEffect(() => {

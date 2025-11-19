@@ -42,6 +42,7 @@ class TenantStatusMiddleware(BaseHTTPMiddleware):
     PREFIX_BYPASS_PATHS = {
         "/public",
         "/media",
+        "/superadmin",  # Super admin endpoint'leri bypass et
     }
 
     async def dispatch(self, request: Request, call_next):
@@ -261,6 +262,7 @@ class SubscriptionLimitMiddleware(BaseHTTPMiddleware):
         "/public",
         "/media",
         "/subscription",  # Subscription yönetimi super admin için
+        "/superadmin",  # Super admin endpoint'leri bypass et
     }
 
     # Limitli endpoint'ler ve limit tipleri

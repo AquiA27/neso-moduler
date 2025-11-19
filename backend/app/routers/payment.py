@@ -35,35 +35,37 @@ class PaymentStatusUpdate(BaseModel):
     odeme_tarihi: Optional[datetime] = None
 
 
-@router.get("/list", response_model=List[PaymentOut])
+@router.get("/list")
 async def list_payments(
     isletme_id: Optional[int] = Query(None, description="İşletme ID ile filtrele"),
     subscription_id: Optional[int] = Query(None, description="Abonelik ID ile filtrele"),
     durum: Optional[str] = Query(None, description="Durum ile filtrele"),
     _: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Tüm ödemeleri listele"""
+    """Tüm ödemeleri listele (işletme adı ile birlikte)"""
     query = """
-        SELECT id, isletme_id, subscription_id, tutar, odeme_turu, durum,
-               fatura_no, aciklama, odeme_tarihi, created_at, updated_at
-        FROM payments
+        SELECT p.id, p.isletme_id, i.ad as isletme_ad, p.subscription_id, 
+               p.tutar, p.odeme_turu, p.durum, p.fatura_no, p.aciklama, 
+               p.odeme_tarihi, p.created_at, p.updated_at
+        FROM payments p
+        LEFT JOIN isletmeler i ON p.isletme_id = i.id
         WHERE 1=1
     """
     params = {}
     
     if isletme_id:
-        query += " AND isletme_id = :isletme_id"
+        query += " AND p.isletme_id = :isletme_id"
         params["isletme_id"] = isletme_id
     
     if subscription_id:
-        query += " AND subscription_id = :subscription_id"
+        query += " AND p.subscription_id = :subscription_id"
         params["subscription_id"] = subscription_id
     
     if durum:
-        query += " AND durum = :durum"
+        query += " AND p.durum = :durum"
         params["durum"] = durum
     
-    query += " ORDER BY created_at DESC"
+    query += " ORDER BY p.created_at DESC"
     
     rows = await db.fetch_all(query, params)
     return [dict(row) for row in rows]

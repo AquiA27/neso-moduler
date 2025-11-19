@@ -1,5 +1,5 @@
 # backend/app/routers/menu.py
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, status
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Mapping
 import csv, io, unicodedata, secrets
@@ -141,16 +141,85 @@ async def menu_liste(
     limit: int = Query(100, ge=1, le=500, description="Sayfa başına kayıt sayısı"),
     offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
     varyasyonlar_dahil: bool = Query(False, description="true ise varyasyonları da getir"),
-    _: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
-    # Cache key oluştur
-    cache_key_str = cache_key("menu:liste", sube_id, sadece_aktif, varyasyonlar_dahil, limit, offset)
+    # Super admin tenant switching yapıyorsa, tenant_id'yi al
+    switched_tenant_id = current_user.get("switched_tenant_id")
+    tenant_id = current_user.get("tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else tenant_id
+    
+    # Cache key oluştur (tenant_id ve sube_id dahil - her tenant için ayrı cache)
+    cache_key_str = cache_key("menu:liste", effective_tenant_id, sube_id, sadece_aktif, varyasyonlar_dahil, limit, offset)
     
     # Cache'den kontrol et
     cached_result = await cache.get(cache_key_str)
     if cached_result is not None:
+        import logging
+        logging.info(f"[MENU_LISTE] Cache hit: sube_id={sube_id}, effective_tenant_id={effective_tenant_id}")
         return cached_result
+    
+    # Super admin tenant switching yapıyorsa (effective_tenant_id varsa), şubenin o tenant'a ait olduğunu doğrula
+    # Ama "Tüm İşletmeler" seçildiğinde (effective_tenant_id null) tenant kontrolü yapma
+    if effective_tenant_id:
+        role = (current_user.get("role") or "").lower()
+        if role == "super_admin":
+            # Şubenin tenant'a ait olduğunu kontrol et
+            sube_check = await db.fetch_one(
+                "SELECT id, isletme_id FROM subeler WHERE id = :sid",
+                {"sid": sube_id},
+            )
+            if sube_check:
+                # sube_check'ü dict'e çevir (Record objesi olabilir)
+                sube_check_dict = dict(sube_check) if hasattr(sube_check, 'keys') else sube_check
+                sube_isletme_id = sube_check_dict.get("isletme_id") if isinstance(sube_check_dict, dict) else (getattr(sube_check, "isletme_id", None) if sube_check else None)
+                
+                # Şube var, tenant'a ait mi kontrol et
+                if sube_isletme_id != effective_tenant_id:
+                    # Şube başka tenant'a ait - o tenant'ın şubelerini kontrol et
+                    tenant_sube = await db.fetch_one(
+                        """
+                        SELECT id FROM subeler 
+                        WHERE isletme_id = :tid AND aktif = TRUE 
+                        ORDER BY id ASC 
+                        LIMIT 1
+                        """,
+                        {"tid": effective_tenant_id},
+                    )
+                    if tenant_sube:
+                        # tenant_sube'yi dict'e çevir
+                        tenant_sube_dict = dict(tenant_sube) if hasattr(tenant_sube, 'keys') else tenant_sube
+                        new_sube_id = tenant_sube_dict.get("id") if isinstance(tenant_sube_dict, dict) else (getattr(tenant_sube, "id", None) if tenant_sube else None)
+                        if new_sube_id:
+                            # Tenant'ın şubesi var, sube_id'yi güncelle
+                            sube_id = new_sube_id
+                            import logging
+                            logging.info(f"[MENU_LISTE] Tenant {effective_tenant_id} için şube güncellendi: {sube_id}")
+                    else:
+                        # Tenant'ın şubesi yok - boş menu dönecek (hata verme)
+                        import logging
+                        logging.warning(f"[MENU_LISTE] Tenant {effective_tenant_id} için şube bulunamadı, boş menu dönecek")
+                        return []  # Boş menu döndür
+            else:
+                # Şube yok - tenant'ın şubesini kontrol et
+                tenant_sube = await db.fetch_one(
+                    """
+                    SELECT id FROM subeler 
+                    WHERE isletme_id = :tid AND aktif = TRUE 
+                    ORDER BY id ASC 
+                    LIMIT 1
+                    """,
+                    {"tid": effective_tenant_id},
+                )
+                if tenant_sube:
+                    sube_id = tenant_sube["id"]
+                    import logging
+                    logging.info(f"[MENU_LISTE] Tenant {effective_tenant_id} için şube bulundu: {sube_id}")
+                else:
+                    # Tenant'ın şubesi yok - boş menu dönecek
+                    import logging
+                    logging.warning(f"[MENU_LISTE] Tenant {effective_tenant_id} için şube bulunamadı, boş menu dönecek")
+                    return []  # Boş menu döndür
     if varyasyonlar_dahil:
         # N+1 query düzeltmesi: Tek JOIN sorgusu ile tüm varyasyonları getir
         # Önce menu'leri pagination ile al, sonra varyasyonları JOIN ile getir
@@ -205,6 +274,11 @@ async def menu_liste(
     
     # Cache'e kaydet (5 dakika TTL)
     await cache.set(cache_key_str, result, ttl=300)
+    
+    # Debug log (sadece dev için)
+    import logging
+    logging.info(f"[MENU_LISTE] sube_id={sube_id}, effective_tenant_id={effective_tenant_id}, items_count={len(result)}")
+    
     return result
 
 @router.patch(

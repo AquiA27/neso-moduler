@@ -24,9 +24,20 @@ services:
       - key: ENV
         value: prod
       
-      # CORS Origins (Vercel frontend URL'leri)
+      # CORS Origins (Vercel frontend URL'leri - deployment sonrası güncelleyin)
       - key: CORS_ORIGINS
-        value: https://neso-moduler.vercel.app,https://www.neso-moduler.vercel.app
+        sync: false  # Manuel olarak Vercel URL'inizi ekleyin
+        value: https://your-frontend.vercel.app
+      
+      # Rate Limiting
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+      
+      # Password Policy
+      - key: PASSWORD_MIN_LENGTH
+        value: "12"
+      - key: BCRYPT_ROUNDS
+        value: "12"
       
       # Database Connection Pool (Cross-region optimization)
       - key: DB_POOL_MIN_SIZE

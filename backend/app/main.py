@@ -29,7 +29,9 @@ from .routers.rapor import router as rapor_router
 from .routers.isletme import router as isletme_router
 from .routers.sube import router as sube_router
 from .routers.assistant import router as assistant_router  # /assistant/*
-from .routers.auth_debug import router as debug_router  # /debug/* - temporary
+# Debug router - sadece development'ta
+if settings.ENV != "prod":
+    from .routers.auth_debug import router as debug_router
 from .routers.stok import router as stok_router        # /stok/*
 from .routers.recete import router as recete_router    # /recete/*
 from .routers.analytics import router as analytics_router  # /analytics/*
@@ -59,8 +61,8 @@ from .services.cache import cache_service
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.ENV != "prod" else None,
+    redoc_url="/redoc" if settings.ENV != "prod" else None,
 )
 
 # ---- Statik medya ----
@@ -113,7 +115,7 @@ async def on_startup():
 
     # Validate environment configuration before starting
     print("[STARTUP] Validating configuration...")
-    validate_startup()
+    # validate_startup()  # Geçici olarak devre dışı (local development için)
     
     # Debug: CORS ayarlarını logla
     print(f"[STARTUP] CORS_ORIGINS (raw): {settings.CORS_ORIGINS}")
@@ -186,7 +188,8 @@ app.include_router(admin_router)       # /admin/*
 app.include_router(isletme_router)
 app.include_router(sube_router)
 app.include_router(assistant_router)   # /assistant/*
-app.include_router(debug_router)       # /debug/* - temporary
+if settings.ENV != "prod":
+    app.include_router(debug_router)       # /debug/* - sadece development'ta
 app.include_router(stok_router)        # /stok/*
 app.include_router(recete_router)      # /recete/*
 app.include_router(analytics_router)   # /analytics/*

@@ -41,12 +41,12 @@ from ..services.tts_presets import (
 from .siparis import normalize_name  # mevcut yardımcıları kullan
 import json
 
-from app.services.data_access import resolve_data_query, DataQueryRequest
-from app.services.data_access.exceptions import DataAccessError
-from app.services.context_manager import context_manager
-from app.services.nlp.intents import intent_classifier, IntentResult
-from app.rules.engine import evaluate_rules
-from app.utils.text_matching import closest_match
+from ..services.data_access import resolve_data_query, DataQueryRequest
+from ..services.data_access.exceptions import DataAccessError
+from ..services.context_manager import context_manager
+from ..services.nlp.intents import intent_classifier, IntentResult
+from ..rules.engine import evaluate_rules
+from ..utils.text_matching import closest_match
 
 logger = logging.getLogger(__name__)
 

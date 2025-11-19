@@ -6,7 +6,7 @@ from typing import Any, Dict, List, Optional
 
 from databases import Database
 
-from app.config import schema_registry_loader as registry
+from ...config import schema_registry_loader as registry
 from .query_builder import build_select_clause, build_order_clause, build_limit_clause
 from .exceptions import UnknownIntentError, InvalidFilterError
 

@@ -73,34 +73,75 @@ async def get_current_user(
     # Super admin için X-Tenant-Id header'ını veya tenant_id query parameter'ını kontrol et (tenant switching)
     switched_tenant_id = None
     if user_dict.get("role") == "super_admin" and request:
+        import logging
         # Önce query parameter'ı kontrol et (frontend'den gelen)
-        query_params = dict(request.query_params) if hasattr(request, 'query_params') else {}
-        tenant_id_param = query_params.get("tenant_id")
+        # Starlette'de query_params bir QueryParams objesi, dict'e çevirirken dikkatli ol
+        tenant_id_param = None
+        if hasattr(request, 'query_params'):
+            # QueryParams objesi üzerinden direkt erişim
+            if "tenant_id" in request.query_params:
+                tenant_id_param = request.query_params.get("tenant_id")
+                # Eğer liste dönerse, ilk elemanı al
+                if isinstance(tenant_id_param, list):
+                    tenant_id_param = tenant_id_param[0] if tenant_id_param else None
         
         # Sonra header'ı kontrol et (alternatif yöntem)
         x_tenant_id = request.headers.get("X-Tenant-Id")
+        
+        logging.info(f"[get_current_user] Super admin tenant switching check: query_param={tenant_id_param}, header={x_tenant_id}")
         
         # Query parameter öncelikli, yoksa header
         tenant_id_value = tenant_id_param or x_tenant_id
         
         if tenant_id_value:
             try:
-                switched_tenant_id = int(tenant_id_value)
-                # Tenant'ın var olduğunu ve aktif olduğunu kontrol et
-                tenant_check = await db.fetch_one(
-                    "SELECT id, aktif FROM isletmeler WHERE id = :tid",
-                    {"tid": switched_tenant_id},
-                )
-                if not tenant_check or not tenant_check.get("aktif"):
-                    # Tenant yoksa veya pasifse, switched_tenant_id'yi None yap
+                # String'i int'e çevir - manuel parse (int() fonksiyonu sorunlu olabilir)
+                tenant_id_str = str(tenant_id_value).strip()
+                if not tenant_id_str or not tenant_id_str.isdigit():
+                    logging.warning(f"[get_current_user] Invalid tenant_id format: {tenant_id_str}")
                     switched_tenant_id = None
                 else:
-                    # Super admin'in bu tenant'ın context'inde çalışması için tenant_id'yi geçici olarak değiştir
-                    user_dict["switched_tenant_id"] = switched_tenant_id
-                    user_dict["tenant_id"] = switched_tenant_id  # Geçici olarak switched tenant'ın context'i
-            except (ValueError, TypeError):
+                    # Manuel olarak string'i int'e çevir
+                    switched_tenant_id = 0
+                    for char in tenant_id_str:
+                        if char.isdigit():
+                            switched_tenant_id = switched_tenant_id * 10 + (ord(char) - ord('0'))
+                        else:
+                            logging.warning(f"[get_current_user] Invalid character in tenant_id: {char}")
+                            switched_tenant_id = None
+                            break
+                    
+                    if switched_tenant_id is not None:
+                        logging.info(f"[get_current_user] Parsed tenant_id: {switched_tenant_id}")
+
+                        # Tenant'ın var olduğunu ve aktif olduğunu kontrol et
+                        try:
+                            tenant_check = await db.fetch_one(
+                                "SELECT id, aktif FROM isletmeler WHERE id = :tid",
+                                {"tid": switched_tenant_id},
+                            )
+                            # tenant_check'ü dict'e çevir
+                            tenant_check_dict = dict(tenant_check) if tenant_check and hasattr(tenant_check, 'keys') else (tenant_check if tenant_check else {})
+                            tenant_aktif = tenant_check_dict.get("aktif") if isinstance(tenant_check_dict, dict) else (getattr(tenant_check, "aktif", False) if tenant_check else False)
+                            
+                            if not tenant_check or not tenant_aktif:
+                                # Tenant yoksa veya pasifse, switched_tenant_id'yi None yap
+                                logging.warning(f"[get_current_user] Tenant {switched_tenant_id} not found or inactive")
+                                switched_tenant_id = None
+                            else:
+                                # Super admin'in bu tenant'ın context'inde çalışması için tenant_id'yi geçici olarak değiştir
+                                user_dict["switched_tenant_id"] = switched_tenant_id
+                                user_dict["tenant_id"] = switched_tenant_id  # Geçici olarak switched tenant'ın context'i
+                                logging.info(f"[get_current_user] Tenant switching active: switched_tenant_id={switched_tenant_id}, user_dict={user_dict}")
+                        except Exception as db_error:
+                            logging.warning(f"[get_current_user] Error checking tenant {switched_tenant_id}: {db_error}")
+                            switched_tenant_id = None
+            except Exception as e:
                 # Geçersiz tenant_id, görmezden gel
+                logging.warning(f"[get_current_user] Invalid tenant_id value: {tenant_id_value} (type: {type(tenant_id_value)}), error: {e}, error_type: {type(e)}")
                 switched_tenant_id = None
+        else:
+            logging.info(f"[get_current_user] No tenant_id provided for super admin")
     
     return user_dict
 
@@ -111,11 +152,19 @@ async def get_current_user_and_role(
 ) -> Mapping[str, Any]:
     """
     Rolü token'dan **değil**, DB'den okur (güncel yetki için daha güvenli).
+    Super admin tenant switching için switched_tenant_id ve tenant_id bilgilerini de döndürür.
     """
     import logging
     user = await get_current_user(request, token)
     logging.info(f"get_current_user_and_role: user={user}")
-    return {"username": user["username"], "role": user["role"], "id": user["id"]}
+    result = {
+        "username": user["username"], 
+        "role": user["role"], 
+        "id": user["id"],
+        "tenant_id": user.get("tenant_id"),
+        "switched_tenant_id": user.get("switched_tenant_id"),
+    }
+    return result
 
 
 def require_roles(allowed: Set[str]):
@@ -257,23 +306,132 @@ async def get_sube_id(
     Şube belirleme:
     - Header (X-Sube-Id) öncelikli
     - Yoksa query (?sube_id=)
-    - İkisi de yoksa: 1 (DEMO varsayılanı) — prod’da zorunlu yapacağız
+    - İkisi de yoksa: Super admin tenant switching yapıyorsa o tenant'ın ilk şubesini, yoksa 1 (DEMO varsayılanı)
     Ayrıca şubenin aktifliğini ve kullanıcının erişim iznini doğrular.
+    Super admin tenant switching yapıyorsa, sadece o tenant'ın şubelerine erişebilir.
     """
     sube_id = x_sube_id if x_sube_id is not None else sube_id_q
+    
+    # Super admin tenant switching yapıyorsa, tenant_id'yi al
+    switched_tenant_id = current.get("switched_tenant_id")
+    tenant_id = current.get("tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else tenant_id
+    
+    role = (current.get("role") or "").lower()
+    is_super_admin = role == "super_admin"
+    
+    # Super admin tenant switching yapıyorsa, şubenin o tenant'a ait olduğunu kontrol et
+    if is_super_admin and effective_tenant_id and sube_id is not None:
+        # Gönderilen sube_id'nin o tenant'a ait olup olmadığını kontrol et
+        sube_check = await db.fetch_one(
+            "SELECT id FROM subeler WHERE id = :sid AND isletme_id = :tid AND aktif = TRUE",
+            {"sid": sube_id, "tid": effective_tenant_id},
+        )
+        if not sube_check:
+            # Gönderilen sube_id o tenant'a ait değil, o tenant'ın ilk şubesini bul
+            row = await db.fetch_one(
+                """
+                SELECT id FROM subeler 
+                WHERE isletme_id = :tid AND aktif = TRUE 
+                ORDER BY id ASC 
+                LIMIT 1
+                """,
+                {"tid": effective_tenant_id},
+            )
+            if row:
+                sube_id = row["id"]
+                import logging
+                logging.info(f"[get_sube_id] Tenant {effective_tenant_id} için şube bulundu: {sube_id}")
+            else:
+                # Tenant'ın şubesi yoksa, hata verme - backend'de varsayılan şube kullanılacak
+                # Ama bu durumda menu boş dönecek (normal davranış)
+                import logging
+                logging.warning(f"[get_sube_id] Tenant {effective_tenant_id} için aktif şube bulunamadı")
+                # sube_id'yi None yap, aşağıda varsayılan şube atanacak ama tenant kontrolü yapılmayacak
+                sube_id = None
+    
+    # Super admin tenant switching yapıyorsa ve sube_id belirtilmemişse, o tenant'ın ilk şubesini bul
+    if sube_id is None and is_super_admin and effective_tenant_id:
+        row = await db.fetch_one(
+            """
+            SELECT id FROM subeler 
+            WHERE isletme_id = :tid AND aktif = TRUE 
+            ORDER BY id ASC 
+            LIMIT 1
+            """,
+            {"tid": effective_tenant_id},
+        )
+        if row:
+            sube_id = row["id"]
+            import logging
+            logging.info(f"[get_sube_id] Tenant {effective_tenant_id} için otomatik şube bulundu: {sube_id}")
+        else:
+            # Tenant'ın şubesi yoksa, varsayılan şube kullan ama tenant kontrolü yapma
+            import logging
+            logging.warning(f"[get_sube_id] Tenant {effective_tenant_id} için şube bulunamadı, varsayılan şube kullanılacak")
+            sube_id = 1  # DEMO varsayılanı - ama aşağıda tenant kontrolü yapılmayacak
+    
     if sube_id is None:
         sube_id = 1  # DEMO varsayılanı
 
-    # Şube aktif mi?
-    row = await db.fetch_one(
-        "SELECT id FROM subeler WHERE id = :id AND aktif = TRUE",
-        {"id": sube_id},
-    )
+    # Şube aktif mi ve tenant_id kontrolü
+    query = "SELECT id, isletme_id FROM subeler WHERE id = :id AND aktif = TRUE"
+    params = {"id": sube_id}
+    
+    # Super admin tenant switching yapıyorsa (effective_tenant_id varsa), şubenin o tenant'a ait olduğunu kontrol et
+    # Ama "Tüm İşletmeler" seçildiğinde (effective_tenant_id null) tenant kontrolü yapma
+    # Ayrıca, eğer tenant'ın şubesi yoksa (yukarıda bulunamadıysa), tenant kontrolü yapma
+    tenant_check_needed = is_super_admin and effective_tenant_id
+    
+    # Önce şubenin var olup olmadığını kontrol et
+    row = await db.fetch_one(query, params)
     if not row:
+        # Şube yok veya pasif
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Geçersiz veya pasif sube_id",
         )
+    
+    # row'u dict'e çevir (Record objesi olabilir)
+    row_dict = dict(row) if hasattr(row, 'keys') else row
+    
+    # Şube var, şimdi tenant kontrolü yap (eğer gerekliyse)
+    if tenant_check_needed:
+        # Şubenin tenant'a ait olduğunu kontrol et
+        row_isletme_id = row_dict.get("isletme_id") if isinstance(row_dict, dict) else (getattr(row, "isletme_id", None) if row else None)
+        if row_isletme_id != effective_tenant_id:
+            # Şube başka bir tenant'a ait - o tenant'ın ilk şubesini tekrar bul
+            tenant_sube = await db.fetch_one(
+                """
+                SELECT id FROM subeler 
+                WHERE isletme_id = :tid AND aktif = TRUE 
+                ORDER BY id ASC 
+                LIMIT 1
+                """,
+                {"tid": effective_tenant_id},
+            )
+            if tenant_sube:
+                # tenant_sube'yi dict'e çevir
+                tenant_sube_dict = dict(tenant_sube) if hasattr(tenant_sube, 'keys') else tenant_sube
+                sube_id = tenant_sube_dict.get("id") if isinstance(tenant_sube_dict, dict) else (getattr(tenant_sube, "id", None) if tenant_sube else None)
+                if sube_id:
+                    # Yeni şube ID'si ile tekrar kontrol et
+                    row = await db.fetch_one(
+                        "SELECT id, isletme_id FROM subeler WHERE id = :id AND aktif = TRUE",
+                        {"id": sube_id},
+                    )
+                    if not row:
+                        raise HTTPException(
+                            status_code=status.HTTP_400_BAD_REQUEST,
+                            detail="Geçersiz veya pasif sube_id",
+                        )
+                    # row'u tekrar dict'e çevir
+                    row_dict = dict(row) if hasattr(row, 'keys') else row
+            else:
+                # Tenant'ın şubesi yok - bu durumda hata verme, sadece boş sonuç dönecek
+                import logging
+                logging.warning(f"[get_sube_id] Tenant {effective_tenant_id} için şube bulunamadı, varsayılan şube kullanılacak")
+                # sube_id'yi olduğu gibi bırak, menu endpoint'i boş sonuç dönecek
 
     # Şube erişim izni
     await enforce_user_sube_access(current["username"], sube_id)

@@ -438,42 +438,129 @@ async def personeller_list(
 ):
     """
     Personelleri listele
-    - Super admin: Tüm personelleri görür
+    - Super admin tenant switching yapıyorsa: Sadece seçili tenant'ın personellerini görür
+    - Super admin "Tüm İşletmeler" modundaysa: Tüm personelleri görür
     - Admin: Sadece kendi işletmesine (tenant_id) ait personelleri görür
     """
+    import logging
     user_role = user.get("role")
     user_tenant_id = user.get("tenant_id")
-    
-    # Super admin tüm personelleri görebilir
-    if user_role == "super_admin":
+
+    # Super admin tenant switching yapıyorsa, effective_tenant_id'yi al
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+
+    # Super admin kontrolü
+    is_super_admin = user_role == "super_admin"
+
+    logging.info(f"[PERSONELLER_LIST] user_role={user_role}, user_tenant_id={user_tenant_id}, switched_tenant_id={switched_tenant_id}, effective_tenant_id={effective_tenant_id}")
+
+    # Super admin tenant switching yapıyorsa (switched_tenant_id varsa), sadece o tenant'ın personellerini göster
+    if is_super_admin and switched_tenant_id:
+        # Önce tenant'ın var olduğunu ve aktif olduğunu kontrol et
+        tenant_check = await db.fetch_one(
+            "SELECT id, aktif FROM isletmeler WHERE id = :tid",
+            {"tid": switched_tenant_id},
+        )
+        # tenant_check'ü dict'e çevir (Record objesi olabilir)
+        tenant_check_dict = dict(tenant_check) if tenant_check and hasattr(tenant_check, 'keys') else (tenant_check if tenant_check else {})
+        tenant_aktif = tenant_check_dict.get("aktif") if isinstance(tenant_check_dict, dict) else (getattr(tenant_check, "aktif", False) if tenant_check else False)
+        
+        if not tenant_check or not tenant_aktif:
+            # Tenant yoksa veya pasifse, boş liste döndür
+            logging.warning(f"[PERSONELLER_LIST] Tenant {switched_tenant_id} not found or inactive, returning empty list")
+            return []
+
+        logging.info(f"[PERSONELLER_LIST] Super admin tenant switching: fetching personeller for tenant_id={switched_tenant_id}")
+        
+        # Önce tenant_id ile eşleşen personelleri bul
         rows = await db.fetch_all(
             """
-            SELECT id, username, role, aktif, tenant_id, created_at 
-            FROM users 
+            SELECT id, username, role, aktif, tenant_id, created_at
+            FROM users
+            WHERE tenant_id = :tid AND role != 'super_admin'
+            ORDER BY id DESC
+            LIMIT :limit OFFSET :offset
+            """,
+            {"tid": switched_tenant_id, "limit": limit, "offset": offset}
+        )
+        logging.info(f"[PERSONELLER_LIST] Found {len(rows)} personeller for tenant_id={switched_tenant_id}")
+        
+        # Eğer hiç personel bulunamadıysa ve tenant_id=1 ise (Demo İşletme), NULL tenant_id'li personelleri de kontrol et
+        if len(rows) == 0 and switched_tenant_id == 1:
+            logging.info(f"[PERSONELLER_LIST] No personeller found for tenant_id=1, checking for NULL tenant_id personeller")
+            rows_null = await db.fetch_all(
+                """
+                SELECT id, username, role, aktif, tenant_id, created_at
+                FROM users
+                WHERE tenant_id IS NULL AND role != 'super_admin'
+                ORDER BY id DESC
+                LIMIT :limit OFFSET :offset
+                """,
+                {"limit": limit, "offset": offset}
+            )
+            logging.info(f"[PERSONELLER_LIST] Found {len(rows_null)} personeller with NULL tenant_id")
+            if len(rows_null) > 0:
+                # NULL tenant_id'li personelleri Demo İşletme'ye atayalım
+                logging.info(f"[PERSONELLER_LIST] Assigning {len(rows_null)} NULL tenant_id personeller to Demo İşletme (tenant_id=1)")
+                for row in rows_null:
+                    # row'u dict'e çevir
+                    row_dict = dict(row) if hasattr(row, 'keys') else row
+                    user_id = row_dict.get("id") if isinstance(row_dict, dict) else (getattr(row, "id", None) if row else None)
+                    if user_id:
+                        await db.execute(
+                            "UPDATE users SET tenant_id = :tid WHERE id = :uid",
+                            {"tid": 1, "uid": user_id}
+                        )
+                # Tekrar sorgula
+                rows = await db.fetch_all(
+                    """
+                    SELECT id, username, role, aktif, tenant_id, created_at
+                    FROM users
+                    WHERE tenant_id = :tid AND role != 'super_admin'
+                    ORDER BY id DESC
+                    LIMIT :limit OFFSET :offset
+                    """,
+                    {"tid": switched_tenant_id, "limit": limit, "offset": offset}
+                )
+                logging.info(f"[PERSONELLER_LIST] After assignment: Found {len(rows)} personeller for tenant_id={switched_tenant_id}")
+    elif is_super_admin:
+        # Super admin "Tüm İşletmeler" modunda - tüm personelleri göster
+        logging.info(f"[PERSONELLER_LIST] Super admin 'Tüm İşletmeler' mode: fetching all personeller")
+        rows = await db.fetch_all(
+            """
+            SELECT id, username, role, aktif, tenant_id, created_at
+            FROM users
             WHERE role != 'super_admin'
             ORDER BY id DESC
             LIMIT :limit OFFSET :offset
             """,
             {"limit": limit, "offset": offset}
         )
+        logging.info(f"[PERSONELLER_LIST] Found {len(rows)} total personeller")
     else:
-        # Admin sadece kendi tenant'ına ait personelleri görebilir
+        # Admin sadece kendi tenant'ına ait personelleri görebilir (kendisi dahil)
         if user_tenant_id:
+            logging.info(f"[PERSONELLER_LIST] Admin mode: fetching personeller for tenant_id={user_tenant_id}")
             rows = await db.fetch_all(
                 """
-                SELECT id, username, role, aktif, tenant_id, created_at 
-                FROM users 
+                SELECT id, username, role, aktif, tenant_id, created_at
+                FROM users
                 WHERE tenant_id = :tid AND role != 'super_admin'
                 ORDER BY id DESC
                 LIMIT :limit OFFSET :offset
                 """,
                 {"tid": user_tenant_id, "limit": limit, "offset": offset}
             )
+            logging.info(f"[PERSONELLER_LIST] Found {len(rows)} personeller for admin tenant_id={user_tenant_id} (including admin user)")
         else:
             # Tenant_id yoksa boş liste döndür
+            logging.warning(f"[PERSONELLER_LIST] Admin has no tenant_id, returning empty list")
             rows = []
-    
-    return [dict(r) if hasattr(r, 'keys') else r for r in rows]
+
+    result = [dict(r) if hasattr(r, 'keys') else r for r in rows]
+    logging.info(f"[PERSONELLER_LIST] Returning {len(result)} personeller")
+    return result
 
 
 @router.post("/personeller/upsert")
@@ -567,7 +654,14 @@ async def personel_analiz(
     - Ortalama sipariş tutarı
     """
     import logging
-    logging.info(f"personel_analiz called: user={user['username']}, gun_say={gun_say}, limit={limit}")
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+    
+    is_super_admin = user_role == "super_admin"
+    
+    logging.info(f"personel_analiz called: user={user['username']}, gun_say={gun_say}, limit={limit}, effective_tenant_id={effective_tenant_id}")
     
     try:
         sube_id = await resolve_sube_id_or_none(
@@ -587,6 +681,17 @@ async def personel_analiz(
             flt += " AND s.sube_id = :sid"
             params["sid"] = sube_id
         
+        # Tenant filtresi ekle (super admin tenant switching yapıyorsa veya normal admin ise)
+        tenant_filter = ""
+        if effective_tenant_id:
+            # Super admin tenant switching yapıyorsa veya normal admin ise, sadece o tenant'ın personellerini göster
+            tenant_filter = " AND u.tenant_id = :tid"
+            params["tid"] = effective_tenant_id
+            logging.info(f"[PERSONEL_ANALIZ] Filtering by tenant_id={effective_tenant_id}")
+        elif is_super_admin:
+            # Super admin "Tüm İşletmeler" modunda - tenant filtresi yok
+            logging.info(f"[PERSONEL_ANALIZ] Super admin 'Tüm İşletmeler' mode - no tenant filter")
+        
         logging.info(f"Executing personel query with params: {params}")
         
         # Personel bazlı analiz (kullanıcılar + yapay zeka)
@@ -605,10 +710,23 @@ async def personel_analiz(
                 OR (s.created_by_user_id IS NULL AND s.created_by_username = u.username)
             )
         )
-        WHERE u.role IN ('garson', 'barista', 'admin', 'operator')
+        WHERE u.role IN ('garson', 'barista', 'admin', 'operator'){tenant_filter}
         GROUP BY u.id, u.username, u.role
         HAVING COUNT(DISTINCT s.id) > 0
         """
+        
+        # AI sorgusu için tenant filtresi (siparişler üzerinden)
+        ai_tenant_filter = ""
+        ai_params = params.copy()
+        if effective_tenant_id:
+            # Siparişlerin şubeleri üzerinden tenant kontrolü yap
+            ai_tenant_filter = """
+            AND EXISTS (
+                SELECT 1 FROM subeler sub 
+                WHERE sub.id = s.sube_id AND sub.isletme_id = :tid
+            )
+            """
+            ai_params["tid"] = effective_tenant_id
         
         q_ai = f"""
         SELECT 
@@ -618,11 +736,11 @@ async def personel_analiz(
             COUNT(*) AS siparis_adedi,
             COALESCE(SUM(tutar), 0) AS toplam_ciro
         FROM siparisler s
-        WHERE {flt} AND created_by_user_id IS NULL AND (s.created_by_username IS NULL OR s.created_by_username = '')
+        WHERE {flt} AND created_by_user_id IS NULL AND (s.created_by_username IS NULL OR s.created_by_username = ''){ai_tenant_filter}
         """
         
         personel_rows = await db.fetch_all(q_personel, params)
-        ai_rows = await db.fetch_all(q_ai, params)
+        ai_rows = await db.fetch_all(q_ai, ai_params)
         logging.info(f"personel_rows count: {len(personel_rows)}, ai_rows count: {len(ai_rows)}")
     except Exception as e:
         logging.error(f"Error in personel_analiz: {e}", exc_info=True)

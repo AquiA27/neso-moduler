@@ -30,13 +30,18 @@ async def tenants_list(
     offset: int = Query(0, ge=0, description="Atlanacak kayıt sayısı"),
     _: Dict[str, Any] = Depends(get_current_user),
 ):
+    import logging
     q = """
     SELECT id, ad, vergi_no, telefon, aktif
     FROM isletmeler
     ORDER BY id DESC
     LIMIT :limit OFFSET :offset
     """
-    return await db.fetch_all(q, {"limit": limit, "offset": offset})
+    results = await db.fetch_all(q, {"limit": limit, "offset": offset})
+    logging.info(f"[TENANTS_LIST] Query returned {len(results)} tenants")
+    for r in results:
+        logging.info(f"[TENANTS_LIST] Tenant: id={r['id']}, ad={r['ad']}, aktif={r['aktif']}")
+    return results
 
 
 @router.get("/tenants/{id}")
@@ -118,12 +123,12 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     # Toplam gelir
     revenue = await db.fetch_one(
         """
-        SELECT COALESCE(SUM(tutar), 0) as total
+        SELECT COALESCE(SUM(o.tutar), 0) as total
         FROM odemeler o
         JOIN adisyons a ON o.adisyon_id = a.id
         JOIN subeler sub ON a.sube_id = sub.id
         WHERE sub.isletme_id = :id
-          AND o.durum = 'tamamlandi'
+          AND o.iptal = FALSE
         """,
         {"id": id}
     )
@@ -142,7 +147,7 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     # Son sipariş tarihi
     last_order = await db.fetch_one(
         """
-        SELECT MAX(created_at) as last_order_date
+        SELECT MAX(s.created_at) as last_order_date
         FROM siparisler s
         JOIN subeler sub ON s.sube_id = sub.id
         WHERE sub.isletme_id = :id
@@ -535,7 +540,8 @@ class QuickSetupIn(BaseModel):
     domain: Optional[str] = None
     app_name: Optional[str] = None
     logo_url: Optional[str] = None
-    primary_color: Optional[str] = None
+    theme: Optional[str] = Field(default="green")  # green, blue, purple, rose
+    odeme_turu: Optional[str] = Field(default="odeme_sistemi")  # odeme_sistemi, nakit, havale, kredi_karti
 
 
 @router.post("/quick-setup")
@@ -627,18 +633,30 @@ async def quick_setup(
         )
         
         # 5. Özelleştirme oluştur (varsa)
-        if payload.domain or payload.app_name or payload.logo_url or payload.primary_color:
+        # Tema paketleri
+        theme_colors = {
+            "green": {"primary": "#00c67f", "secondary": "#00e699"},
+            "blue": {"primary": "#2563eb", "secondary": "#3b82f6"},
+            "purple": {"primary": "#7c3aed", "secondary": "#8b5cf6"},
+            "rose": {"primary": "#e11d48", "secondary": "#f43f5e"},
+        }
+        
+        theme = payload.theme or "green"
+        theme_color = theme_colors.get(theme, theme_colors["green"])
+        
+        if payload.domain or payload.app_name or payload.logo_url or theme:
             await db.execute(
                 """
                 INSERT INTO tenant_customizations (
-                    isletme_id, domain, app_name, logo_url, primary_color
+                    isletme_id, domain, app_name, logo_url, primary_color, secondary_color
                 )
-                VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color)
+                VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color)
                 ON CONFLICT (isletme_id) DO UPDATE
                    SET domain = EXCLUDED.domain,
                        app_name = EXCLUDED.app_name,
                        logo_url = EXCLUDED.logo_url,
                        primary_color = EXCLUDED.primary_color,
+                       secondary_color = EXCLUDED.secondary_color,
                        updated_at = NOW()
                 """,
                 {
@@ -646,7 +664,31 @@ async def quick_setup(
                     "domain": payload.domain,
                     "app_name": payload.app_name,
                     "logo_url": payload.logo_url,
-                    "primary_color": payload.primary_color or "#3b82f6",
+                    "primary_color": theme_color["primary"],
+                    "secondary_color": theme_color["secondary"],
+                },
+            )
+        
+        # 6. Ödeme kaydı oluştur (aylık fiyat > 0 ise)
+        if payload.ayllik_fiyat > 0:
+            odeme_turu = payload.odeme_turu or "odeme_sistemi"
+            await db.execute(
+                """
+                INSERT INTO payments (
+                    isletme_id, subscription_id, tutar, odeme_turu, durum,
+                    aciklama, odeme_tarihi
+                )
+                VALUES (
+                    :isletme_id, :subscription_id, :tutar, :odeme_turu, 'completed',
+                    :aciklama, NOW()
+                )
+                """,
+                {
+                    "isletme_id": isletme_id,
+                    "subscription_id": subscription["id"],
+                    "tutar": payload.ayllik_fiyat,
+                    "odeme_turu": odeme_turu,
+                    "aciklama": f"İlk kurulum - Aylık abonelik ücreti ({payload.plan_type})",
                 },
             )
     
@@ -669,11 +711,18 @@ async def dashboard_stats(_: Dict[str, Any] = Depends(get_current_user)):
     # Aktif işletme sayısı
     active_isletme = await db.fetch_one("SELECT COUNT(*) as count FROM isletmeler WHERE aktif = TRUE")
     
+    # Pasif işletme sayısı
+    passive_isletme = await db.fetch_one("SELECT COUNT(*) as count FROM isletmeler WHERE aktif = FALSE")
+    
     # Toplam şube sayısı
     total_sube = await db.fetch_one("SELECT COUNT(*) as count FROM subeler")
     
     # Toplam kullanıcı sayısı
     total_user = await db.fetch_one("SELECT COUNT(*) as count FROM users")
+    
+    # Arıza ve servis talepleri sayısı (şimdilik 0, gelecekte ticket/support tablosu eklendiğinde güncellenecek)
+    # TODO: Arıza ve servis talepleri için bir tablo oluşturulduğunda bu sorgu güncellenecek
+    ariza_servis_talepleri = 0  # Gelecekte: SELECT COUNT(*) FROM support_tickets WHERE durum IN ('pending', 'in_progress')
     
     # Aktif abonelik sayısı
     active_subscription = await db.fetch_one(
@@ -713,6 +762,7 @@ async def dashboard_stats(_: Dict[str, Any] = Depends(get_current_user)):
         "isletmeler": {
             "total": total_isletme["count"] if total_isletme else 0,
             "active": active_isletme["count"] if active_isletme else 0,
+            "passive": passive_isletme["count"] if passive_isletme else 0,
         },
         "subeler": {
             "total": total_sube["count"] if total_sube else 0,
@@ -724,6 +774,7 @@ async def dashboard_stats(_: Dict[str, Any] = Depends(get_current_user)):
             "active": active_subscription["count"] if active_subscription else 0,
             "plan_distribution": [dict(r) for r in plan_distribution],
         },
+        "ariza_servis_talepleri": ariza_servis_talepleri,
         "finansal": {
             "this_month_revenue": float(this_month_revenue["total"]) if this_month_revenue else 0.0,
             "pending_payments": {

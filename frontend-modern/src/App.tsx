@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
+import TenantRequiredGuard from './components/TenantRequiredGuard';
 
 // Lazy load heavy pages for better initial bundle size
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -35,6 +36,22 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
+// Index redirect component - Super Admin "Tüm İşletmeler" modundaysa Super Admin paneline yönlendir
+function IndexRedirect() {
+  const { user, selectedTenantId } = useAuthStore();
+  const userRole = user?.role?.toLowerCase();
+  const username = user?.username?.toLowerCase();
+  const isSuperAdmin = user && (userRole === 'super_admin' || username === 'super');
+  
+  // Super admin "Tüm İşletmeler" modundaysa Super Admin paneline yönlendir
+  if (isSuperAdmin && selectedTenantId === null) {
+    return <Navigate to="/superadmin" replace />;
+  }
+  
+  // Diğer durumlarda dashboard'a yönlendir
+  return <Navigate to="/dashboard" replace />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -63,25 +80,27 @@ function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
-            <Route path="dashboard" element={<DashboardPage />} />
-            <Route path="raporlar" element={<RaporlarPage />} />
-            <Route path="menu" element={<MenuPage />} />
-            <Route path="mutfak" element={<MutfakPage />} />
-            <Route path="kasa" element={<KasaPage />} />
-            <Route path="stok" element={<StokPage />} />
-            <Route path="giderler" element={<GiderlerPage />} />
-            <Route path="masalar" element={<MasalarPage />} />
-            <Route path="recete" element={<RecetePage />} />
-            <Route path="asistan" element={<AssistantPage />} />
-            <Route path="isletme-asistani" element={<BIAssistantPage />} />
-            <Route path="personeller" element={<PersonellerPage />} />
-            <Route path="terminal" element={<PersonelTerminalPage />} />
+            <Route index element={<IndexRedirect />} />
+            {/* Veri sayfaları - tenant seçilmesi gerekiyor */}
+            <Route path="dashboard" element={<TenantRequiredGuard><DashboardPage /></TenantRequiredGuard>} />
+            <Route path="raporlar" element={<TenantRequiredGuard><RaporlarPage /></TenantRequiredGuard>} />
+            <Route path="menu" element={<TenantRequiredGuard><MenuPage /></TenantRequiredGuard>} />
+            <Route path="stok" element={<TenantRequiredGuard><StokPage /></TenantRequiredGuard>} />
+            <Route path="giderler" element={<TenantRequiredGuard><GiderlerPage /></TenantRequiredGuard>} />
+            <Route path="masalar" element={<TenantRequiredGuard><MasalarPage /></TenantRequiredGuard>} />
+            <Route path="recete" element={<TenantRequiredGuard><RecetePage /></TenantRequiredGuard>} />
+            <Route path="asistan" element={<TenantRequiredGuard><AssistantPage /></TenantRequiredGuard>} />
+            <Route path="isletme-asistani" element={<TenantRequiredGuard><BIAssistantPage /></TenantRequiredGuard>} />
+            <Route path="personeller" element={<TenantRequiredGuard><PersonellerPage /></TenantRequiredGuard>} />
+            <Route path="mutfak" element={<TenantRequiredGuard><MutfakPage /></TenantRequiredGuard>} />
+            <Route path="kasa" element={<TenantRequiredGuard><KasaPage /></TenantRequiredGuard>} />
+            <Route path="terminal" element={<TenantRequiredGuard><PersonelTerminalPage /></TenantRequiredGuard>} />
+            {/* Sistem ayarları ve Super Admin - her zaman erişilebilir */}
             <Route path="system" element={<SystemSettingsPage />} />
             <Route path="superadmin" element={<SuperAdminPanel />} />
           </Route>
           
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<IndexRedirect />} />
         </Routes>
       </Suspense>
     </BrowserRouter>

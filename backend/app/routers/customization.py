@@ -164,20 +164,29 @@ async def update_customization(
             raise HTTPException(400, "Bu domain zaten kullanılıyor")
     
     import json
-    data = payload.model_dump(exclude={"isletme_id"})
+    data = payload.model_dump(exclude={"isletme_id"}, exclude_unset=False)
     data["isletme_id"] = isletme_id
     data["meta_settings"] = json.dumps(data.get("meta_settings", {}))
     data["updated_at"] = datetime.utcnow()
     
-    # Sadece verilen alanları güncelle
+    # Sadece verilen alanları güncelle (None olmayan ve boş string olmayan değerler)
     update_fields = []
     update_values = {"isletme_id": isletme_id, "updated_at": data["updated_at"]}
     
     for field in ["domain", "app_name", "logo_url", "primary_color", "secondary_color",
                   "footer_text", "email", "telefon", "adres", "meta_settings"]:
         if field in data and data[field] is not None:
-            update_fields.append(f"{field} = :{field}")
-            update_values[field] = data[field]
+            # Boş string'leri None'a çevir (opsiyonel alanlar için)
+            if field in ["domain", "app_name", "logo_url", "footer_text", "email", "telefon", "adres"]:
+                if data[field] == "":
+                    update_fields.append(f"{field} = NULL")
+                else:
+                    update_fields.append(f"{field} = :{field}")
+                    update_values[field] = data[field]
+            else:
+                # primary_color, secondary_color, meta_settings her zaman güncellenmeli
+                update_fields.append(f"{field} = :{field}")
+                update_values[field] = data[field]
     
     if not update_fields:
         raise HTTPException(400, "Güncellenecek alan yok")

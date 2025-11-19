@@ -39,31 +39,33 @@ class SubscriptionStatusUpdate(BaseModel):
     bitis_tarihi: Optional[datetime] = None
 
 
-@router.get("/list", response_model=List[SubscriptionOut])
+@router.get("/list")
 async def list_subscriptions(
     isletme_id: Optional[int] = Query(None, description="İşletme ID ile filtrele"),
     status: Optional[str] = Query(None, description="Durum ile filtrele"),
     _: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Tüm abonelikleri listele"""
+    """Tüm abonelikleri listele (işletme adı ile birlikte)"""
     query = """
-        SELECT id, isletme_id, plan_type, status, max_subeler, max_kullanicilar,
-               max_menu_items, ayllik_fiyat, trial_baslangic, trial_bitis,
-               baslangic_tarihi, bitis_tarihi, otomatik_yenileme, created_at, updated_at
-        FROM subscriptions
+        SELECT s.id, s.isletme_id, i.ad as isletme_ad, s.plan_type, s.status, 
+               s.max_subeler, s.max_kullanicilar, s.max_menu_items, s.ayllik_fiyat, 
+               s.trial_baslangic, s.trial_bitis, s.baslangic_tarihi, s.bitis_tarihi, 
+               s.otomatik_yenileme, s.created_at, s.updated_at
+        FROM subscriptions s
+        LEFT JOIN isletmeler i ON s.isletme_id = i.id
         WHERE 1=1
     """
     params = {}
     
     if isletme_id:
-        query += " AND isletme_id = :isletme_id"
+        query += " AND s.isletme_id = :isletme_id"
         params["isletme_id"] = isletme_id
     
     if status:
-        query += " AND status = :status"
+        query += " AND s.status = :status"
         params["status"] = status
     
-    query += " ORDER BY created_at DESC"
+    query += " ORDER BY s.created_at DESC"
     
     rows = await db.fetch_all(query, params)
     return [dict(row) for row in rows]

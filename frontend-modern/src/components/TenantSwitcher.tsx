@@ -50,10 +50,37 @@ export default function TenantSwitcher() {
   );
 
   // Tenant seç
-  const handleSelectTenant = (tenantId: number | null) => {
+  const handleSelectTenant = async (tenantId: number | null) => {
     setSelectedTenantId(tenantId);
     setOpen(false);
     setSearchTerm('');
+    
+    const { setSubeId } = useAuthStore.getState();
+    
+    // Tenant seçildiğinde, o tenant'ın ilk şubesini bul ve sube_id'yi güncelle
+    if (tenantId) {
+      try {
+        const detailRes = await superadminApi.tenantDetail(tenantId);
+        const subeler = detailRes.data?.subeler || [];
+        if (subeler.length > 0) {
+          const firstSube = subeler[0];
+          setSubeId(firstSube.id);
+          console.log(`[TenantSwitcher] Tenant ${tenantId} seçildi, şube ID: ${firstSube.id}`);
+        } else {
+          // Tenant'ın şubesi yoksa, varsayılan şube ID'sini kullan (backend otomatik bulacak)
+          console.warn(`[TenantSwitcher] Tenant ${tenantId} için şube bulunamadı, varsayılan şube kullanılacak`);
+          setSubeId(1); // Backend get_sube_id fonksiyonu tenant'ın ilk şubesini bulacak
+        }
+      } catch (err) {
+        console.error('Tenant şubeleri yüklenemedi:', err);
+        // Hata durumunda da varsayılan şube ID'sini kullan
+        setSubeId(1);
+      }
+    } else {
+      // "Tüm İşletmeler" seçildiğinde, varsayılan şube ID'sini kullan (1)
+      setSubeId(1);
+    }
+    
     // Sayfayı refresh et (tenant değişti)
     window.location.reload();
   };

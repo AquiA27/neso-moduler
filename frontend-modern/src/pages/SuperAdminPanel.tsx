@@ -1,9 +1,12 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { superadminApi, subscriptionApi, paymentApi, customizationApi } from '../lib/api';
+import { useAuthStore } from '../store/authStore';
 import { 
   Building2, CreditCard, Settings, Plus, Search, 
   BarChart3, Users, AlertCircle, CheckCircle,
-  DollarSign, Package, ArrowLeft, Phone, Calendar
+  DollarSign, Package, ArrowLeft, Phone, Calendar,
+  ExternalLink, UserCog, Menu as MenuIcon, FileText
 } from 'lucide-react';
 
 interface Tenant {
@@ -17,6 +20,7 @@ interface Tenant {
 interface Subscription {
   id: number;
   isletme_id: number;
+  isletme_ad?: string;
   plan_type: string;
   status: string;
   max_subeler: number;
@@ -25,24 +29,29 @@ interface Subscription {
   ayllik_fiyat: number;
   baslangic_tarihi: string;
   bitis_tarihi?: string;
+  otomatik_yenileme?: boolean;
 }
 
 interface Payment {
   id: number;
   isletme_id: number;
+  isletme_ad?: string;
+  subscription_id?: number;
   tutar: number;
   odeme_turu: string;
   durum: string;
   fatura_no?: string;
+  aciklama?: string;
   odeme_tarihi?: string;
   created_at: string;
 }
 
 interface DashboardStats {
-  isletmeler: { total: number; active: number };
+  isletmeler: { total: number; active: number; passive: number };
   subeler: { total: number };
   kullanicilar: { total: number };
   abonelikler: { active: number; plan_distribution: Array<{ plan_type: string; count: number }> };
+  ariza_servis_talepleri: number;
   finansal: {
     this_month_revenue: number;
     pending_payments: { total: number; count: number };
@@ -154,11 +163,13 @@ export default function SuperAdminPanel() {
   );
 
   const filteredSubscriptions = subscriptions.filter(s => 
-    s.isletme_id.toString().includes(searchTerm)
+    s.isletme_id.toString().includes(searchTerm) ||
+    s.isletme_ad?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const filteredPayments = payments.filter(p => 
     p.isletme_id.toString().includes(searchTerm) ||
+    p.isletme_ad?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.fatura_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -298,22 +309,45 @@ function DashboardTab({ stats }: { stats: DashboardStats }) {
           color="blue"
         />
         <StatCard
-          title="Toplam Şube"
-          value={stats.subeler.total}
+          title="Aktif İşletme"
+          value={stats.isletmeler.active}
+          subtitle={`${stats.isletmeler.passive} pasif`}
           icon={Building2}
           color="green"
         />
         <StatCard
+          title="Toplam Şube"
+          value={stats.subeler.total}
+          icon={Building2}
+          color="purple"
+        />
+        <StatCard
+          title="Pasif İşletme"
+          value={stats.isletmeler.passive}
+          icon={AlertCircle}
+          color="red"
+        />
+      </div>
+
+      {/* Second Row Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <StatCard
           title="Toplam Kullanıcı"
           value={stats.kullanicilar.total}
           icon={Users}
-          color="purple"
+          color="indigo"
+        />
+        <StatCard
+          title="Arıza ve Servis Talepleri"
+          value={stats.ariza_servis_talepleri}
+          icon={AlertCircle}
+          color="orange"
         />
         <StatCard
           title="Aktif Abonelik"
           value={stats.abonelikler.active}
           icon={Package}
-          color="orange"
+          color="teal"
         />
       </div>
 
@@ -382,6 +416,9 @@ function StatCard({
     green: 'bg-green-100 text-green-600',
     purple: 'bg-purple-100 text-purple-600',
     orange: 'bg-orange-100 text-orange-600',
+    red: 'bg-red-100 text-red-600',
+    indigo: 'bg-indigo-100 text-indigo-600',
+    teal: 'bg-teal-100 text-teal-600',
   };
 
   return (
@@ -415,65 +452,83 @@ function TenantsTab({
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h2 className="text-2xl font-bold">İşletmeler</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">İşletmeler</h2>
+          <p className="text-sm text-gray-600 mt-1">Toplam {tenants.length} işletme</p>
+        </div>
         <div className="flex items-center space-x-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
             <input
               type="text"
-              placeholder="Ara..."
+              placeholder="İşletme adı veya vergi no ile ara..."
               value={searchTerm}
               onChange={(e) => onSearchChange(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent w-64"
             />
           </div>
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşletme Adı</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vergi No</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Telefon</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Durum</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşlemler</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {tenants.map((tenant) => (
-              <tr key={tenant.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{tenant.id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{tenant.ad}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tenant.vergi_no || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{tenant.telefon || '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
+      {tenants.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+          <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">İşletme bulunamadı</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tenants.map((tenant) => (
+            <div
+              key={tenant.id}
+              className="bg-white rounded-xl shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-200 overflow-hidden"
+            >
+              <div className={`h-2 ${tenant.aktif ? 'bg-green-500' : 'bg-red-500'}`} />
+              <div className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">{tenant.ad}</h3>
+                    <p className="text-sm text-gray-500">ID: {tenant.id}</p>
+                  </div>
                   {tenant.aktif ? (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <CheckCircle className="w-3 h-3 mr-1" />
                       Aktif
                     </span>
                   ) : (
                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                      <AlertCircle className="w-3 h-3 mr-1" />
                       Pasif
                     </span>
                   )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button 
-                    onClick={() => onTenantClick(tenant.id)}
-                    className="text-blue-600 hover:text-blue-900 mr-4"
-                    title="Detayları Gör"
-                  >
-                    Detay
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </div>
+                
+                <div className="space-y-2 mb-4">
+                  {tenant.vergi_no && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <span className="font-medium mr-2">Vergi No:</span>
+                      <span>{tenant.vergi_no}</span>
+                    </div>
+                  )}
+                  {tenant.telefon && (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Phone className="w-4 h-4 mr-2" />
+                      <span>{tenant.telefon}</span>
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  onClick={() => onTenantClick(tenant.id)}
+                  className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm flex items-center justify-center"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Detayları Gör
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -498,6 +553,18 @@ function TenantDetailTab({
   }
 
   const { isletme, subscription, subeler, kullanicilar, customization, istatistikler } = tenantDetail;
+  const navigate = useNavigate();
+  const { setSelectedTenantId } = useAuthStore();
+
+  const handleSwitchToTenant = () => {
+    setSelectedTenantId(isletme.id);
+    navigate('/dashboard');
+  };
+
+  const handleQuickAccess = (path: string) => {
+    setSelectedTenantId(isletme.id);
+    navigate(path);
+  };
 
   return (
     <div>
@@ -505,28 +572,77 @@ function TenantDetailTab({
         <div className="flex items-center space-x-4">
           <button
             onClick={onBack}
-            className="text-gray-600 hover:text-gray-900"
+            className="text-gray-600 hover:text-gray-900 transition-colors"
             title="Geri"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-2xl font-bold">{isletme.ad}</h2>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">{isletme.ad}</h2>
+            <p className="text-sm text-gray-500 mt-1">ID: {isletme.id}</p>
+          </div>
           {isletme.aktif ? (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+              <CheckCircle className="w-3 h-3 mr-1" />
               Aktif
             </span>
           ) : (
             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+              <AlertCircle className="w-3 h-3 mr-1" />
               Pasif
             </span>
           )}
         </div>
-        <button
-          onClick={onRefresh}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-        >
-          Yenile
-        </button>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={onRefresh}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+          >
+            Yenile
+          </button>
+          <button
+            onClick={handleSwitchToTenant}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center"
+          >
+            <ExternalLink className="w-4 h-4 mr-2" />
+            İşletmeye Geç
+          </button>
+        </div>
+      </div>
+
+      {/* Hızlı Erişim Butonları */}
+      <div className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-100">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Hızlı Erişim</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <button
+            onClick={() => handleQuickAccess('/dashboard')}
+            className="flex items-center justify-center px-4 py-3 bg-white rounded-lg hover:bg-blue-50 border border-blue-200 transition-all group"
+          >
+            <BarChart3 className="w-5 h-5 mr-2 text-blue-600 group-hover:text-blue-700" />
+            <span className="font-medium text-gray-700">Dashboard</span>
+          </button>
+          <button
+            onClick={() => handleQuickAccess('/personeller')}
+            className="flex items-center justify-center px-4 py-3 bg-white rounded-lg hover:bg-blue-50 border border-blue-200 transition-all group"
+          >
+            <UserCog className="w-5 h-5 mr-2 text-blue-600 group-hover:text-blue-700" />
+            <span className="font-medium text-gray-700">Personeller</span>
+          </button>
+          <button
+            onClick={() => handleQuickAccess('/menu')}
+            className="flex items-center justify-center px-4 py-3 bg-white rounded-lg hover:bg-blue-50 border border-blue-200 transition-all group"
+          >
+            <MenuIcon className="w-5 h-5 mr-2 text-blue-600 group-hover:text-blue-700" />
+            <span className="font-medium text-gray-700">Menü</span>
+          </button>
+          <button
+            onClick={() => handleQuickAccess('/raporlar')}
+            className="flex items-center justify-center px-4 py-3 bg-white rounded-lg hover:bg-blue-50 border border-blue-200 transition-all group"
+          >
+            <FileText className="w-5 h-5 mr-2 text-blue-600 group-hover:text-blue-700" />
+            <span className="font-medium text-gray-700">Raporlar</span>
+          </button>
+        </div>
       </div>
 
       {/* İşletme Bilgileri */}
@@ -539,31 +655,31 @@ function TenantDetailTab({
           <div className="space-y-3">
             <div>
               <p className="text-sm text-gray-600">İşletme ID</p>
-              <p className="font-medium">{isletme.id}</p>
+              <p className="font-medium text-gray-900">{isletme.id}</p>
             </div>
             <div>
               <p className="text-sm text-gray-600">İşletme Adı</p>
-              <p className="font-medium">{isletme.ad}</p>
+              <p className="font-medium text-gray-900">{isletme.ad}</p>
             </div>
             {isletme.vergi_no && (
               <div>
                 <p className="text-sm text-gray-600">Vergi No</p>
-                <p className="font-medium">{isletme.vergi_no}</p>
+                <p className="font-medium text-gray-900">{isletme.vergi_no}</p>
               </div>
             )}
             {isletme.telefon && (
               <div>
                 <p className="text-sm text-gray-600">Telefon</p>
-                <p className="font-medium flex items-center">
-                  <Phone className="w-4 h-4 mr-1" />
+                <p className="font-medium text-gray-900 flex items-center">
+                  <Phone className="w-4 h-4 mr-1 text-gray-600" />
                   {isletme.telefon}
                 </p>
               </div>
             )}
             <div>
               <p className="text-sm text-gray-600">Oluşturulma Tarihi</p>
-              <p className="font-medium flex items-center">
-                <Calendar className="w-4 h-4 mr-1" />
+              <p className="font-medium text-gray-900 flex items-center">
+                <Calendar className="w-4 h-4 mr-1 text-gray-600" />
                 {new Date(isletme.created_at).toLocaleDateString('tr-TR')}
               </p>
             </div>
@@ -580,7 +696,7 @@ function TenantDetailTab({
             <div className="space-y-3">
               <div>
                 <p className="text-sm text-gray-600">Plan Tipi</p>
-                <p className="font-medium capitalize">{subscription.plan_type}</p>
+                <p className="font-medium text-gray-900 capitalize">{subscription.plan_type}</p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">Durum</p>
@@ -594,36 +710,36 @@ function TenantDetailTab({
               </div>
               <div>
                 <p className="text-sm text-gray-600">Aylık Fiyat</p>
-                <p className="font-medium text-lg">₺{subscription.ayllik_fiyat.toFixed(2)}</p>
+                <p className="font-medium text-lg text-gray-900">₺{subscription.ayllik_fiyat.toFixed(2)}</p>
               </div>
               <div className="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-200">
                 <div>
                   <p className="text-xs text-gray-500">Max Şube</p>
-                  <p className="font-medium">{subscription.max_subeler}</p>
+                  <p className="font-medium text-gray-900">{subscription.max_subeler}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Max Kullanıcı</p>
-                  <p className="font-medium">{subscription.max_kullanicilar}</p>
+                  <p className="font-medium text-gray-900">{subscription.max_kullanicilar}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Max Menü</p>
-                  <p className="font-medium">{subscription.max_menu_items}</p>
+                  <p className="font-medium text-gray-900">{subscription.max_menu_items}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Otomatik Yenileme</p>
-                  <p className="font-medium">{subscription.otomatik_yenileme ? 'Evet' : 'Hayır'}</p>
+                  <p className="font-medium text-gray-900">{subscription.otomatik_yenileme ? 'Evet' : 'Hayır'}</p>
                 </div>
               </div>
               {subscription.bitis_tarihi && (
                 <div>
                   <p className="text-sm text-gray-600">Bitiş Tarihi</p>
-                  <p className="font-medium">{new Date(subscription.bitis_tarihi).toLocaleDateString('tr-TR')}</p>
+                  <p className="font-medium text-gray-900">{new Date(subscription.bitis_tarihi).toLocaleDateString('tr-TR')}</p>
                 </div>
               )}
               {subscription.trial_bitis && (
                 <div>
                   <p className="text-sm text-gray-600">Trial Bitiş</p>
-                  <p className="font-medium">{new Date(subscription.trial_bitis).toLocaleDateString('tr-TR')}</p>
+                  <p className="font-medium text-gray-900">{new Date(subscription.trial_bitis).toLocaleDateString('tr-TR')}</p>
                 </div>
               )}
             </div>
@@ -635,7 +751,7 @@ function TenantDetailTab({
 
       {/* İstatistikler */}
       <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold mb-4 flex items-center">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
           <BarChart3 className="w-5 h-5 mr-2 text-purple-600" />
           İstatistikler
         </h3>
@@ -648,7 +764,7 @@ function TenantDetailTab({
           {istatistikler.son_siparis_tarihi && (
             <div className="bg-gray-50 rounded-lg p-4">
               <p className="text-xs text-gray-600">Son Sipariş</p>
-              <p className="font-medium text-sm mt-1">{new Date(istatistikler.son_siparis_tarihi).toLocaleDateString('tr-TR')}</p>
+              <p className="font-medium text-sm text-gray-900 mt-1">{new Date(istatistikler.son_siparis_tarihi).toLocaleDateString('tr-TR')}</p>
             </div>
           )}
         </div>
@@ -657,16 +773,16 @@ function TenantDetailTab({
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {/* Şubeler */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <Building2 className="w-5 h-5 mr-2 text-indigo-600" />
             Şubeler ({subeler.length})
           </h3>
           {subeler.length > 0 ? (
             <div className="space-y-3">
               {subeler.map((sube) => (
-                <div key={sube.id} className="border border-gray-200 rounded-lg p-4">
+                <div key={sube.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium">{sube.ad}</p>
+                    <p className="font-medium text-gray-900">{sube.ad}</p>
                     {sube.aktif ? (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                         Aktif
@@ -678,11 +794,11 @@ function TenantDetailTab({
                     )}
                   </div>
                   {sube.adres && (
-                    <p className="text-sm text-gray-600">{sube.adres}</p>
+                    <p className="text-sm text-gray-700">{sube.adres}</p>
                   )}
                   {sube.telefon && (
-                    <p className="text-sm text-gray-600 flex items-center mt-1">
-                      <Phone className="w-3 h-3 mr-1" />
+                    <p className="text-sm text-gray-700 flex items-center mt-1">
+                      <Phone className="w-3 h-3 mr-1 text-gray-500" />
                       {sube.telefon}
                     </p>
                   )}
@@ -696,16 +812,16 @@ function TenantDetailTab({
 
         {/* Kullanıcılar */}
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <Users className="w-5 h-5 mr-2 text-purple-600" />
             Kullanıcılar ({kullanicilar.length})
           </h3>
           {kullanicilar.length > 0 ? (
             <div className="space-y-3">
               {kullanicilar.map((user) => (
-                <div key={user.id} className="border border-gray-200 rounded-lg p-4">
+                <div key={user.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium">{user.username}</p>
+                    <p className="font-medium text-gray-900">{user.username}</p>
                     <div className="flex items-center space-x-2">
                       <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
                         {user.role}
@@ -721,7 +837,7 @@ function TenantDetailTab({
                       )}
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500">
+                  <p className="text-xs text-gray-600">
                     {new Date(user.created_at).toLocaleDateString('tr-TR')}
                   </p>
                 </div>
@@ -736,7 +852,7 @@ function TenantDetailTab({
       {/* Customization */}
       {customization && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-semibold mb-4 flex items-center">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
             <Settings className="w-5 h-5 mr-2 text-yellow-600" />
             Özelleştirme
           </h3>
@@ -744,30 +860,38 @@ function TenantDetailTab({
             {customization.app_name && (
               <div>
                 <p className="text-sm text-gray-600">App Adı</p>
-                <p className="font-medium">{customization.app_name}</p>
+                <p className="font-medium text-gray-900">{customization.app_name}</p>
               </div>
             )}
             {customization.domain && (
               <div>
                 <p className="text-sm text-gray-600">Domain</p>
-                <p className="font-medium">{customization.domain}</p>
+                <p className="font-medium text-gray-900">{customization.domain}</p>
               </div>
             )}
             {customization.logo_url && (
               <div>
                 <p className="text-sm text-gray-600">Logo URL</p>
-                <p className="font-medium break-all">{customization.logo_url}</p>
+                <p className="font-medium text-gray-900 break-all">{customization.logo_url}</p>
               </div>
             )}
             {customization.primary_color && (
               <div>
-                <p className="text-sm text-gray-600">Ana Renk</p>
+                <p className="text-sm text-gray-600">Tema</p>
                 <div className="flex items-center space-x-2">
                   <div 
                     className="w-8 h-8 rounded border border-gray-300"
                     style={{ backgroundColor: customization.primary_color }}
                   />
-                  <p className="font-medium">{customization.primary_color}</p>
+                  {customization.secondary_color && (
+                    <div 
+                      className="w-8 h-8 rounded border border-gray-300"
+                      style={{ backgroundColor: customization.secondary_color }}
+                    />
+                  )}
+                  <p className="font-medium text-gray-900">
+                    {customization.primary_color} / {customization.secondary_color || 'N/A'}
+                  </p>
                 </div>
               </div>
             )}
@@ -796,7 +920,7 @@ function SubscriptionsTab({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="İşletme ID ile ara..."
+            placeholder="İşletme adı veya ID ile ara..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -805,38 +929,89 @@ function SubscriptionsTab({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {subscriptions.map((sub) => (
-          <div key={sub.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">İşletme #{sub.isletme_id}</h3>
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                sub.status === 'active' ? 'bg-green-100 text-green-800' :
-                sub.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
-              }`}>
-                {sub.status}
-              </span>
+        {subscriptions.map((sub) => {
+          // Kullanım süresi hesapla
+          const baslangic = sub.baslangic_tarihi ? new Date(sub.baslangic_tarihi) : null;
+          const bitis = sub.bitis_tarihi ? new Date(sub.bitis_tarihi) : null;
+          const simdi = new Date();
+          
+          let kullanimSuresi = '';
+          let sonrakiYenileme = '';
+          
+          if (baslangic) {
+            const gunFarki = Math.floor((simdi.getTime() - baslangic.getTime()) / (1000 * 60 * 60 * 24));
+            if (gunFarki < 30) {
+              kullanimSuresi = `${gunFarki} gün`;
+            } else if (gunFarki < 365) {
+              const ay = Math.floor(gunFarki / 30);
+              kullanimSuresi = `${ay} ay`;
+            } else {
+              const yil = Math.floor(gunFarki / 365);
+              const ay = Math.floor((gunFarki % 365) / 30);
+              kullanimSuresi = ay > 0 ? `${yil} yıl ${ay} ay` : `${yil} yıl`;
+            }
+          }
+          
+          if (sub.otomatik_yenileme && bitis) {
+            sonrakiYenileme = new Date(bitis).toLocaleDateString('tr-TR');
+          } else if (bitis) {
+            sonrakiYenileme = new Date(bitis).toLocaleDateString('tr-TR');
+          }
+          
+          return (
+            <div key={sub.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow bg-white">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    {sub.isletme_ad || `İşletme #${sub.isletme_id}`}
+                  </h3>
+                  {sub.isletme_ad && (
+                    <p className="text-xs text-gray-500 mt-1">ID: {sub.isletme_id}</p>
+                  )}
+                </div>
+                <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
+                  sub.status === 'active' ? 'bg-green-100 text-green-800' :
+                  sub.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-red-100 text-red-800'
+                }`}>
+                  {sub.status === 'active' ? 'Aktif' : sub.status === 'suspended' ? 'Askıya Alındı' : 'İptal'}
+                </span>
+              </div>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Plan:</span>
+                  <span className="font-medium text-gray-900 capitalize">{sub.plan_type}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Aylık Fiyat:</span>
+                  <span className="font-medium text-gray-900">₺{sub.ayllik_fiyat.toFixed(2)}</span>
+                </div>
+                {kullanimSuresi && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Kullanım Süresi:</span>
+                    <span className="font-medium text-gray-900">{kullanimSuresi}</span>
+                  </div>
+                )}
+                {sonrakiYenileme && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">{sub.otomatik_yenileme ? 'Yenilenme' : 'Bitiş'} Tarihi:</span>
+                    <span className="font-medium text-gray-900">{sonrakiYenileme}</span>
+                  </div>
+                )}
+                <div className="pt-2 mt-2 border-t border-gray-200 grid grid-cols-2 gap-2">
+                  <div>
+                    <span className="text-xs text-gray-500">Max Şube</span>
+                    <p className="font-medium text-gray-900">{sub.max_subeler}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-500">Max Kullanıcı</span>
+                    <p className="font-medium text-gray-900">{sub.max_kullanicilar}</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Plan:</span>
-                <span className="font-medium capitalize">{sub.plan_type}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Aylık Fiyat:</span>
-                <span className="font-medium">₺{sub.ayllik_fiyat.toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Max Şube:</span>
-                <span className="font-medium">{sub.max_subeler}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Max Kullanıcı:</span>
-                <span className="font-medium">{sub.max_kullanicilar}</span>
-              </div>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -860,7 +1035,7 @@ function PaymentsTab({
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
-            placeholder="Ara..."
+            placeholder="İşletme adı, ID veya fatura no ile ara..."
             value={searchTerm}
             onChange={(e) => onSearchChange(e.target.value)}
             className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -868,61 +1043,157 @@ function PaymentsTab({
         </div>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşletme ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tutar</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ödeme Türü</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {payments.map((payment) => (
-              <tr key={payment.id}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.isletme_id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">₺{payment.tutar.toFixed(2)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{payment.odeme_turu}</td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  {payment.durum === 'completed' ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                      Tamamlandı
-                    </span>
-                  ) : payment.durum === 'pending' ? (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-                      Bekliyor
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                      Başarısız
-                    </span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {payment.odeme_tarihi ? new Date(payment.odeme_tarihi).toLocaleDateString('tr-TR') : '-'}
-                </td>
+      {payments.length === 0 ? (
+        <div className="bg-white border border-gray-200 rounded-lg p-8 text-center">
+          <p className="text-gray-500 text-lg">Henüz ödeme kaydı bulunmuyor.</p>
+          <p className="text-gray-400 text-sm mt-2">Ödeme kayıtları burada görüntülenecek.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşletme</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tutar</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ödeme Türü</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ödeme Tarihi</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fatura No</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {payments.map((payment) => (
+                <tr key={payment.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{payment.id}</td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {payment.isletme_ad || `İşletme #${payment.isletme_id}`}
+                      </p>
+                      {payment.isletme_ad && (
+                        <p className="text-xs text-gray-500">ID: {payment.isletme_id}</p>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">₺{payment.tutar.toFixed(2)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 capitalize">
+                    {payment.odeme_turu === 'odeme_sistemi' ? 'Ödeme Sistemi' :
+                     payment.odeme_turu === 'kredi_karti' ? 'Kredi Kartı' :
+                     payment.odeme_turu === 'havale' ? 'Havale' :
+                     payment.odeme_turu === 'nakit' ? 'Nakit' : payment.odeme_turu}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {payment.durum === 'completed' ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Tamamlandı
+                      </span>
+                    ) : payment.durum === 'pending' ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        Bekliyor
+                      </span>
+                    ) : payment.durum === 'failed' ? (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                        Başarısız
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        İade Edildi
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {payment.odeme_tarihi ? new Date(payment.odeme_tarihi).toLocaleDateString('tr-TR', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }) : '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {payment.fatura_no || '-'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
 
 // Customizations Tab
 function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefresh: () => void }) {
+  // Tema paketleri
+  const themePresets = {
+    green: {
+      name: 'Yeşil',
+      primary: '#00c67f',
+      secondary: '#00e699',
+      description: 'Doğal ve taze hissiyat',
+    },
+    blue: {
+      name: 'Mavi',
+      primary: '#2563eb',
+      secondary: '#3b82f6',
+      description: 'Profesyonel ve güvenilir görünüm',
+    },
+    purple: {
+      name: 'Mor',
+      primary: '#7c3aed',
+      secondary: '#8b5cf6',
+      description: 'Yaratıcı ve modern',
+    },
+    rose: {
+      name: 'Pembe',
+      primary: '#e11d48',
+      secondary: '#f43f5e',
+      description: 'Sıcak ve davetkar',
+    },
+  };
+
+  // Renkten temaya çevirme fonksiyonu
+  const getThemeFromColors = (primary: string, secondary: string): keyof typeof themePresets => {
+    // Mevcut renkleri tema paketlerine eşleştir
+    const colorMap: Record<string, keyof typeof themePresets> = {
+      '#00c67f': 'green',
+      '#00e699': 'green',
+      '#10b981': 'green',
+      '#34d399': 'green',
+      '#2563eb': 'blue',
+      '#3b82f6': 'blue',
+      '#60a5fa': 'blue',
+      '#7c3aed': 'purple',
+      '#8b5cf6': 'purple',
+      '#a78bfa': 'purple',
+      '#e11d48': 'rose',
+      '#f43f5e': 'rose',
+    };
+    
+    const normalizedPrimary = primary.toLowerCase();
+    const themeKey = colorMap[normalizedPrimary];
+    
+    if (themeKey) {
+      return themeKey;
+    }
+    
+    // Eğer eşleşme yoksa, en yakın temayı bul
+    for (const [key, theme] of Object.entries(themePresets)) {
+      if (theme.primary.toLowerCase() === normalizedPrimary || 
+          theme.secondary.toLowerCase() === secondary.toLowerCase()) {
+        return key as keyof typeof themePresets;
+      }
+    }
+    
+    return 'green'; // Varsayılan
+  };
+
   const [selectedTenant, setSelectedTenant] = useState<number | null>(tenants[0]?.id ?? null);
   const [formData, setFormData] = useState({
     domain: '',
     app_name: '',
     logo_url: '',
-    primary_color: '#00c67f',
-    secondary_color: '#0ea5e9',
+    theme: 'green' as keyof typeof themePresets,
     footer_text: '',
     email: '',
     telefon: '',
@@ -940,8 +1211,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       domain: '',
       app_name: '',
       logo_url: '',
-      primary_color: '#00c67f',
-      secondary_color: '#0ea5e9',
+      theme: 'green',
       footer_text: '',
       email: '',
       telefon: '',
@@ -970,12 +1240,13 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       setSuccess(null);
       try {
         const response = await customizationApi.get(selectedTenant);
+        const primary = response.data.primary_color || themePresets.green.primary;
+        const secondary = response.data.secondary_color || themePresets.green.secondary;
         setFormData({
           domain: response.data.domain || '',
           app_name: response.data.app_name || '',
           logo_url: response.data.logo_url || '',
-          primary_color: response.data.primary_color || '#00c67f',
-          secondary_color: response.data.secondary_color || '#0ea5e9',
+          theme: getThemeFromColors(primary, secondary),
           footer_text: response.data.footer_text || '',
           email: response.data.email || '',
           telefon: response.data.telefon || '',
@@ -1005,18 +1276,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
     setError(null);
     setSuccess(null);
     try {
+      const selectedTheme = themePresets[formData.theme];
       const payload = {
-        ...formData,
         isletme_id: selectedTenant,
-        domain: formData.domain || undefined,
-        app_name: formData.app_name || undefined,
-        logo_url: formData.logo_url || undefined,
-        primary_color: formData.primary_color || '#00c67f',
-        secondary_color: formData.secondary_color || '#0ea5e9',
-        footer_text: formData.footer_text || undefined,
-        email: formData.email || undefined,
-        telefon: formData.telefon || undefined,
-        adres: formData.adres || undefined,
+        domain: formData.domain || null,
+        app_name: formData.app_name || null,
+        logo_url: formData.logo_url || null,
+        primary_color: selectedTheme.primary,
+        secondary_color: selectedTheme.secondary,
+        footer_text: formData.footer_text || null,
+        email: formData.email || null,
+        telefon: formData.telefon || null,
+        adres: formData.adres || null,
       };
 
       if (exists) {
@@ -1027,6 +1298,22 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         setSuccess('Özelleştirme oluşturuldu');
         setExists(true);
       }
+      
+      // FormData'yı yeniden yükle
+      const response = await customizationApi.get(selectedTenant);
+      const primary = response.data.primary_color || themePresets.green.primary;
+      const secondary = response.data.secondary_color || themePresets.green.secondary;
+      setFormData({
+        domain: response.data.domain || '',
+        app_name: response.data.app_name || '',
+        logo_url: response.data.logo_url || '',
+        theme: getThemeFromColors(primary, secondary),
+        footer_text: response.data.footer_text || '',
+        email: response.data.email || '',
+        telefon: response.data.telefon || '',
+        adres: response.data.adres || '',
+      });
+      
       onRefresh();
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Kaydetme sırasında hata oluştu');
@@ -1114,32 +1401,35 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                 placeholder="https://..."
               />
               <div className="flex flex-col">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Renkler</label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2">
-                    <input
-                      type="color"
-                      value={formData.primary_color}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, primary_color: e.target.value }))}
-                      className="h-10 w-16 border border-gray-300 rounded-lg"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">Ana Renk</p>
-                      <p className="text-xs text-gray-500">{formData.primary_color}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2">
-                    <input
-                      type="color"
-                      value={formData.secondary_color}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, secondary_color: e.target.value }))}
-                      className="h-10 w-16 border border-gray-300 rounded-lg"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-700">İkincil Renk</p>
-                      <p className="text-xs text-gray-500">{formData.secondary_color}</p>
-                    </div>
-                  </div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">Tema Paketi</label>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(themePresets).map(([key, theme]) => (
+                    <label
+                      key={key}
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition ${
+                        formData.theme === key
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="theme"
+                        value={key}
+                        checked={formData.theme === key}
+                        onChange={() => setFormData((prev) => ({ ...prev, theme: key as keyof typeof themePresets }))}
+                        className="hidden"
+                      />
+                      <div className="flex items-center gap-2 mb-1">
+                        <div
+                          className="w-6 h-6 rounded border border-gray-300"
+                          style={{ backgroundColor: theme.primary }}
+                        />
+                        <span className="font-medium text-sm text-gray-900">{theme.name}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">{theme.description}</p>
+                    </label>
+                  ))}
                 </div>
               </div>
             </div>
@@ -1201,6 +1491,34 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
     },
   };
 
+  // Tema paketleri
+  const themePresets = {
+    green: {
+      name: 'Yeşil',
+      primary: '#00c67f',
+      secondary: '#00e699',
+      description: 'Doğal ve taze hissiyat',
+    },
+    blue: {
+      name: 'Mavi',
+      primary: '#2563eb',
+      secondary: '#3b82f6',
+      description: 'Profesyonel ve güvenilir görünüm',
+    },
+    purple: {
+      name: 'Mor',
+      primary: '#7c3aed',
+      secondary: '#8b5cf6',
+      description: 'Yaratıcı ve modern',
+    },
+    rose: {
+      name: 'Pembe',
+      primary: '#e11d48',
+      secondary: '#f43f5e',
+      description: 'Sıcak ve davetkar',
+    },
+  };
+
   const initialForm = {
     isletme_ad: '',
     isletme_vergi_no: '',
@@ -1213,7 +1531,8 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
     domain: '',
     app_name: '',
     logo_url: '',
-    primary_color: '#00c67f',
+    theme: 'green' as keyof typeof themePresets,
+    odeme_turu: 'odeme_sistemi' as 'odeme_sistemi' | 'nakit' | 'havale' | 'kredi_karti',
   };
 
   const [formData, setFormData] = useState(initialForm);
@@ -1271,23 +1590,6 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
     }
   };
 
-  const fillFistikKafe = () => {
-    setFormData({
-      ...initialForm,
-      isletme_ad: 'Fıstık Kafe',
-      isletme_vergi_no: '',
-      isletme_telefon: '+90 532 000 00 00',
-      sube_ad: 'Kadıköy',
-      admin_username: 'fistik_admin',
-      admin_password: 'fistik123',
-      plan_type: 'basic',
-      ayllik_fiyat: planPresets.basic.price,
-      domain: 'fistik-kafe.neso.app',
-      app_name: 'Fıstık Kafe Panel',
-      logo_url: '',
-      primary_color: '#00c67f',
-    });
-  };
 
   const copyCredentials = async () => {
     if (!result) return;
@@ -1336,23 +1638,6 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
 
   return (
     <div className="space-y-8">
-      <div className="bg-blue-50 border border-blue-100 rounded-xl p-6">
-        <h2 className="text-xl font-semibold text-blue-900 mb-2">Hızlı İşletme Kurulumu</h2>
-        <p className="text-sm text-blue-700 leading-relaxed">
-          Yeni bir işletme eklemek için aşağıdaki formu doldurun. İşletme, şube, admin kullanıcı ve abonelik bilgileri tek adımda oluşturulur.
-          Kurulumdan sonra admin kullanıcı bilgilerini işletme sahibine iletmeyi unutmayın.
-        </p>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={fillFistikKafe}
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
-          >
-            Fıstık Kafe Örneğiyle Doldur
-          </button>
-        </div>
-      </div>
-
       {result && (
         <div className="border border-emerald-200 bg-emerald-50 rounded-xl p-6 space-y-4">
           <div className="flex items-center gap-3 text-emerald-700">
@@ -1519,15 +1804,74 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
               error={errors.logo_url}
             />
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Ana Renk</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="color"
-                  value={formData.primary_color}
-                  onChange={(e) => handleChange('primary_color', e.target.value)}
-                  className="h-10 w-16 border border-gray-300 rounded-lg"
-                />
-                <span className="text-sm text-gray-500">{formData.primary_color}</span>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Tema Paketi</label>
+              <div className="grid grid-cols-2 gap-3">
+                {Object.entries(themePresets).map(([key, theme]) => (
+                  <label
+                    key={key}
+                    className={`border-2 rounded-lg p-3 cursor-pointer transition ${
+                      formData.theme === key
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="theme"
+                      value={key}
+                      checked={formData.theme === key}
+                      onChange={() => handleChange('theme', key)}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2 mb-1">
+                      <div
+                        className="w-6 h-6 rounded border border-gray-300"
+                        style={{ backgroundColor: theme.primary }}
+                      />
+                      <span className="font-medium text-sm text-gray-900">{theme.name}</span>
+                    </div>
+                    <p className="text-xs text-gray-600">{theme.description}</p>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Ödeme Bilgileri</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">Ödeme Türü</label>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { value: 'odeme_sistemi', label: 'Ödeme Sistemi', icon: '💳' },
+                  { value: 'kredi_karti', label: 'Kredi Kartı', icon: '💳' },
+                  { value: 'havale', label: 'Havale', icon: '🏦' },
+                  { value: 'nakit', label: 'Nakit', icon: '💵' },
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`border-2 rounded-lg p-3 cursor-pointer transition ${
+                      formData.odeme_turu === option.value
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="odeme_turu"
+                      value={option.value}
+                      checked={formData.odeme_turu === option.value}
+                      onChange={() => handleChange('odeme_turu', option.value)}
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{option.icon}</span>
+                      <span className="font-medium text-sm text-gray-900">{option.label}</span>
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
           </div>

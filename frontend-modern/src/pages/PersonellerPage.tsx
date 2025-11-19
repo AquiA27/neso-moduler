@@ -39,25 +39,23 @@ export default function PersonellerPage() {
   const [userPermissions, setUserPermissions] = useState<Record<string, boolean>>({});
   const [loadingPermissions, setLoadingPermissions] = useState(false);
 
+  const { selectedTenantId } = useAuthStore();
+  
   const loadPersoneller = useCallback(async () => {
     try {
-      // Super admin için superadmin endpoint'i, admin için admin endpoint'i kullan
-      const currentUser = useAuthStore.getState().user;
-      const role = currentUser?.role?.toLowerCase();
-      let response;
-      if (role === 'super_admin' || currentUser?.username?.toLowerCase() === 'super') {
-        response = await superadminApi.usersList();
-      } else {
-        // Admin için tenant bazlı personeller endpoint'i
-        response = await adminApi.personellerList();
-      }
+      // Super admin tenant switching yapıyorsa (selectedTenantId varsa), 
+      // /admin/personeller endpoint'ini kullan (tenant filtresi yapıyor)
+      // Super admin "Tüm İşletmeler" modundaysa (selectedTenantId null), 
+      // /admin/personeller endpoint'ini kullan (tüm personelleri gösteriyor)
+      // Normal admin için de /admin/personeller endpoint'ini kullan
+      const response = await adminApi.personellerList();
       setPersoneller(response.data || []);
     } catch (err) {
       console.error('Personeller yüklenemedi:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedTenantId]); // Tenant değiştiğinde personelleri yeniden yükle
 
   const loadPerformans = useCallback(async () => {
     try {

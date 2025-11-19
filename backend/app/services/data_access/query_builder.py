@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Tuple
 
-from app.config.schema_registry_loader import find_field
+from ...config.schema_registry_loader import find_field
 from .exceptions import UnknownIntentError
 
 # Intent -> view tanımları. İlk sprintte ana örnekler ekleniyor.

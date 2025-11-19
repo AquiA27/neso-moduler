@@ -82,24 +82,30 @@ export default function DashboardPage() {
   const formatHour = useCallback((hour: number | null | undefined) =>
     hour === null || hour === undefined ? '-' : `${hour.toString().padStart(2, '0')}:00`, []);
 
+  const { selectedTenantId } = useAuthStore();
+  
   useEffect(() => {
-    // Yetki kontrolü - sadece tenant admin erişebilir (super_admin super admin panelini kullanmalı)
+    // Yetki kontrolü - sadece tenant admin erişebilir
+    // Super admin tenant seçtiğinde dashboard'u görebilir
     if (user) {
       const role = user.role?.toLowerCase();
       const username = user.username?.toLowerCase();
+      const isSuperAdmin = role === 'super_admin' || username === 'super';
       
-      // Super admin dashboard'u görmemeli, super admin panelini görmeli
-      if (role === 'super_admin' || username === 'super') {
+      // Super admin "Tüm İşletmeler" modundaysa Super Admin paneline yönlendir
+      // (TenantRequiredGuard zaten bunu yapıyor ama ekstra güvenlik için)
+      if (isSuperAdmin && selectedTenantId === null) {
         navigate('/superadmin');
         return;
       }
       
-      // Sadece tenant admin erişebilir
-      if (role !== 'admin') {
+      // Super admin tenant seçtiğinde dashboard'u görebilir
+      // Normal admin'ler her zaman görebilir
+      if (!isSuperAdmin && role !== 'admin') {
         navigate('/login');
       }
     }
-  }, [user, navigate]);
+  }, [user, selectedTenantId, navigate]);
 
   const summaryQuery = useQuery<SummaryData>({
     queryKey: ['analytics', 'summary', summaryPeriod],

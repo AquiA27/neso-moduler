@@ -2,7 +2,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import List, Optional, Union
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,7 +32,10 @@ class Settings(BaseSettings):
     # ---------- Observability & Rate Limit ----------
     # Rate limit: 0 = disabled (dev), prod'da env'den ayarla
     # Önerilen: RATE_LIMIT_PER_MINUTE=60 (API), 120 (public), 30 (assistant)
-    RATE_LIMIT_PER_MINUTE: int = 0  # 0 = disabled (for dev)
+    RATE_LIMIT_PER_MINUTE: int = Field(
+        default=0,  # 0 = disabled (for dev)
+        description="Production'da 60 veya daha yüksek bir değer kullanın"
+    )
     REQUEST_LOG_ENABLED: bool = True
     ADD_REQUEST_ID_HEADER: bool = True
 
@@ -54,7 +57,7 @@ class Settings(BaseSettings):
     MAX_UPLOAD_SIZE_MB: int = 5
 
     # ---------- Auth/JWT ----------
-    SECRET_KEY: str = "change-me"
+    SECRET_KEY: str = Field(default="change-me", description="Production'da mutlaka güçlü bir değer kullanın")
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
     ALGORITHM: str = "HS256"
 
@@ -73,8 +76,14 @@ class Settings(BaseSettings):
     # ---------- CORS ----------
     CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:5173", "http://localhost:3000"]
     CORS_ALLOW_CREDENTIALS: bool = True
-    CORS_ALLOW_METHODS: List[str] = ["*"]
-    CORS_ALLOW_HEADERS: List[str] = ["*"]
+    CORS_ALLOW_METHODS: List[str] = Field(
+        default=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        description="Production'da sadece gerekli method'lar"
+    )
+    CORS_ALLOW_HEADERS: List[str] = Field(
+        default=["Content-Type", "Authorization", "X-Sube-Id", "X-Tenant-Id", "X-Request-ID"],
+        description="Production'da sadece gerekli header'lar"
+    )
 
     # ---------- Varsayılan admin (ilk kurulum) ----------
     DEFAULT_ADMIN_USERNAME: str = "admin"
