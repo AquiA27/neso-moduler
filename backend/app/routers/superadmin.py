@@ -808,35 +808,74 @@ async def quick_setup(
         theme_color = theme_colors.get(theme, theme_colors["green"])
         
         if payload.domain or payload.app_name or payload.logo_url or theme or payload.openai_api_key:
-            await db.execute(
+            # Kolonların varlığını kontrol et
+            column_check = await db.fetch_one(
                 """
-                INSERT INTO tenant_customizations (
-                    isletme_id, domain, app_name, logo_url, primary_color, secondary_color,
-                    openai_api_key, openai_model
-                )
-                VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color,
-                        :openai_api_key, :openai_model)
-                ON CONFLICT (isletme_id) DO UPDATE
-                   SET domain = EXCLUDED.domain,
-                       app_name = EXCLUDED.app_name,
-                       logo_url = EXCLUDED.logo_url,
-                       primary_color = EXCLUDED.primary_color,
-                       secondary_color = EXCLUDED.secondary_color,
-                       openai_api_key = EXCLUDED.openai_api_key,
-                       openai_model = EXCLUDED.openai_model,
-                       updated_at = NOW()
-                """,
-                {
-                    "isletme_id": isletme_id,
-                    "domain": payload.domain,
-                    "app_name": payload.app_name,
-                    "logo_url": payload.logo_url,
-                    "primary_color": theme_color["primary"],
-                    "secondary_color": theme_color["secondary"],
-                    "openai_api_key": payload.openai_api_key,
-                    "openai_model": payload.openai_model or "gpt-4o-mini",
-                },
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenant_customizations' 
+                AND column_name IN ('openai_api_key', 'openai_model')
+                """
             )
+            
+            has_openai_columns = column_check is not None
+            
+            # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları kullan
+            if has_openai_columns:
+                await db.execute(
+                    """
+                    INSERT INTO tenant_customizations (
+                        isletme_id, domain, app_name, logo_url, primary_color, secondary_color,
+                        openai_api_key, openai_model
+                    )
+                    VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color,
+                            :openai_api_key, :openai_model)
+                    ON CONFLICT (isletme_id) DO UPDATE
+                       SET domain = EXCLUDED.domain,
+                           app_name = EXCLUDED.app_name,
+                           logo_url = EXCLUDED.logo_url,
+                           primary_color = EXCLUDED.primary_color,
+                           secondary_color = EXCLUDED.secondary_color,
+                           openai_api_key = EXCLUDED.openai_api_key,
+                           openai_model = EXCLUDED.openai_model,
+                           updated_at = NOW()
+                    """,
+                    {
+                        "isletme_id": isletme_id,
+                        "domain": payload.domain,
+                        "app_name": payload.app_name,
+                        "logo_url": payload.logo_url,
+                        "primary_color": theme_color["primary"],
+                        "secondary_color": theme_color["secondary"],
+                        "openai_api_key": payload.openai_api_key,
+                        "openai_model": payload.openai_model or "gpt-4o-mini",
+                    },
+                )
+            else:
+                # Kolonlar yoksa sadece mevcut kolonları kullan
+                await db.execute(
+                    """
+                    INSERT INTO tenant_customizations (
+                        isletme_id, domain, app_name, logo_url, primary_color, secondary_color
+                    )
+                    VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color)
+                    ON CONFLICT (isletme_id) DO UPDATE
+                       SET domain = EXCLUDED.domain,
+                           app_name = EXCLUDED.app_name,
+                           logo_url = EXCLUDED.logo_url,
+                           primary_color = EXCLUDED.primary_color,
+                           secondary_color = EXCLUDED.secondary_color,
+                           updated_at = NOW()
+                    """,
+                    {
+                        "isletme_id": isletme_id,
+                        "domain": payload.domain,
+                        "app_name": payload.app_name,
+                        "logo_url": payload.logo_url,
+                        "primary_color": theme_color["primary"],
+                        "secondary_color": theme_color["secondary"],
+                    },
+                )
         
         # 6. Ödeme kaydı oluştur (aylık fiyat > 0 ise)
         if payload.ayllik_fiyat > 0:
