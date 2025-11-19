@@ -1,5 +1,6 @@
 # backend/app/main.py
 import os
+import logging
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,8 +11,17 @@ from .core.middleware import ErrorMiddleware, DefaultSubeMiddleware
 from .core.tenant_middleware import TenantStatusMiddleware, SubscriptionLimitMiddleware
 from .core.domain_middleware import DomainTenantMiddleware
 from .core.startup_checks import validate_startup
+from .core.logging_config import setup_logging
 from .db.database import db
 from .db.schema import create_tables
+
+# Setup logging first, before anything else
+setup_logging(
+    log_level=os.getenv("LOG_LEVEL", "INFO"),
+    json_logs=settings.ENV == "prod"
+)
+logger = logging.getLogger(__name__)
+logger.info(f"[STARTUP] Application starting in {settings.ENV} mode")
 
 # Routers
 from .routers.system import router as system_router    # /health, /version, /me
@@ -114,46 +124,45 @@ async def on_startup():
     import logging
 
     # Validate environment configuration before starting
-    print("[STARTUP] Validating configuration...")
+    logger.info("[STARTUP] Validating configuration...")
     # validate_startup()  # Geçici olarak devre dışı (local development için)
     
     # Debug: CORS ayarlarını logla
-    print(f"[STARTUP] CORS_ORIGINS (raw): {settings.CORS_ORIGINS}")
-    print(f"[STARTUP] CORS_ORIGINS (type): {type(settings.CORS_ORIGINS)}")
-    print(f"[STARTUP] CORS_ORIGINS (parsed): {cors_origins_list}")
-    print(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
-    print(f"[STARTUP] CORS_ALLOW_METHODS: {settings.CORS_ALLOW_METHODS}")
-    print(f"[STARTUP] CORS_ALLOW_HEADERS: {settings.CORS_ALLOW_HEADERS}")
+    logger.info(f"[STARTUP] CORS_ORIGINS (raw): {settings.CORS_ORIGINS}")
+    logger.info(f"[STARTUP] CORS_ORIGINS (type): {type(settings.CORS_ORIGINS)}")
+    logger.info(f"[STARTUP] CORS_ORIGINS (parsed): {cors_origins_list}")
+    logger.info(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
+    logger.info(f"[STARTUP] CORS_ALLOW_METHODS: {settings.CORS_ALLOW_METHODS}")
+    logger.info(f"[STARTUP] CORS_ALLOW_HEADERS: {settings.CORS_ALLOW_HEADERS}")
 
-    print("[STARTUP] Connecting to database...")
+    logger.info("[STARTUP] Connecting to database...")
     # min_size ve max_size validasyonu (min_size max_size'tan küçük veya eşit olmalı)
     min_size = min(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
     max_size = max(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
-    print(f"[STARTUP] Connection pool: min={min_size}, max={max_size}, timeout={settings.DB_COMMAND_TIMEOUT}s")
+    logger.info(f"[STARTUP] Connection pool: min={min_size}, max={max_size}, timeout={settings.DB_COMMAND_TIMEOUT}s")
     await db.connect()
-    print("[STARTUP] Database connected, creating tables...")
+    logger.info("[STARTUP] Database connected, creating tables...")
     try:
         await create_tables(db)
-        print("[STARTUP] Tables created successfully")
+        logger.info("[STARTUP] Tables created successfully")
     except Exception as e:
-        print(f"[STARTUP] Error creating tables: {e}")
-        logging.error(f"Error in create_tables: {e}", exc_info=True)
+        logger.error(f"[STARTUP] Error creating tables: {e}", exc_info=True)
 
     # Redis Cache'i başlat
     try:
         await cache_service.connect()
-        print("[STARTUP] Redis cache initialized")
+        logger.info("[STARTUP] Redis cache initialized")
     except Exception as e:
-        print(f"[STARTUP] Error initializing cache: {e}")
-        logging.warning(f"Cache initialization failed: {e}")
+        logger.warning(f"[STARTUP] Error initializing cache: {e}")
 
     # Scheduler'ı başlat (otomatik yedekleme için)
     try:
         scheduler_service.start()
-        print("[STARTUP] Scheduler started successfully")
+        logger.info("[STARTUP] Scheduler started successfully")
     except Exception as e:
-        print(f"[STARTUP] Error starting scheduler: {e}")
-        logging.error(f"Error starting scheduler: {e}", exc_info=True)
+        logger.error(f"[STARTUP] Error starting scheduler: {e}", exc_info=True)
+    
+    logger.info("[STARTUP] Application startup completed successfully")
 
 @app.on_event("shutdown")
 async def on_shutdown():
