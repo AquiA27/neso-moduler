@@ -167,20 +167,74 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
         {"id": id}
     )
     
-    # Result hazırla
+    # Result hazırla - Record objelerini güvenli şekilde dict'e çevir
+    def safe_dict(obj):
+        if not obj:
+            return None
+        if isinstance(obj, dict):
+            return obj
+        if hasattr(obj, 'keys'):
+            return dict(obj)
+        return obj
+    
+    def safe_get(obj, key, default=None):
+        if not obj:
+            return default
+        obj_dict = safe_dict(obj)
+        if isinstance(obj_dict, dict):
+            return obj_dict.get(key, default)
+        return getattr(obj, key, default)
+    
+    # İstatistikleri güvenli şekilde hesapla
+    siparis_sayisi = 0
+    if siparis_count:
+        count_val = safe_get(siparis_count, "count") or safe_get(siparis_count, "count", 0)
+        try:
+            siparis_sayisi = int(count_val) if count_val is not None else 0
+        except (ValueError, TypeError):
+            siparis_sayisi = 0
+    
+    toplam_gelir = 0.0
+    if revenue:
+        total_val = safe_get(revenue, "total") or safe_get(revenue, "total", 0.0)
+        try:
+            toplam_gelir = float(total_val) if total_val is not None else 0.0
+        except (ValueError, TypeError):
+            toplam_gelir = 0.0
+    
+    menu_item_sayisi = 0
+    if menu_count:
+        count_val = safe_get(menu_count, "count") or safe_get(menu_count, "count", 0)
+        try:
+            menu_item_sayisi = int(count_val) if count_val is not None else 0
+        except (ValueError, TypeError):
+            menu_item_sayisi = 0
+    
+    son_siparis_tarihi = None
+    if last_order:
+        last_order_date = safe_get(last_order, "last_order_date")
+        if last_order_date:
+            try:
+                if hasattr(last_order_date, 'isoformat'):
+                    son_siparis_tarihi = last_order_date.isoformat()
+                else:
+                    son_siparis_tarihi = str(last_order_date)
+            except (AttributeError, TypeError):
+                son_siparis_tarihi = None
+    
     result = {
-        "isletme": dict(isletme) if isletme else None,
-        "subscription": dict(subscription) if subscription else None,
-        "subeler": [dict(s) if hasattr(s, 'keys') else s for s in subeler],
-        "kullanicilar": [dict(u) if hasattr(u, 'keys') else u for u in users],
+        "isletme": safe_dict(isletme),
+        "subscription": safe_dict(subscription),
+        "subeler": [safe_dict(s) for s in subeler] if subeler else [],
+        "kullanicilar": [safe_dict(u) for u in users] if users else [],
         "customization": customization if customization else None,
         "istatistikler": {
-            "siparis_sayisi": int(siparis_count["count"]) if siparis_count else 0,
-            "toplam_gelir": float(revenue["total"]) if revenue else 0.0,
-            "menu_item_sayisi": int(menu_count["count"]) if menu_count else 0,
-            "kullanici_sayisi": len(users),
-            "sube_sayisi": len(subeler),
-            "son_siparis_tarihi": last_order["last_order_date"].isoformat() if last_order and last_order["last_order_date"] else None,
+            "siparis_sayisi": siparis_sayisi,
+            "toplam_gelir": toplam_gelir,
+            "menu_item_sayisi": menu_item_sayisi,
+            "kullanici_sayisi": len(users) if users else 0,
+            "sube_sayisi": len(subeler) if subeler else 0,
+            "son_siparis_tarihi": son_siparis_tarihi,
         }
     }
     

@@ -237,8 +237,19 @@ async def get_customization_by_domain(
         raise HTTPException(404, "Özelleştirme bulunamadı")
     
     import json
-    result = dict(row)
+    # Record objesini güvenli şekilde dict'e çevir
+    if hasattr(row, 'keys'):
+        result = dict(row)
+    elif isinstance(row, dict):
+        result = row
+    else:
+        result = dict(row) if row else {}
+    
     if isinstance(result.get("meta_settings"), str):
-        result["meta_settings"] = json.loads(result["meta_settings"])
+        try:
+            result["meta_settings"] = json.loads(result["meta_settings"])
+        except (json.JSONDecodeError, TypeError):
+            result["meta_settings"] = {}
+    
     return result
 
