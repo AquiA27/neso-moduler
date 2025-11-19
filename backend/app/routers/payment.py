@@ -44,7 +44,7 @@ async def list_payments(
 ):
     """Tüm ödemeleri listele (işletme adı ile birlikte)"""
     query = """
-        SELECT p.id, p.isletme_id, i.ad as isletme_ad, p.subscription_id, 
+        SELECT p.id, p.isletme_id, COALESCE(i.ad, 'Bilinmeyen İşletme') as isletme_ad, p.subscription_id, 
                p.tutar, p.odeme_turu, p.durum, p.fatura_no, p.aciklama, 
                p.odeme_tarihi, p.created_at, p.updated_at
         FROM payments p

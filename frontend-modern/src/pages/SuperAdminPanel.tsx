@@ -6,7 +6,8 @@ import {
   Building2, CreditCard, Settings, Plus, Search, 
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
-  ExternalLink, UserCog, Menu as MenuIcon, FileText
+  ExternalLink, UserCog, Menu as MenuIcon, FileText,
+  Trash2, RefreshCw
 } from 'lucide-react';
 
 interface Tenant {
@@ -742,11 +743,98 @@ function TenantDetailTab({
                   <p className="font-medium text-gray-900">{new Date(subscription.trial_bitis).toLocaleDateString('tr-TR')}</p>
                 </div>
               )}
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-sm text-gray-600 mb-2">Plan Güncelle</p>
+                <div className="flex gap-2">
+                  {subscription.plan_type !== 'pro' && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`${isletme.ad} işletmesinin planını Pro'ya güncellemek istediğinizden emin misiniz?`)) return;
+                        try {
+                          const planPresets = {
+                            basic: { max_subeler: 1, max_kullanicilar: 5, max_menu_items: 100, ayllik_fiyat: 0 },
+                            pro: { max_subeler: 5, max_kullanicilar: 20, max_menu_items: 500, ayllik_fiyat: 999 },
+                            enterprise: { max_subeler: 999, max_kullanicilar: 999, max_menu_items: 9999, ayllik_fiyat: 2999 }
+                          };
+                          const newPlan = subscription.plan_type === 'basic' ? 'pro' : 'enterprise';
+                          await subscriptionApi.update(isletme.id, {
+                            ...subscription,
+                            plan_type: newPlan,
+                            ...planPresets[newPlan as keyof typeof planPresets]
+                          });
+                          alert('Plan başarıyla güncellendi');
+                          onRefresh();
+                        } catch (error: any) {
+                          alert(`Plan güncellenemedi: ${error.response?.data?.detail || error.message}`);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      {subscription.plan_type === 'basic' ? 'Pro\'ya Yükselt' : 'Enterprise\'a Yükselt'}
+                    </button>
+                  )}
+                  {subscription.plan_type !== 'basic' && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`${isletme.ad} işletmesinin planını ${subscription.plan_type === 'pro' ? 'Basic' : 'Pro'}'ye düşürmek istediğinizden emin misiniz?`)) return;
+                        try {
+                          const planPresets = {
+                            basic: { max_subeler: 1, max_kullanicilar: 5, max_menu_items: 100, ayllik_fiyat: 0 },
+                            pro: { max_subeler: 5, max_kullanicilar: 20, max_menu_items: 500, ayllik_fiyat: 999 },
+                            enterprise: { max_subeler: 999, max_kullanicilar: 999, max_menu_items: 9999, ayllik_fiyat: 2999 }
+                          };
+                          const newPlan = subscription.plan_type === 'enterprise' ? 'pro' : 'basic';
+                          await subscriptionApi.update(isletme.id, {
+                            ...subscription,
+                            plan_type: newPlan,
+                            ...planPresets[newPlan as keyof typeof planPresets]
+                          });
+                          alert('Plan başarıyla güncellendi');
+                          onRefresh();
+                        } catch (error: any) {
+                          alert(`Plan güncellenemedi: ${error.response?.data?.detail || error.message}`);
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-orange-600 text-white text-sm rounded-lg hover:bg-orange-700 transition-colors"
+                    >
+                      {subscription.plan_type === 'enterprise' ? 'Pro\'ya Düşür' : 'Basic\'e Düşür'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-gray-500 text-sm">Abonelik bulunamadı</p>
           )}
         </div>
+      </div>
+      
+      {/* İşletme Silme */}
+      <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold text-red-900 mb-2 flex items-center">
+          <AlertCircle className="w-5 h-5 mr-2" />
+          Tehlikeli İşlemler
+        </h3>
+        <p className="text-sm text-red-700 mb-4">
+          İşletmeyi silmek, tüm ilişkili verileri (şubeler, menüler, siparişler, ödemeler, abonelikler, vb.) kalıcı olarak silecektir. Bu işlem geri alınamaz!
+        </p>
+        <button
+          onClick={async () => {
+            if (!confirm(`"${isletme.ad}" işletmesini ve TÜM ilişkili verilerini silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) return;
+            if (!confirm('Son bir kez daha onaylıyor musunuz? Bu işlem geri alınamaz!')) return;
+            try {
+              await superadminApi.tenantDelete(isletme.id);
+              alert('İşletme ve tüm ilişkili veriler başarıyla silindi');
+              onBack();
+            } catch (error: any) {
+              alert(`İşletme silinemedi: ${error.response?.data?.detail || error.message}`);
+            }
+          }}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center"
+        >
+          <Trash2 className="w-4 h-4 mr-2" />
+          İşletmeyi Sil
+        </button>
       </div>
 
       {/* İstatistikler */}

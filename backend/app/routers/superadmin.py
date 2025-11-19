@@ -207,8 +207,31 @@ async def tenant_update(id: int, payload: TenantIn, _: Dict[str, Any] = Depends(
 
 @router.delete("/tenants/{id}")
 async def tenant_delete(id: int, _: Dict[str, Any] = Depends(get_current_user)):
+    """İşletmeyi ve tüm ilişkili verilerini sil (cascade delete)"""
+    import logging
+    
+    # İşletme var mı kontrol et
+    isletme = await db.fetch_one(
+        "SELECT id, ad FROM isletmeler WHERE id = :id",
+        {"id": id}
+    )
+    if not isletme:
+        raise HTTPException(status_code=404, detail="İşletme bulunamadı")
+    
+    logging.info(f"[TENANT_DELETE] İşletme siliniyor: id={id}, ad={isletme.get('ad')}")
+    
+    # Transaction içinde cascade delete
+    # Foreign key'ler ON DELETE CASCADE olduğu için otomatik silinir:
+    # - subeler (ve altındaki menu, siparisler, odemeler, adisyons)
+    # - subscriptions
+    # - payments
+    # - tenant_customizations
+    # users tablosunda tenant_id NULL olur (ON DELETE SET NULL)
+    
     await db.execute("DELETE FROM isletmeler WHERE id = :id", {"id": id})
-    return {"ok": True}
+    
+    logging.info(f"[TENANT_DELETE] İşletme ve ilişkili veriler silindi: id={id}")
+    return {"ok": True, "message": f"İşletme '{isletme.get('ad')}' ve tüm ilişkili veriler silindi"}
 
 
 # ---- Kullanıcılar ----
