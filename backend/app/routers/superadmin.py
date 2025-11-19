@@ -47,198 +47,206 @@ async def tenants_list(
 @router.get("/tenants/{id}")
 async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     """Tenant (işletme) detay bilgileri: genel bilgiler, abonelik, kullanıcılar, şubeler, customization, istatistikler"""
+    import logging
+    import traceback
     
-    # 1. İşletme bilgileri
-    isletme = await db.fetch_one(
-        """
-        SELECT id, ad, vergi_no, telefon, aktif, created_at
-        FROM isletmeler
-        WHERE id = :id
-        """,
-        {"id": id}
-    )
-    
-    if not isletme:
-        raise HTTPException(404, "İşletme bulunamadı")
-    
-    # 2. Abonelik bilgileri
-    subscription = await db.fetch_one(
-        """
-        SELECT 
-            id, plan_type, status, max_subeler, max_kullanicilar, max_menu_items,
-            ayllik_fiyat, trial_baslangic, trial_bitis, baslangic_tarihi, bitis_tarihi,
-            otomatik_yenileme
-        FROM subscriptions
-        WHERE isletme_id = :id
-        ORDER BY id DESC
-        LIMIT 1
-        """,
-        {"id": id}
-    )
-    
-    # 3. Şubeler
-    subeler = await db.fetch_all(
-        """
-        SELECT id, ad, adres, telefon, aktif, created_at
-        FROM subeler
-        WHERE isletme_id = :id
-        ORDER BY id
-        """,
-        {"id": id}
-    )
-    
-    # 4. Kullanıcılar (bu işletmeye ait)
-    users = await db.fetch_all(
-        """
-        SELECT id, username, role, aktif, created_at
-        FROM users
-        WHERE tenant_id = :id
-        ORDER BY created_at DESC
-        """,
-        {"id": id}
-    )
-    
-    # 5. Customization
-    customization = await db.fetch_one(
-        """
-        SELECT domain, app_name, logo_url, primary_color, secondary_color,
-               openai_api_key, openai_model
-        FROM tenant_customizations
-        WHERE isletme_id = :id
-        """,
-        {"id": id}
-    )
-    
-    # API key'i kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
-    if customization:
-        customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
-        if customization_dict.get("openai_api_key"):
-            api_key = str(customization_dict["openai_api_key"])
-            if api_key and len(api_key) > 12:
-                customization_dict["openai_api_key"] = f"{api_key[:8]}...{api_key[-4:]}"
-            elif api_key:
-                customization_dict["openai_api_key"] = "***"
-        customization = customization_dict
-    
-    # 6. İstatistikler
-    # Toplam sipariş sayısı
-    siparis_count = await db.fetch_one(
-        """
-        SELECT COUNT(*) as count
-        FROM siparisler s
-        JOIN subeler sub ON s.sube_id = sub.id
-        WHERE sub.isletme_id = :id
-        """,
-        {"id": id}
-    )
-    
-    # Toplam gelir
-    revenue = await db.fetch_one(
-        """
-        SELECT COALESCE(SUM(o.tutar), 0) as total
-        FROM odemeler o
-        JOIN adisyons a ON o.adisyon_id = a.id
-        JOIN subeler sub ON a.sube_id = sub.id
-        WHERE sub.isletme_id = :id
-          AND o.iptal = FALSE
-        """,
-        {"id": id}
-    )
-    
-    # Toplam menu item sayısı
-    menu_count = await db.fetch_one(
-        """
-        SELECT COUNT(*) as count
-        FROM menu m
-        JOIN subeler sub ON m.sube_id = sub.id
-        WHERE sub.isletme_id = :id AND m.aktif = TRUE
-        """,
-        {"id": id}
-    )
-    
-    # Son sipariş tarihi
-    last_order = await db.fetch_one(
-        """
-        SELECT MAX(s.created_at) as last_order_date
-        FROM siparisler s
-        JOIN subeler sub ON s.sube_id = sub.id
-        WHERE sub.isletme_id = :id
-        """,
-        {"id": id}
-    )
-    
-    # Result hazırla - Record objelerini güvenli şekilde dict'e çevir
-    def safe_dict(obj):
-        if not obj:
-            return None
-        if isinstance(obj, dict):
+    try:
+        # 1. İşletme bilgileri
+        isletme = await db.fetch_one(
+            """
+            SELECT id, ad, vergi_no, telefon, aktif, created_at
+            FROM isletmeler
+            WHERE id = :id
+            """,
+            {"id": id}
+        )
+        
+        if not isletme:
+            raise HTTPException(404, "İşletme bulunamadı")
+        
+        # 2. Abonelik bilgileri
+        subscription = await db.fetch_one(
+            """
+            SELECT 
+                id, plan_type, status, max_subeler, max_kullanicilar, max_menu_items,
+                ayllik_fiyat, trial_baslangic, trial_bitis, baslangic_tarihi, bitis_tarihi,
+                otomatik_yenileme
+            FROM subscriptions
+            WHERE isletme_id = :id
+            ORDER BY id DESC
+            LIMIT 1
+            """,
+            {"id": id}
+        )
+        
+        # 3. Şubeler
+        subeler = await db.fetch_all(
+            """
+            SELECT id, ad, adres, telefon, aktif, created_at
+            FROM subeler
+            WHERE isletme_id = :id
+            ORDER BY id
+            """,
+            {"id": id}
+        )
+        
+        # 4. Kullanıcılar (bu işletmeye ait)
+        users = await db.fetch_all(
+            """
+            SELECT id, username, role, aktif, created_at
+            FROM users
+            WHERE tenant_id = :id
+            ORDER BY created_at DESC
+            """,
+            {"id": id}
+        )
+        
+        # 5. Customization
+        customization = await db.fetch_one(
+            """
+            SELECT domain, app_name, logo_url, primary_color, secondary_color,
+                   openai_api_key, openai_model
+            FROM tenant_customizations
+            WHERE isletme_id = :id
+            """,
+            {"id": id}
+        )
+        
+        # API key'i kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
+        if customization:
+            customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
+            if customization_dict.get("openai_api_key"):
+                api_key = str(customization_dict["openai_api_key"])
+                if api_key and len(api_key) > 12:
+                    customization_dict["openai_api_key"] = f"{api_key[:8]}...{api_key[-4:]}"
+                elif api_key:
+                    customization_dict["openai_api_key"] = "***"
+            customization = customization_dict
+        
+        # 6. İstatistikler
+        # Toplam sipariş sayısı
+        siparis_count = await db.fetch_one(
+            """
+            SELECT COUNT(*) as count
+            FROM siparisler s
+            JOIN subeler sub ON s.sube_id = sub.id
+            WHERE sub.isletme_id = :id
+            """,
+            {"id": id}
+        )
+        
+        # Toplam gelir
+        revenue = await db.fetch_one(
+            """
+            SELECT COALESCE(SUM(o.tutar), 0) as total
+            FROM odemeler o
+            JOIN adisyons a ON o.adisyon_id = a.id
+            JOIN subeler sub ON a.sube_id = sub.id
+            WHERE sub.isletme_id = :id
+              AND o.iptal = FALSE
+            """,
+            {"id": id}
+        )
+        
+        # Toplam menu item sayısı
+        menu_count = await db.fetch_one(
+            """
+            SELECT COUNT(*) as count
+            FROM menu m
+            JOIN subeler sub ON m.sube_id = sub.id
+            WHERE sub.isletme_id = :id AND m.aktif = TRUE
+            """,
+            {"id": id}
+        )
+        
+        # Son sipariş tarihi
+        last_order = await db.fetch_one(
+            """
+            SELECT MAX(s.created_at) as last_order_date
+            FROM siparisler s
+            JOIN subeler sub ON s.sube_id = sub.id
+            WHERE sub.isletme_id = :id
+            """,
+            {"id": id}
+        )
+        
+        # Result hazırla - Record objelerini güvenli şekilde dict'e çevir
+        def safe_dict(obj):
+            if not obj:
+                return None
+            if isinstance(obj, dict):
+                return obj
+            if hasattr(obj, 'keys'):
+                return dict(obj)
             return obj
-        if hasattr(obj, 'keys'):
-            return dict(obj)
-        return obj
-    
-    def safe_get(obj, key, default=None):
-        if not obj:
-            return default
-        obj_dict = safe_dict(obj)
-        if isinstance(obj_dict, dict):
-            return obj_dict.get(key, default)
-        return getattr(obj, key, default)
-    
-    # İstatistikleri güvenli şekilde hesapla
-    siparis_sayisi = 0
-    if siparis_count:
-        count_val = safe_get(siparis_count, "count") or safe_get(siparis_count, "count", 0)
-        try:
-            siparis_sayisi = int(count_val) if count_val is not None else 0
-        except (ValueError, TypeError):
-            siparis_sayisi = 0
-    
-    toplam_gelir = 0.0
-    if revenue:
-        total_val = safe_get(revenue, "total") or safe_get(revenue, "total", 0.0)
-        try:
-            toplam_gelir = float(total_val) if total_val is not None else 0.0
-        except (ValueError, TypeError):
-            toplam_gelir = 0.0
-    
-    menu_item_sayisi = 0
-    if menu_count:
-        count_val = safe_get(menu_count, "count") or safe_get(menu_count, "count", 0)
-        try:
-            menu_item_sayisi = int(count_val) if count_val is not None else 0
-        except (ValueError, TypeError):
-            menu_item_sayisi = 0
-    
-    son_siparis_tarihi = None
-    if last_order:
-        last_order_date = safe_get(last_order, "last_order_date")
-        if last_order_date:
+        
+        def safe_get(obj, key, default=None):
+            if not obj:
+                return default
+            obj_dict = safe_dict(obj)
+            if isinstance(obj_dict, dict):
+                return obj_dict.get(key, default)
+            return getattr(obj, key, default)
+        
+        # İstatistikleri güvenli şekilde hesapla
+        siparis_sayisi = 0
+        if siparis_count:
+            count_val = safe_get(siparis_count, "count") or safe_get(siparis_count, "count", 0)
             try:
-                if hasattr(last_order_date, 'isoformat'):
-                    son_siparis_tarihi = last_order_date.isoformat()
-                else:
-                    son_siparis_tarihi = str(last_order_date)
-            except (AttributeError, TypeError):
-                son_siparis_tarihi = None
-    
-    result = {
-        "isletme": safe_dict(isletme),
-        "subscription": safe_dict(subscription),
-        "subeler": [safe_dict(s) for s in subeler] if subeler else [],
-        "kullanicilar": [safe_dict(u) for u in users] if users else [],
-        "customization": customization if customization else None,
-        "istatistikler": {
-            "siparis_sayisi": siparis_sayisi,
-            "toplam_gelir": toplam_gelir,
-            "menu_item_sayisi": menu_item_sayisi,
-            "kullanici_sayisi": len(users) if users else 0,
-            "sube_sayisi": len(subeler) if subeler else 0,
-            "son_siparis_tarihi": son_siparis_tarihi,
+                siparis_sayisi = int(count_val) if count_val is not None else 0
+            except (ValueError, TypeError):
+                siparis_sayisi = 0
+        
+        toplam_gelir = 0.0
+        if revenue:
+            total_val = safe_get(revenue, "total") or safe_get(revenue, "total", 0.0)
+            try:
+                toplam_gelir = float(total_val) if total_val is not None else 0.0
+            except (ValueError, TypeError):
+                toplam_gelir = 0.0
+        
+        menu_item_sayisi = 0
+        if menu_count:
+            count_val = safe_get(menu_count, "count") or safe_get(menu_count, "count", 0)
+            try:
+                menu_item_sayisi = int(count_val) if count_val is not None else 0
+            except (ValueError, TypeError):
+                menu_item_sayisi = 0
+        
+        son_siparis_tarihi = None
+        if last_order:
+            last_order_date = safe_get(last_order, "last_order_date")
+            if last_order_date:
+                try:
+                    if hasattr(last_order_date, 'isoformat'):
+                        son_siparis_tarihi = last_order_date.isoformat()
+                    else:
+                        son_siparis_tarihi = str(last_order_date)
+                except (AttributeError, TypeError):
+                    son_siparis_tarihi = None
+        
+        result = {
+            "isletme": safe_dict(isletme),
+            "subscription": safe_dict(subscription),
+            "subeler": [safe_dict(s) for s in subeler] if subeler else [],
+            "kullanicilar": [safe_dict(u) for u in users] if users else [],
+            "customization": customization if customization else None,
+            "istatistikler": {
+                "siparis_sayisi": siparis_sayisi,
+                "toplam_gelir": toplam_gelir,
+                "menu_item_sayisi": menu_item_sayisi,
+                "kullanici_sayisi": len(users) if users else 0,
+                "sube_sayisi": len(subeler) if subeler else 0,
+                "son_siparis_tarihi": son_siparis_tarihi,
+            }
         }
-    }
-    
-    return result
+        
+        return result
+    except Exception as e:
+        error_msg = f"Tenant detail error for id={id}: {str(e)}"
+        error_trace = traceback.format_exc()
+        logging.error(f"[TENANT_DETAIL] {error_msg}\n{error_trace}")
+        raise HTTPException(status_code=500, detail=f"İşletme detayı yüklenirken hata oluştu: {str(e)}")
 
 
 @router.post("/tenants", response_model=TenantOut)
