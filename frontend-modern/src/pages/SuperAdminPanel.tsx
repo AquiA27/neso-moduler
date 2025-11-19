@@ -7,7 +7,7 @@ import {
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
-  Trash2, RefreshCw
+  Trash2
 } from 'lucide-react';
 
 interface Tenant {
