@@ -552,12 +552,40 @@ class UserPermissionOut(BaseModel):
     available_permissions: Dict[str, str]
 
 
-@router.get("/users/{username}/permissions", response_model=UserPermissionOut)
+@router.get("/users/{username}/permissions", response_model=UserPermissionOut, dependencies=[Depends(require_roles({"admin", "super_admin"}))])
 async def get_user_permissions(
     username: str,
-    _: Dict[str, Any] = Depends(get_current_user)
+    user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Kullanıcının mevcut izinlerini getir"""
+    import logging
+    
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+    
+    # Normal admin sadece kendi tenant'ındaki kullanıcıların yetkilerini görebilir
+    if user_role != "super_admin":
+        # Hedef kullanıcının tenant_id'sini kontrol et
+        target_user = await db.fetch_one(
+            "SELECT tenant_id FROM users WHERE username = :u",
+            {"u": username},
+        )
+        if not target_user:
+            raise HTTPException(status_code=404, detail=f"Kullanıcı bulunamadı: {username}")
+        
+        target_user_dict = dict(target_user) if hasattr(target_user, 'keys') else target_user
+        target_tenant_id = target_user_dict.get("tenant_id") if isinstance(target_user_dict, dict) else (getattr(target_user, "tenant_id", None) if target_user else None)
+        
+        # Normal admin sadece kendi tenant'ındaki kullanıcıları görebilir
+        if target_tenant_id != effective_tenant_id:
+            logging.warning(f"[GET_USER_PERMISSIONS] Admin {user.get('username')} tried to access permissions for user {username} from different tenant: {target_tenant_id} != {effective_tenant_id}")
+            raise HTTPException(
+                status_code=403,
+                detail="Bu kullanıcının yetkilerini görüntüleyemezsiniz. Sadece kendi işletmenizdeki kullanıcıların yetkilerini görebilirsiniz."
+            )
+    
     # Kullanıcının mevcut izinlerini al
     rows = await db.fetch_all(
         """
@@ -588,20 +616,40 @@ async def get_user_permissions(
     }
 
 
-@router.put("/users/{username}/permissions", response_model=UserPermissionOut)
+@router.put("/users/{username}/permissions", response_model=UserPermissionOut, dependencies=[Depends(require_roles({"admin", "super_admin"}))])
 async def update_user_permissions(
     username: str,
     payload: UserPermissionIn,
-    _: Dict[str, Any] = Depends(get_current_user)
+    user: Dict[str, Any] = Depends(get_current_user)
 ):
     """Kullanıcının izinlerini güncelle"""
+    import logging
+    
+    user_role = user.get("role")
+    user_tenant_id = user.get("tenant_id")
+    switched_tenant_id = user.get("switched_tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else user_tenant_id
+    
     # Kullanıcının var olduğunu kontrol et
     user_row = await db.fetch_one(
-        "SELECT id, role FROM users WHERE username = :u",
+        "SELECT id, role, tenant_id FROM users WHERE username = :u",
         {"u": username},
     )
     if not user_row:
         raise HTTPException(status_code=404, detail=f"Kullanıcı bulunamadı: {username}")
+    
+    # Normal admin sadece kendi tenant'ındaki kullanıcıların yetkilerini güncelleyebilir
+    if user_role != "super_admin":
+        user_row_dict = dict(user_row) if hasattr(user_row, 'keys') else user_row
+        target_tenant_id = user_row_dict.get("tenant_id") if isinstance(user_row_dict, dict) else (getattr(user_row, "tenant_id", None) if user_row else None)
+        
+        # Normal admin sadece kendi tenant'ındaki kullanıcıları güncelleyebilir
+        if target_tenant_id != effective_tenant_id:
+            logging.warning(f"[UPDATE_USER_PERMISSIONS] Admin {user.get('username')} tried to update permissions for user {username} from different tenant: {target_tenant_id} != {effective_tenant_id}")
+            raise HTTPException(
+                status_code=403,
+                detail="Bu kullanıcının yetkilerini güncelleyemezsiniz. Sadece kendi işletmenizdeki kullanıcıların yetkilerini güncelleyebilirsiniz."
+            )
     
     # Mevcut izinleri sil
     await db.execute(
@@ -642,7 +690,7 @@ async def update_user_permissions(
     }
 
 
-@router.get("/permissions/available", response_model=Dict[str, str])
+@router.get("/permissions/available", response_model=Dict[str, str], dependencies=[Depends(require_roles({"admin", "super_admin"}))])
 async def get_available_permissions(_: Dict[str, Any] = Depends(get_current_user)):
     """Tüm mevcut izin anahtarlarını listele"""
     return PERMISSION_KEYS
