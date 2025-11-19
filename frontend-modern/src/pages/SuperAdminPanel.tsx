@@ -1279,15 +1279,15 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       const selectedTheme = themePresets[formData.theme];
       const payload = {
         isletme_id: selectedTenant,
-        domain: formData.domain || null,
-        app_name: formData.app_name || null,
-        logo_url: formData.logo_url || null,
+        domain: formData.domain || undefined,
+        app_name: formData.app_name || undefined,
+        logo_url: formData.logo_url || undefined,
         primary_color: selectedTheme.primary,
         secondary_color: selectedTheme.secondary,
-        footer_text: formData.footer_text || null,
-        email: formData.email || null,
-        telefon: formData.telefon || null,
-        adres: formData.adres || null,
+        footer_text: formData.footer_text || undefined,
+        email: formData.email || undefined,
+        telefon: formData.telefon || undefined,
+        adres: formData.adres || undefined,
       };
 
       if (exists) {
