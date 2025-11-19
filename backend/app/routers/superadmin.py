@@ -111,12 +111,12 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     
     # API key'i kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
     if customization:
-        customization_dict = dict(customization)
+        customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
         if customization_dict.get("openai_api_key"):
-            api_key = customization_dict["openai_api_key"]
-            if len(api_key) > 12:
+            api_key = str(customization_dict["openai_api_key"])
+            if api_key and len(api_key) > 12:
                 customization_dict["openai_api_key"] = f"{api_key[:8]}...{api_key[-4:]}"
-            else:
+            elif api_key:
                 customization_dict["openai_api_key"] = "***"
         customization = customization_dict
     
@@ -171,9 +171,9 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
     result = {
         "isletme": dict(isletme) if isletme else None,
         "subscription": dict(subscription) if subscription else None,
-        "subeler": [dict(s) for s in subeler],
-        "kullanicilar": [dict(u) for u in users],
-        "customization": dict(customization) if customization else None,
+        "subeler": [dict(s) if hasattr(s, 'keys') else s for s in subeler],
+        "kullanicilar": [dict(u) if hasattr(u, 'keys') else u for u in users],
+        "customization": customization if customization else None,
         "istatistikler": {
             "siparis_sayisi": int(siparis_count["count"]) if siparis_count else 0,
             "toplam_gelir": float(revenue["total"]) if revenue else 0.0,
