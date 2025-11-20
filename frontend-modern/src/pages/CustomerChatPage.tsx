@@ -16,7 +16,7 @@ export default function CustomerChatPage() {
   const navigate = useNavigate();
   const [masa, setMasa] = useState(searchParams.get('masa') || '');
   const [masaLoading, setMasaLoading] = useState(false);
-  const subeId = parseInt(searchParams.get('sube_id') || '1', 10);
+  const [subeId, setSubeId] = useState<number>(parseInt(searchParams.get('sube_id') || '1', 10));
   const qrCode = searchParams.get('qr');
   
   const [messages, setMessages] = useState<Message[]>([
@@ -137,6 +137,11 @@ export default function CustomerChatPage() {
             const data = await response.json();
             console.log('[QR] Masa bilgisi yüklendi:', data);
             setMasa(data.masa_adi);
+            // QR kod response'undan sube_id'yi al
+            if (data.sube_id) {
+              setSubeId(parseInt(data.sube_id, 10));
+              console.log('[QR] sube_id güncellendi:', data.sube_id);
+            }
           }
         } catch (err) {
           console.error('QR kod masa bilgisi yüklenemedi:', err);
