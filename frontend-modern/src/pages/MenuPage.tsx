@@ -78,8 +78,12 @@ export default function MenuPage() {
 
   const loadMenu = async () => {
     try {
+      setLoading(true);
       const response = await menuApi.list({ limit: 200 });
-      setMenuItems(response.data || []);
+      const items = response.data || [];
+      const { subeId, tenantId } = useAuthStore.getState();
+      console.log('[MENU_PAGE] Menü yüklendi:', { count: items.length, subeId, tenantId, selectedTenantId });
+      setMenuItems(items);
     } catch (err) {
       console.error('Menü yüklenemedi:', err);
     } finally {
@@ -100,6 +104,7 @@ export default function MenuPage() {
     setUploadingId(id);
     try {
       await menuApi.uploadImage(id, file);
+      // Cache temizlendi, menüyü yeniden yükle (görsel görünecek)
       await loadMenu();
     } catch (err) {
       console.error('Görsel yüklenemedi:', err);
@@ -201,7 +206,8 @@ export default function MenuPage() {
         }
       }
       resetForm();
-      loadMenu();
+      // Menü listesini yeniden yükle (cache temizlendi, yeni menü görünecek)
+      await loadMenu();
     } catch (err) {
       console.error('Menü kaydedilemedi:', err);
       alert('Hata: Menü kaydedilemedi');

@@ -98,9 +98,17 @@ class MenuUpdateIn(BaseModel):
 )
 async def menu_ekle(
     item: MenuItemIn,
-    _: Dict[str, Any] = Depends(get_current_user),
+    current_user: Dict[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
+    # Super admin tenant switching yapıyorsa, tenant_id'yi al
+    switched_tenant_id = current_user.get("switched_tenant_id")
+    tenant_id = current_user.get("tenant_id")
+    effective_tenant_id = switched_tenant_id if switched_tenant_id else tenant_id
+    
+    import logging
+    logging.info(f"[MENU_EKLE] sube_id={sube_id}, effective_tenant_id={effective_tenant_id}, item={item.model_dump()}")
+    
     # UNIQUE (sube_id, unaccent(lower(ad))) nedeniyle kopya yazımlar hata verebilir -> INSERT dene, patlarsa UPDATE
     params = {**item.model_dump(), "sid": sube_id}
     try:
@@ -112,8 +120,10 @@ async def menu_ekle(
             """,
             params,
         )
-    except Exception:
+        logging.info(f"[MENU_EKLE] Menü eklendi: id={row['id']}, ad={row['ad']}, sube_id={sube_id}")
+    except Exception as e:
         # Aynı ürün farklı yazımla varsa (aynı şubede) UPDATE'e düş
+        logging.warning(f"[MENU_EKLE] INSERT başarısız, UPDATE deneniyor: {e}")
         row = await db.fetch_one(
             """
             UPDATE menu
@@ -128,10 +138,13 @@ async def menu_ekle(
             params,
         )
         if not row:
+            logging.error(f"[MENU_EKLE] UPDATE başarısız: sube_id={sube_id}, ad={params.get('ad')}")
             raise HTTPException(status_code=400, detail="Menü ekleme/güncelleme başarısız")
+        logging.info(f"[MENU_EKLE] Menü güncellendi: id={row['id']}, ad={row['ad']}, sube_id={sube_id}")
     
-    # Cache'i temizle (menu listesi değişti)
+    # Cache'i temizle (menu listesi değişti) - TÜM tenant'lar ve sube'ler için
     await cache.delete_pattern("menu:liste:*")
+    logging.info(f"[MENU_EKLE] Cache temizlendi: pattern=menu:liste:*")
     
     return row_to_menu_out(row)
 
@@ -275,9 +288,18 @@ async def menu_liste(
     # Cache'e kaydet (5 dakika TTL)
     await cache.set(cache_key_str, result, ttl=300)
     
-    # Debug log (sadece dev için)
+    # Debug log (production'da da yararlı - sorun giderme için)
     import logging
-    logging.info(f"[MENU_LISTE] sube_id={sube_id}, effective_tenant_id={effective_tenant_id}, items_count={len(result)}")
+    logging.info(f"[MENU_LISTE] sube_id={sube_id}, effective_tenant_id={effective_tenant_id}, items_count={len(result)}, sadece_aktif={sadece_aktif}")
+    
+    # Eğer sonuç boşsa ve tenant var ise, şube kontrolü yap
+    if len(result) == 0 and effective_tenant_id:
+        # Tenant'ın şubelerini kontrol et
+        subeler_check = await db.fetch_all(
+            "SELECT id, ad, aktif FROM subeler WHERE isletme_id = :tid ORDER BY id",
+            {"tid": effective_tenant_id},
+        )
+        logging.warning(f"[MENU_LISTE] Boş sonuç - Tenant {effective_tenant_id} şubeleri: {[dict(s) for s in subeler_check] if subeler_check else 'yok'}")
     
     return result
 
@@ -491,6 +513,11 @@ async def menu_gorsel_yukle(
     if not row:
         raise HTTPException(status_code=404, detail="Menü ürünü güncellenemedi")
 
+    # Cache'i temizle (menü listesi değişti - görsel eklendi)
+    await cache.delete_pattern("menu:liste:*")
+    import logging
+    logging.info(f"[MENU_GORSEL_YUKLE] Görsel yüklendi: menu_id={menu_id}, sube_id={sube_id}, cache temizlendi")
+
     return row_to_menu_out(row)
 
 @router.delete(
@@ -534,6 +561,11 @@ async def menu_gorsel_sil(
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Menü ürünü güncellenemedi")
+
+    # Cache'i temizle (menü listesi değişti - görsel silindi)
+    await cache.delete_pattern("menu:liste:*")
+    import logging
+    logging.info(f"[MENU_GORSEL_SIL] Görsel silindi: menu_id={menu_id}, sube_id={sube_id}, cache temizlendi")
 
     return row_to_menu_out(updated)
 

@@ -167,7 +167,7 @@ async def get_masa_by_qr(qr_code: str):
     """QR kod ile masa bilgisini al (public endpoint)"""
     row = await db.fetch_one(
         """
-        SELECT id, masa_adi, qr_code, durum, kapasite
+        SELECT id, masa_adi, qr_code, durum, kapasite, sube_id
         FROM masalar
         WHERE qr_code = :qr_code
         """,
@@ -182,4 +182,5 @@ async def get_masa_by_qr(qr_code: str):
         "qr_code": row["qr_code"],
         "durum": row["durum"],
         "kapasite": row["kapasite"],
+        "sube_id": row["sube_id"],
     }
