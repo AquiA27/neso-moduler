@@ -1955,13 +1955,16 @@ async def chat_smart(payload: ChatRequest):
                 reply += f", {venue} şubemize hoş geldiniz"
             else:
                 reply += "! Hoş geldiniz"
-            reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            if sample and len(sample) > 0:
+                reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            else:
+                reply += "! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Ne istersiniz?"
             _append_session(conversation_id, "user", text)
             _append_session(conversation_id, "assistant", reply)
             return await _build_chat_response(
                 reply=reply,
                 conversation_id=conversation_id,
-                suggestions=sample,
+                suggestions=sample if sample else None,
                 detected_language=detected_lang,
                 tenant_id=tenant_id,
             )
@@ -2008,13 +2011,16 @@ async def chat_smart(payload: ChatRequest):
                 reply += f", {venue} şubemize hoş geldiniz"
             else:
                 reply += "! Hoş geldiniz"
-            reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            if sample and len(sample) > 0:
+                reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            else:
+                reply += "! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Ne istersiniz?"
             _append_session(conversation_id, "user", text)
             _append_session(conversation_id, "assistant", reply)
             return await _build_chat_response(
                 reply=reply,
                 conversation_id=conversation_id,
-                suggestions=sample,
+                suggestions=sample if sample else None,
                 detected_language=detected_lang,
                 tenant_id=tenant_id,
             )
@@ -2057,13 +2063,16 @@ async def chat_smart(payload: ChatRequest):
                 reply += f", {venue} şubemize hoş geldiniz"
             else:
                 reply += "! Hoş geldiniz"
-            reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            if sample and len(sample) > 0:
+                reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            else:
+                reply += "! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Ne istersiniz?"
             _append_session(conversation_id, "user", text)
             _append_session(conversation_id, "assistant", reply)
             return await _build_chat_response(
                 reply=reply,
                 conversation_id=conversation_id,
-                suggestions=sample,
+                suggestions=sample if sample else None,
                 detected_language=detected_lang,
                 tenant_id=tenant_id,
             )
