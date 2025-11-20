@@ -73,10 +73,9 @@ create_views.py
 # Alembic cache
 alembic/versions/__pycache__/
 
-# Super admin panel (if not used)
+# Super admin panel (if not used) - completely exclude to reduce build context
 super-admin-panel/
-super-admin-panel/node_modules/
-super-admin-panel/dist/
+super-admin-panel/**
 
 # Node modules (if any)
 node_modules/
