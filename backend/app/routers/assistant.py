@@ -1933,11 +1933,42 @@ async def chat_smart(payload: ChatRequest):
     # Tek kelime ve tam eşleşme kontrolü
     if text_clean_pure in simple_greetings_exact and not hunger_signal:
         logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
-        # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
-        business_profile = await _load_business_profile(sube_id)
-        menu_items = await _load_menu_details(sube_id)
-        if not menu_items:
-            reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
+        try:
+            # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
+            business_profile = await _load_business_profile(sube_id)
+            menu_items = await _load_menu_details(sube_id)
+            if not menu_items:
+                reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
+                _append_session(conversation_id, "user", text)
+                _append_session(conversation_id, "assistant", reply)
+                return await _build_chat_response(
+                    reply=reply,
+                    conversation_id=conversation_id,
+                    detected_language=detected_lang,
+                    tenant_id=tenant_id,
+                )
+            
+            sample = _pick_menu_samples(menu_items, 4)
+            venue = business_profile.get("sube_ad") if business_profile else None
+            reply = "Merhaba"
+            if venue:
+                reply += f", {venue} şubemize hoş geldiniz"
+            else:
+                reply += "! Hoş geldiniz"
+            reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            _append_session(conversation_id, "user", text)
+            _append_session(conversation_id, "assistant", reply)
+            return await _build_chat_response(
+                reply=reply,
+                conversation_id=conversation_id,
+                suggestions=sample,
+                detected_language=detected_lang,
+                tenant_id=tenant_id,
+            )
+        except Exception as e:
+            logging.error(f"[GREETING] Error in greeting response: {e}", exc_info=True)
+            # Hata durumunda basit bir greeting döndür
+            reply = "Merhaba! Hoş geldiniz! Ben Neso, sipariş asistanınız. Size nasıl yardımcı olabilirim?"
             _append_session(conversation_id, "user", text)
             _append_session(conversation_id, "assistant", reply)
             return await _build_chat_response(
@@ -1946,24 +1977,6 @@ async def chat_smart(payload: ChatRequest):
                 detected_language=detected_lang,
                 tenant_id=tenant_id,
             )
-        
-        sample = _pick_menu_samples(menu_items, 4)
-        venue = business_profile.get("sube_ad") if business_profile else None
-        reply = "Merhaba"
-        if venue:
-            reply += f", {venue} şubemize hoş geldiniz"
-        else:
-            reply += "! Hoş geldiniz"
-        reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
-        _append_session(conversation_id, "user", text)
-        _append_session(conversation_id, "assistant", reply)
-        return await _build_chat_response(
-            reply=reply,
-            conversation_id=conversation_id,
-            suggestions=sample,
-            detected_language=detected_lang,
-            tenant_id=tenant_id,
-        )
     
     # Kelimelere ayır ve kontrol et
     text_words_split = text_clean.split()
@@ -1972,11 +1985,43 @@ async def chat_smart(payload: ChatRequest):
     
     # Tek kelime ve greeting mi?
     if len(text_words_clean) == 1 and text_words_clean[0] in simple_greetings_exact and not hunger_signal:
-        # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
-        business_profile = await _load_business_profile(sube_id)
-        menu_items = await _load_menu_details(sube_id)
-        if not menu_items:
-            reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
+        logging.info(f"[GREETING] Early detection for simple greeting: '{text}'")
+        try:
+            # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
+            business_profile = await _load_business_profile(sube_id)
+            menu_items = await _load_menu_details(sube_id)
+            if not menu_items:
+                reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
+                _append_session(conversation_id, "user", text)
+                _append_session(conversation_id, "assistant", reply)
+                return await _build_chat_response(
+                    reply=reply,
+                    conversation_id=conversation_id,
+                    detected_language=detected_lang,
+                    tenant_id=tenant_id,
+                )
+            
+            sample = _pick_menu_samples(menu_items, 4)
+            venue = business_profile.get("sube_ad") if business_profile else None
+            reply = "Merhaba"
+            if venue:
+                reply += f", {venue} şubemize hoş geldiniz"
+            else:
+                reply += "! Hoş geldiniz"
+            reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            _append_session(conversation_id, "user", text)
+            _append_session(conversation_id, "assistant", reply)
+            return await _build_chat_response(
+                reply=reply,
+                conversation_id=conversation_id,
+                suggestions=sample,
+                detected_language=detected_lang,
+                tenant_id=tenant_id,
+            )
+        except Exception as e:
+            logging.error(f"[GREETING] Error in early greeting response: {e}", exc_info=True)
+            # Hata durumunda basit bir greeting döndür
+            reply = "Merhaba! Hoş geldiniz! Ben Neso, sipariş asistanınız. Size nasıl yardımcı olabilirim?"
             _append_session(conversation_id, "user", text)
             _append_session(conversation_id, "assistant", reply)
             return await _build_chat_response(
@@ -1985,25 +2030,6 @@ async def chat_smart(payload: ChatRequest):
                 detected_language=detected_lang,
                 tenant_id=tenant_id,
             )
-        
-        sample = _pick_menu_samples(menu_items, 4)
-        venue = business_profile.get("sube_ad") if business_profile else None
-        reply = "Merhaba"
-        if venue:
-            reply += f", {venue} şubemize hoş geldiniz"
-        else:
-            reply += "! Hoş geldiniz"
-        reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
-        logging.info(f"[GREETING] Early detection for simple greeting: '{text}'")
-        _append_session(conversation_id, "user", text)
-        _append_session(conversation_id, "assistant", reply)
-        return await _build_chat_response(
-            reply=reply,
-            conversation_id=conversation_id,
-            suggestions=sample,
-            detected_language=detected_lang,
-            tenant_id=tenant_id,
-        )
 
     skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
     intent_result = intent_classifier.predict(text, sube_id=sube_id, masa=masa)
