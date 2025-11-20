@@ -1744,8 +1744,8 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                   label="TTS Konuşma Hızı (İşletme Asistanı)"
                   type="number"
                   step="0.1"
-                  min="0.5"
-                  max="2.0"
+                  min={0.5}
+                  max={2.0}
                   value={formData.business_assistant_tts_speech_rate.toString()}
                   onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_tts_speech_rate: parseFloat(value) || 1.0 }))}
                   placeholder="1.0"
@@ -2403,6 +2403,7 @@ function Field({
   error?: string;
   type?: string;
   min?: number;
+  max?: number;
   step?: number | string;
   helpText?: string;
 }) {
@@ -2418,6 +2419,7 @@ function Field({
         placeholder={placeholder}
         required={required}
         min={min}
+        max={max}
         step={step}
         className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 ${
           error ? 'border-red-400 focus:ring-red-300' : 'border-gray-300'
