@@ -1926,7 +1926,7 @@ async def chat_smart(payload: ChatRequest):
     
     # Tek kelime ve tam eşleşme kontrolü
     if text_clean_pure in simple_greetings_exact and not hunger_signal:
-            logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
+        logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
         try:
             # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
             business_profile = await _load_business_profile(sube_id)
