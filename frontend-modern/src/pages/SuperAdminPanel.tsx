@@ -2392,6 +2392,7 @@ function Field({
   error,
   type = 'text',
   min,
+  max,
   step,
   helpText,
 }: {
