@@ -1903,8 +1903,6 @@ async def chat_smart(payload: ChatRequest):
             logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
     except Exception as e:
         logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
-    
-    try:
 
     # Check if user is providing table number in the message
     detected_table = _detect_table_number(text)
