@@ -36,6 +36,7 @@ async def get_current_user(
 ) -> Mapping[str, Any]:
     """
     JWT 'sub' içinden kullanıcıyı DB'den çeker ve aktifliğini doğrular.
+    Domain-based tenant routing: request.state.tenant_id varsa (DomainTenantMiddleware'den gelmişse) öncelik verir.
     Super admin için X-Tenant-Id header'ını veya tenant_id query parameter'ını kontrol eder (tenant switching).
     Dönüş: {"id": ..., "username": ..., "role": ..., "aktif": ..., "tenant_id": ..., "switched_tenant_id": ...}
     """
@@ -66,8 +67,15 @@ async def get_current_user(
 
     user_dict = dict(row) if hasattr(row, 'keys') else row
     
-    # Tenant_id'yi token'dan veya DB'den al
-    tenant_id = user_dict.get("tenant_id") or token_tenant_id
+    # Domain-based tenant routing: request.state.tenant_id varsa öncelik ver (DomainTenantMiddleware'den gelmişse)
+    domain_tenant_id = None
+    if hasattr(request.state, 'tenant_id') and request.state.tenant_id:
+        domain_tenant_id = request.state.tenant_id
+        import logging
+        logging.info(f"[get_current_user] Domain-based tenant detected: tenant_id={domain_tenant_id}")
+    
+    # Tenant_id'yi domain > token > DB sırasıyla al
+    tenant_id = domain_tenant_id or user_dict.get("tenant_id") or token_tenant_id
     user_dict["tenant_id"] = tenant_id
     
     # Super admin için X-Tenant-Id header'ını veya tenant_id query parameter'ını kontrol et (tenant switching)

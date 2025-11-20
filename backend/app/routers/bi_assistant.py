@@ -1356,7 +1356,7 @@ async def bi_query(
                         sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
                         tenant_id = sube_dict.get("isletme_id")
                 
-                provider = await get_llm_provider(tenant_id=tenant_id)
+                provider = await get_llm_provider(tenant_id=tenant_id, assistant_type="business")
 
                 revenue_info = await load_data("revenue_30", lambda: get_revenue_data(target_sube_id))
                 expense_info = await load_data("expense_30", lambda: get_expense_data(target_sube_id))

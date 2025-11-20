@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from ..core.deps import require_roles, get_current_user
 from ..db.database import db
+from .customization_helper import check_assistant_columns, get_select_fields, add_default_assistant_fields
 
 router = APIRouter(
     prefix="/customization",
@@ -23,8 +24,20 @@ class CustomizationIn(BaseModel):
     email: Optional[str] = None
     telefon: Optional[str] = None
     adres: Optional[str] = None
-    openai_api_key: Optional[str] = Field(None, description="OpenAI API anahtarı (işletme bazında)")
-    openai_model: Optional[str] = Field(default="gpt-4o-mini", description="OpenAI model (varsayılan: gpt-4o-mini)")
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API anahtarı (işletme bazında - genel)")
+    openai_model: Optional[str] = Field(default="gpt-4o-mini", description="OpenAI model (varsayılan: gpt-4o-mini - genel)")
+    # Müşteri asistanı ayarları
+    customer_assistant_openai_api_key: Optional[str] = Field(None, description="Müşteri asistanı OpenAI API anahtarı")
+    customer_assistant_openai_model: Optional[str] = Field(default="gpt-4o-mini", description="Müşteri asistanı OpenAI model")
+    customer_assistant_tts_voice_id: Optional[str] = Field(None, description="Müşteri asistanı TTS ses ID")
+    customer_assistant_tts_speech_rate: Optional[float] = Field(default=1.0, description="Müşteri asistanı TTS konuşma hızı")
+    customer_assistant_tts_provider: Optional[str] = Field(default="system", description="Müşteri asistanı TTS provider")
+    # İşletme asistanı ayarları
+    business_assistant_openai_api_key: Optional[str] = Field(None, description="İşletme asistanı OpenAI API anahtarı")
+    business_assistant_openai_model: Optional[str] = Field(default="gpt-4o-mini", description="İşletme asistanı OpenAI model")
+    business_assistant_tts_voice_id: Optional[str] = Field(None, description="İşletme asistanı TTS ses ID")
+    business_assistant_tts_speech_rate: Optional[float] = Field(default=1.0, description="İşletme asistanı TTS konuşma hızı")
+    business_assistant_tts_provider: Optional[str] = Field(default="system", description="İşletme asistanı TTS provider")
     meta_settings: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
 

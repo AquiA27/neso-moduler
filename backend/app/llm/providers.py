@@ -170,12 +170,13 @@ class OpenAIProvider(LLMProvider):
             return "", None
 
 
-async def get_llm_provider(tenant_id: Optional[int] = None) -> LLMProvider:
+async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
     """
     Tenant-specific veya global API key ile LLM provider döndürür.
     
     Args:
         tenant_id: İşletme ID'si (opsiyonel). Varsa tenant-specific API key kullanılır.
+        assistant_type: Asistan tipi ('customer' veya 'business'). Varsa o asistan için özel ayarları kullanır.
     
     Returns:
         LLMProvider: OpenAIProvider veya RuleBasedProvider
@@ -189,32 +190,89 @@ async def get_llm_provider(tenant_id: Optional[int] = None) -> LLMProvider:
     # Önce tenant-specific API key'i kontrol et
     if tenant_id:
         try:
-            customization = await db.fetch_one(
+            # Asistan tipine göre kolon seç
+            api_key_col = "openai_api_key"
+            model_col = "openai_model"
+            if assistant_type == "customer":
+                api_key_col = "customer_assistant_openai_api_key"
+                model_col = "customer_assistant_openai_model"
+            elif assistant_type == "business":
+                api_key_col = "business_assistant_openai_api_key"
+                model_col = "business_assistant_openai_model"
+            
+            # Kolonların varlığını kontrol et
+            column_check = await db.fetch_one(
                 """
-                SELECT openai_api_key, openai_model
-                FROM tenant_customizations
-                WHERE isletme_id = :id AND openai_api_key IS NOT NULL AND openai_api_key != ''
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = 'tenant_customizations' 
+                AND column_name = :api_key_col
                 """,
-                {"id": tenant_id}
+                {"api_key_col": api_key_col}
             )
+            
+            if column_check and api_key_col != "openai_api_key":
+                # Yeni kolonlar varsa kullan (asistan-specific)
+                try:
+                    customization = await db.fetch_one(
+                        f"""
+                        SELECT {api_key_col} as api_key, {model_col} as model
+                        FROM tenant_customizations
+                        WHERE isletme_id = :id AND {api_key_col} IS NOT NULL AND {api_key_col} != ''
+                        """,
+                        {"id": tenant_id}
+                    )
+                except Exception as col_err:
+                    logging.warning(f"[LLM_PROVIDER] Column {api_key_col} not found, falling back: {col_err}")
+                    customization = None
+            else:
+                # Yeni kolonlar yoksa genel kolonları kullan
+                customization = await db.fetch_one(
+                    """
+                    SELECT openai_api_key as api_key, openai_model as model
+                    FROM tenant_customizations
+                    WHERE isletme_id = :id AND openai_api_key IS NOT NULL AND openai_api_key != ''
+                    """,
+                    {"id": tenant_id}
+                )
+            
             if customization:
                 customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
-                tenant_api_key = customization_dict.get("openai_api_key")
-                tenant_model = customization_dict.get("openai_model")
+                tenant_api_key = customization_dict.get("api_key")
+                tenant_model = customization_dict.get("model")
                 if tenant_api_key and tenant_api_key.strip():
                     api_key = tenant_api_key.strip()
                     if tenant_model:
                         model = tenant_model
-                    logging.info(f"[LLM_PROVIDER] Using tenant-specific API key for tenant_id={tenant_id}, model={model}")
+                    logging.info(f"[LLM_PROVIDER] Using tenant-specific API key for tenant_id={tenant_id}, assistant_type={assistant_type}, model={model}")
+                elif assistant_type and api_key_col != "openai_api_key":
+                    # Asistan-specific key yoksa genel key'i kullan
+                    fallback = await db.fetch_one(
+                        """
+                        SELECT openai_api_key as api_key, openai_model as model
+                        FROM tenant_customizations
+                        WHERE isletme_id = :id AND openai_api_key IS NOT NULL AND openai_api_key != ''
+                        """,
+                        {"id": tenant_id}
+                    )
+                    if fallback:
+                        fallback_dict = dict(fallback) if hasattr(fallback, 'keys') else fallback
+                        fallback_key = fallback_dict.get("api_key")
+                        fallback_model = fallback_dict.get("model")
+                        if fallback_key and fallback_key.strip():
+                            api_key = fallback_key.strip()
+                            if fallback_model:
+                                model = fallback_model
+                            logging.info(f"[LLM_PROVIDER] Using fallback general API key for tenant_id={tenant_id}, assistant_type={assistant_type}, model={model}")
         except Exception as e:
-            logging.warning(f"[LLM_PROVIDER] Failed to fetch tenant API key for tenant_id={tenant_id}: {e}")
+            logging.warning(f"[LLM_PROVIDER] Failed to fetch tenant API key for tenant_id={tenant_id}, assistant_type={assistant_type}: {e}")
     
     # Tenant-specific key yoksa global key'i kontrol et
     if not api_key:
         api_key = settings.OPENAI_API_KEY
         if api_key:
             api_key = api_key.strip()
-            logging.info(f"[LLM_PROVIDER] Using global API key, model={model}")
+            logging.info(f"[LLM_PROVIDER] Using global API key, assistant_type={assistant_type}, model={model}")
     
     has_api_key = bool(api_key)
     is_llm_enabled = settings.ASSISTANT_ENABLE_LLM

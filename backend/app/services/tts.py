@@ -45,24 +45,81 @@ _LANG_TO_GOOGLE_TTS = {
 # Legacy gender-based maps were superseded by configurable voice presets.
 
 
-async def _get_assistant_settings() -> tuple[str, float, str]:
-    """Veritabanından asistan ayarlarını getir. Returns: (voice_id, rate, provider)"""
+async def _get_assistant_settings(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> tuple[str, float, str]:
+    """Veritabanından asistan ayarlarını getir. Returns: (voice_id, rate, provider)
+    
+    Args:
+        tenant_id: İşletme ID'si (opsiyonel). Varsa tenant-specific ayarları kullanır.
+        assistant_type: Asistan tipi ('customer' veya 'business'). Varsa o asistan için özel ayarları kullanır.
+    """
     try:
         from ..db.database import db
-
-        rows = await db.fetch_all(
-            """
-            SELECT key, value
-              FROM app_settings
-             WHERE key IN (
-                 'assistant_tts_voice_id',
-                 'assistant_tts_speech_rate',
-                 'assistant_tts_provider',
-                 'assistant_tts_voice_gender'
-             )
-            """
-        )
-        settings_dict = {r["key"]: r["value"] for r in rows}
+        
+        voice_id = None
+        rate = 1.0
+        provider = "system"
+        
+        # Önce tenant-specific ayarları kontrol et
+        if tenant_id and assistant_type:
+            try:
+                # Asistan tipine göre kolon seç
+                voice_col = "customer_assistant_tts_voice_id"
+                rate_col = "customer_assistant_tts_speech_rate"
+                provider_col = "customer_assistant_tts_provider"
+                if assistant_type == "business":
+                    voice_col = "business_assistant_tts_voice_id"
+                    rate_col = "business_assistant_tts_speech_rate"
+                    provider_col = "business_assistant_tts_provider"
+                
+                # Kolonların varlığını kontrol et
+                column_check = await db.fetch_one(
+                    """
+                    SELECT column_name 
+                    FROM information_schema.columns 
+                    WHERE table_name = 'tenant_customizations' 
+                    AND column_name = :voice_col
+                    """,
+                    {"voice_col": voice_col}
+                )
+                
+                if column_check:
+                    # Yeni kolonlar varsa kullan
+                    try:
+                        row = await db.fetch_one(
+                            f"""
+                            SELECT {voice_col} as voice_id, {rate_col} as speech_rate, {provider_col} as tts_provider
+                            FROM tenant_customizations
+                            WHERE isletme_id = :id
+                            """,
+                            {"id": tenant_id}
+                        )
+                        if row:
+                            row_dict = dict(row) if hasattr(row, 'keys') else row
+                            voice_id = row_dict.get("voice_id")
+                            rate = float(row_dict.get("speech_rate") or 1.0)
+                            provider = row_dict.get("tts_provider") or "system"
+                            if voice_id or provider != "system":
+                                logging.info(f"[TTS_SETTINGS] Using tenant-specific settings for tenant_id={tenant_id}, assistant_type={assistant_type}")
+                    except Exception as col_err:
+                        logging.warning(f"[TTS_SETTINGS] Column {voice_col} not found or error: {col_err}")
+            except Exception as e:
+                logging.warning(f"[TTS_SETTINGS] Failed to fetch tenant-specific TTS settings: {e}")
+        
+        # Tenant-specific ayar yoksa global ayarları kontrol et
+        if not voice_id and provider == "system":
+            rows = await db.fetch_all(
+                """
+                SELECT key, value
+                  FROM app_settings
+                 WHERE key IN (
+                     'assistant_tts_voice_id',
+                     'assistant_tts_speech_rate',
+                     'assistant_tts_provider',
+                     'assistant_tts_voice_gender'
+                 )
+                """
+            )
+            settings_dict = {r["key"]: r["value"] for r in rows}
 
         def _coerce_str(value: Optional[object], default: Optional[str] = None) -> Optional[str]:
             if value is None:
@@ -101,9 +158,9 @@ async def _get_assistant_settings() -> tuple[str, float, str]:
                     return default
             return default
 
-        voice_id = _coerce_str(settings_dict.get("assistant_tts_voice_id"))
-        rate = _coerce_float(settings_dict.get("assistant_tts_speech_rate"), 1.0)
-        provider = (_coerce_str(settings_dict.get("assistant_tts_provider"), "system") or "system").lower()
+            voice_id = voice_id or _coerce_str(settings_dict.get("assistant_tts_voice_id"))
+            rate = rate if voice_id else _coerce_float(settings_dict.get("assistant_tts_speech_rate"), 1.0)
+            provider = (provider if voice_id or provider != "system" else _coerce_str(settings_dict.get("assistant_tts_provider"), "system") or "system").lower()
 
         valid_providers = ["system", "google", "azure", "aws", "openai"]
         if provider not in valid_providers:
@@ -501,16 +558,27 @@ async def synthesize_speech(
     rate: Optional[int] = None,
     voice_id: Optional[str] = None,
     speech_rate: Optional[float] = None,
+    tenant_id: Optional[int] = None,
+    assistant_type: Optional[str] = None,
 ) -> bytes:
     """
     Generate speech audio for the supplied text using the configured TTS provider.
+
+    Args:
+        text: Metin
+        language: Dil kodu (opsiyonel)
+        rate: Konuşma hızı (opsiyonel, eski format)
+        voice_id: Ses ID (opsiyonel)
+        speech_rate: Konuşma hızı (opsiyonel, yeni format)
+        tenant_id: İşletme ID'si (opsiyonel)
+        assistant_type: Asistan tipi ('customer' veya 'business') (opsiyonel)
 
     Returns raw WAV bytes.
     """
     if not text:
         return b""
 
-    db_voice_id, db_rate, db_provider = await _get_assistant_settings()
+    db_voice_id, db_rate, db_provider = await _get_assistant_settings(tenant_id=tenant_id, assistant_type=assistant_type)
     provider = (db_provider or settings.TTS_PROVIDER or "system").lower()
 
     if provider == "system":

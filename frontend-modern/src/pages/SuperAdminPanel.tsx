@@ -1293,6 +1293,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
     adres: '',
     openai_api_key: '',
     openai_model: 'gpt-4o-mini',
+    // Müşteri asistanı ayarları
+    customer_assistant_openai_api_key: '',
+    customer_assistant_openai_model: 'gpt-4o-mini',
+    customer_assistant_tts_voice_id: '',
+    customer_assistant_tts_speech_rate: 1.0,
+    customer_assistant_tts_provider: 'system',
+    // İşletme asistanı ayarları
+    business_assistant_openai_api_key: '',
+    business_assistant_openai_model: 'gpt-4o-mini',
+    business_assistant_tts_voice_id: '',
+    business_assistant_tts_speech_rate: 1.0,
+    business_assistant_tts_provider: 'system',
   });
   const [initialLoaded, setInitialLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -1313,6 +1325,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       adres: '',
       openai_api_key: '',
       openai_model: 'gpt-4o-mini',
+      // Müşteri asistanı ayarları
+      customer_assistant_openai_api_key: '',
+      customer_assistant_openai_model: 'gpt-4o-mini',
+      customer_assistant_tts_voice_id: '',
+      customer_assistant_tts_speech_rate: 1.0,
+      customer_assistant_tts_provider: 'system',
+      // İşletme asistanı ayarları
+      business_assistant_openai_api_key: '',
+      business_assistant_openai_model: 'gpt-4o-mini',
+      business_assistant_tts_voice_id: '',
+      business_assistant_tts_speech_rate: 1.0,
+      business_assistant_tts_provider: 'system',
     });
     setExists(false);
     setError(null);
@@ -1397,6 +1421,22 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
           ? formData.openai_api_key 
           : undefined,
         openai_model: formData.openai_model || 'gpt-4o-mini',
+        // Müşteri asistanı ayarları
+        customer_assistant_openai_api_key: formData.customer_assistant_openai_api_key && !formData.customer_assistant_openai_api_key.includes('...') 
+          ? formData.customer_assistant_openai_api_key 
+          : undefined,
+        customer_assistant_openai_model: formData.customer_assistant_openai_model || 'gpt-4o-mini',
+        customer_assistant_tts_voice_id: formData.customer_assistant_tts_voice_id || undefined,
+        customer_assistant_tts_speech_rate: formData.customer_assistant_tts_speech_rate || 1.0,
+        customer_assistant_tts_provider: formData.customer_assistant_tts_provider || 'system',
+        // İşletme asistanı ayarları
+        business_assistant_openai_api_key: formData.business_assistant_openai_api_key && !formData.business_assistant_openai_api_key.includes('...') 
+          ? formData.business_assistant_openai_api_key 
+          : undefined,
+        business_assistant_openai_model: formData.business_assistant_openai_model || 'gpt-4o-mini',
+        business_assistant_tts_voice_id: formData.business_assistant_tts_voice_id || undefined,
+        business_assistant_tts_speech_rate: formData.business_assistant_tts_speech_rate || 1.0,
+        business_assistant_tts_provider: formData.business_assistant_tts_provider || 'system',
       };
 
       if (exists) {
@@ -1578,24 +1618,121 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
               />
             </div>
             
-            {/* OpenAI API Ayarları */}
+            {/* Genel OpenAI API Ayarları */}
             <div className="border-t pt-6 mt-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">OpenAI API Ayarları</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Genel OpenAI API Ayarları</h3>
+              <p className="text-sm text-gray-600 mb-4">Asistan-specific ayarlar yoksa kullanılacak genel ayarlar</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field
-                  label="OpenAI API Key"
+                  label="OpenAI API Key (Genel)"
                   type="password"
                   value={formData.openai_api_key}
                   onChange={(value) => setFormData((prev) => ({ ...prev, openai_api_key: value }))}
                   placeholder="sk-..."
-                  helpText="İşletme bazında OpenAI API anahtarı. Boş bırakılırsa global API key kullanılır."
+                  helpText="İşletme bazında genel OpenAI API anahtarı. Boş bırakılırsa global API key kullanılır."
                 />
                 <Field
-                  label="OpenAI Model"
+                  label="OpenAI Model (Genel)"
                   value={formData.openai_model}
                   onChange={(value) => setFormData((prev) => ({ ...prev, openai_model: value }))}
                   placeholder="gpt-4o-mini"
-                  helpText="Kullanılacak OpenAI model (örn: gpt-4o-mini, gpt-4o)"
+                  helpText="Genel OpenAI model (örn: gpt-4o-mini, gpt-4o)"
+                />
+              </div>
+            </div>
+
+            {/* Müşteri Asistanı Ayarları */}
+            <div className="border-t pt-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Müşteri Asistanı Ayarları</h3>
+              <p className="text-sm text-gray-600 mb-4">Müşteri sipariş asistanı için özel ayarlar</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Field
+                  label="OpenAI API Key (Müşteri Asistanı)"
+                  type="password"
+                  value={formData.customer_assistant_openai_api_key}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_openai_api_key: value }))}
+                  placeholder="sk-..."
+                  helpText="Müşteri asistanı için özel API anahtarı. Boş bırakılırsa genel veya global API key kullanılır."
+                />
+                <Field
+                  label="OpenAI Model (Müşteri Asistanı)"
+                  value={formData.customer_assistant_openai_model}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_openai_model: value }))}
+                  placeholder="gpt-4o-mini"
+                  helpText="Müşteri asistanı için OpenAI model (örn: gpt-4o-mini)"
+                />
+                <Field
+                  label="TTS Ses ID (Müşteri Asistanı)"
+                  value={formData.customer_assistant_tts_voice_id}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_tts_voice_id: value }))}
+                  placeholder="system_tr_default"
+                  helpText="Müşteri asistanı için TTS ses ID (örn: system_tr_default)"
+                />
+                <Field
+                  label="TTS Konuşma Hızı (Müşteri Asistanı)"
+                  type="number"
+                  step="0.1"
+                  min="0.5"
+                  max="2.0"
+                  value={formData.customer_assistant_tts_speech_rate.toString()}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_tts_speech_rate: parseFloat(value) || 1.0 }))}
+                  placeholder="1.0"
+                  helpText="Müşteri asistanı için TTS konuşma hızı (0.5 - 2.0)"
+                />
+                <Field
+                  label="TTS Provider (Müşteri Asistanı)"
+                  value={formData.customer_assistant_tts_provider}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_tts_provider: value }))}
+                  placeholder="system"
+                  helpText="Müşteri asistanı için TTS provider (system, google, azure, openai)"
+                />
+              </div>
+            </div>
+
+            {/* İşletme Asistanı Ayarları */}
+            <div className="border-t pt-6 mt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">İşletme Asistanı Ayarları</h3>
+              <p className="text-sm text-gray-600 mb-4">İşletme analiz asistanı için özel ayarlar</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Field
+                  label="OpenAI API Key (İşletme Asistanı)"
+                  type="password"
+                  value={formData.business_assistant_openai_api_key}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_openai_api_key: value }))}
+                  placeholder="sk-..."
+                  helpText="İşletme asistanı için özel API anahtarı. Boş bırakılırsa genel veya global API key kullanılır."
+                />
+                <Field
+                  label="OpenAI Model (İşletme Asistanı)"
+                  value={formData.business_assistant_openai_model}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_openai_model: value }))}
+                  placeholder="gpt-4o-mini"
+                  helpText="İşletme asistanı için OpenAI model (örn: gpt-4o, gpt-4o-mini)"
+                />
+                <Field
+                  label="TTS Ses ID (İşletme Asistanı)"
+                  value={formData.business_assistant_tts_voice_id}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_tts_voice_id: value }))}
+                  placeholder="system_tr_default"
+                  helpText="İşletme asistanı için TTS ses ID (örn: system_tr_default)"
+                />
+                <Field
+                  label="TTS Konuşma Hızı (İşletme Asistanı)"
+                  type="number"
+                  step="0.1"
+                  min="0.5"
+                  max="2.0"
+                  value={formData.business_assistant_tts_speech_rate.toString()}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_tts_speech_rate: parseFloat(value) || 1.0 }))}
+                  placeholder="1.0"
+                  helpText="İşletme asistanı için TTS konuşma hızı (0.5 - 2.0)"
+                />
+                <Field
+                  label="TTS Provider (İşletme Asistanı)"
+                  value={formData.business_assistant_tts_provider}
+                  onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_tts_provider: value }))}
+                  placeholder="system"
+                  helpText="İşletme asistanı için TTS provider (system, google, azure, openai)"
                 />
               </div>
             </div>

@@ -1,9 +1,10 @@
-import { Suspense, lazy, type ReactNode } from 'react';
+import { Suspense, lazy, type ReactNode, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
 import TenantRequiredGuard from './components/TenantRequiredGuard';
+import { getCurrentSubdomain } from './lib/domain';
 
 // Lazy load heavy pages for better initial bundle size
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
@@ -52,9 +53,27 @@ function IndexRedirect() {
   return <Navigate to="/dashboard" replace />;
 }
 
+// Subdomain detection component - uygulama başlangıcında subdomain'i algılar
+function SubdomainDetector() {
+  const { setTenantId } = useAuthStore();
+  
+  useEffect(() => {
+    const subdomain = getCurrentSubdomain();
+    if (subdomain) {
+      // Subdomain varsa, backend'den tenant'ı al ve store'a ekle
+      // Bu işlem Layout component'inde yapılıyor (loadTenantByDomain),
+      // ama burada da subdomain'i loglamak için kullanabiliriz
+      console.log('Subdomain detected:', subdomain);
+    }
+  }, [setTenantId]);
+  
+  return null;
+}
+
 function App() {
   return (
     <BrowserRouter>
+      <SubdomainDetector />
       <Suspense
         fallback={
           <div className="flex h-screen items-center justify-center text-sm text-slate-500">

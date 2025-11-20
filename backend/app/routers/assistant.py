@@ -692,6 +692,8 @@ async def _build_chat_response(
             audio_bytes = await synthesize_speech(
                 reply,
                 language=detected_language,
+                tenant_id=tenant_id,
+                assistant_type="customer",
             )
             if audio_bytes:
                 audio_base64 = base64.b64encode(audio_bytes).decode("ascii")
@@ -3682,7 +3684,7 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
             sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
             tenant_id = sube_dict.get("isletme_id")
     
-    provider = await get_llm_provider(tenant_id=tenant_id)
+    provider = await get_llm_provider(tenant_id=tenant_id, assistant_type="customer")
     messages_for_llm: List[Dict[str, str]] = [{"role": "system", "content": "\n".join(system_parts)}]
     messages_for_llm.extend(history_snapshot)
     messages_for_llm.append({"role": "user", "content": text})

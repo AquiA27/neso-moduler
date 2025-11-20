@@ -3,6 +3,13 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { publicMenuApi } from '../lib/api';
 
+interface Varyasyon {
+  id: number;
+  ad: string;
+  ek_fiyat: number;
+  sira: number;
+}
+
 interface MenuItem {
   id: number;
   ad: string;
@@ -11,6 +18,7 @@ interface MenuItem {
   aktif: boolean;
   aciklama?: string;
   gorsel_url?: string;
+  varyasyonlar?: Varyasyon[];
 }
 
 export default function PublicMenuPage() {
@@ -73,15 +81,20 @@ export default function PublicMenuPage() {
       setLoading(true);
       const response = await publicMenuApi.list(subeId);
       // Public API direkt aktif ürünleri döndürüyor, aktif filtrelemeye gerek yok
-      const items = (response.data || []).map((item: any) => ({
-        id: item.id,
-        ad: item.ad,
-        fiyat: item.fiyat,
-        kategori: item.kategori || '',
-        aktif: true, // Public API sadece aktif ürünleri döndürür
-        aciklama: item.aciklama,
-        gorsel_url: item.gorsel_url,
-      }));
+      const items = (response.data || []).map((item: any) => {
+        console.log('Menu item loaded:', item.id, item.ad, 'gorsel_url:', item.gorsel_url, 'varyasyonlar:', item.varyasyonlar?.length || 0);
+        return {
+          id: item.id,
+          ad: item.ad,
+          fiyat: item.fiyat,
+          kategori: item.kategori || '',
+          aktif: true, // Public API sadece aktif ürünleri döndürür
+          aciklama: item.aciklama,
+          gorsel_url: item.gorsel_url,
+          varyasyonlar: item.varyasyonlar || [], // Varyasyonları da ekle
+        };
+      });
+      console.log('Total menu items loaded:', items.length, 'Items with images:', items.filter((i: MenuItem) => i.gorsel_url).length, 'Items with variations:', items.filter((i: MenuItem) => i.varyasyonlar && i.varyasyonlar.length > 0).length);
       setMenuItems(items);
       
       // Kategorileri çıkar
@@ -143,26 +156,26 @@ export default function PublicMenuPage() {
       <div className="relative overflow-hidden border-b border-white/10">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),_transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(56,189,248,0.12),_transparent_60%)]" />
-        <div className="relative max-w-6xl mx-auto px-4 py-6 flex flex-col gap-6">
-          <div className="flex items-start gap-4">
+        <div className="relative max-w-6xl mx-auto px-3 py-3 md:px-4 md:py-6 flex flex-col gap-3 md:gap-6">
+          <div className="flex items-start gap-2 md:gap-4">
             <button
               onClick={handleBack}
-              className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+              className="p-1.5 md:p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
               aria-label="Geri dön"
             >
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
             </button>
-            <div className="flex-1 space-y-3">
-              <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-3xl md:text-4xl font-bold tracking-tight">Neso Menü</h1>
-                <span className="px-3 py-1 text-xs font-semibold rounded-full bg-white/10 border border-white/15">
+            <div className="flex-1 space-y-2 md:space-y-3">
+              <div className="flex flex-wrap items-center gap-2 md:gap-3">
+                <h1 className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight">Neso Menü</h1>
+                <span className="px-2 py-0.5 md:px-3 md:py-1 text-xs font-semibold rounded-full bg-white/10 border border-white/15">
                   Şefin Önerileri
                 </span>
               </div>
-              <p className="text-sm md:text-base text-white/70 leading-relaxed max-w-3xl">
+              <p className="text-xs md:text-sm lg:text-base text-white/70 leading-relaxed max-w-3xl hidden md:block">
                 Günün en sevilen lezzetlerini keşfedin. Seçtiğiniz ürünleri doğrudan asistanımıza ileterek sipariş verebilir veya menüyü incelemeye devam edebilirsiniz.
               </p>
-              <div className="flex flex-wrap gap-3 text-xs">
+              <div className="flex flex-wrap gap-1.5 md:gap-3 text-xs">
                 {masaLoading ? (
                   <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
                     Masa bilgisi yükleniyor...
@@ -270,6 +283,10 @@ export default function PublicMenuPage() {
                               alt={`${item.ad} görseli`}
                               className="w-full h-40 object-cover transition-transform duration-300 group-hover:scale-105"
                               loading="lazy"
+                              onError={(e) => {
+                                console.error('Görsel yüklenemedi:', item.gorsel_url, 'Resolved URL:', resolveImageUrl(item.gorsel_url));
+                                (e.target as HTMLImageElement).style.display = 'none';
+                              }}
                             />
                           </div>
                         )}
@@ -288,6 +305,23 @@ export default function PublicMenuPage() {
                             {item.fiyat.toFixed(2)} ₺
                           </span>
                         </div>
+                        {item.varyasyonlar && item.varyasyonlar.length > 0 && (
+                          <div className="space-y-2 pt-2 border-t border-white/10">
+                            <div className="text-xs font-semibold text-white/70 uppercase tracking-wide">
+                              Varyasyonlar:
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {item.varyasyonlar.map((variation: Varyasyon) => (
+                                <span
+                                  key={variation.id}
+                                  className="px-2 py-1 rounded-lg bg-white/10 text-white/90 text-xs border border-white/20"
+                                >
+                                  {variation.ad} (+{variation.ek_fiyat.toFixed(2)} ₺)
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
                         <div className="flex items-center justify-between text-xs text-white/50">
                           <span className="flex items-center gap-1">
                             <span className="inline-block h-2 w-2 rounded-full bg-secondary-300" />

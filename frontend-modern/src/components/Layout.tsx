@@ -221,13 +221,13 @@ function Layout() {
       >
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),_transparent_55%)]" aria-hidden="true" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(163,230,53,0.12),_transparent_65%)]" aria-hidden="true" />
-        <div className="relative container mx-auto px-4 py-4">
-          <div className="flex flex-wrap items-center gap-4 md:gap-6">
-            <div className="flex flex-1 flex-col items-center gap-3 text-center min-w-[260px]">
+        <div className="relative container mx-auto px-3 py-2 md:px-4 md:py-4">
+          <div className="flex flex-wrap items-center gap-2 md:gap-6">
+            <div className="flex flex-1 flex-col items-center gap-2 md:gap-3 text-center min-w-[180px] md:min-w-[260px]">
               <img
                 src={displayLogo}
                 alt={displayName}
-                className="h-20 w-20 md:h-24 md:w-24 object-contain drop-shadow-[0_18px_28px_rgba(45,212,191,0.35)]"
+                className="h-12 w-12 md:h-24 md:w-24 object-contain drop-shadow-[0_18px_28px_rgba(45,212,191,0.35)]"
                 onError={(e) => {
                   // Logo yüklenemezse varsayılan logo'yu göster
                   if (e.currentTarget.src !== logo) {
@@ -235,30 +235,30 @@ function Layout() {
                   }
                 }}
               />
-              <div className="space-y-1">
-                <h1 className="text-3xl md:text-4xl font-extrabold tracking-wide bg-gradient-to-r from-amber-100 via-lime-200 to-emerald-200 bg-clip-text text-transparent">
+              <div className="space-y-0.5 md:space-y-1">
+                <h1 className="text-lg md:text-4xl font-extrabold tracking-wide bg-gradient-to-r from-amber-100 via-lime-200 to-emerald-200 bg-clip-text text-transparent">
                   {displayName}
                 </h1>
-                <p className="text-sm md:text-base text-white/70">
+                <p className="text-xs md:text-base text-white/70 hidden md:block">
                   Hoş geldiniz!
                 </p>
               </div>
             </div>
 
-            <div className="ml-auto flex items-center gap-3 md:hidden">
+            <div className="ml-auto flex items-center gap-2 md:hidden">
               <button
                 onClick={() => navigate('/system')}
-                className="rounded-xl border border-white/20 bg-white/5 p-2 text-white/80 transition hover:bg-white/10"
+                className="rounded-lg border border-white/20 bg-white/5 p-1.5 text-white/80 transition hover:bg-white/10"
                 aria-label="Sistem ayarları"
               >
-                <Settings className="h-5 w-5" />
+                <Settings className="h-4 w-4" />
               </button>
               <button
                 onClick={toggleNav}
-                className="rounded-xl border border-white/20 bg-white/5 p-2 text-white/80 transition hover:bg-white/10"
+                className="rounded-lg border border-white/20 bg-white/5 p-1.5 text-white/80 transition hover:bg-white/10"
                 aria-label="Menüyü aç"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-4 w-4" />
               </button>
             </div>
 

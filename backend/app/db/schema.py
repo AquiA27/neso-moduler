@@ -688,6 +688,18 @@ async def create_tables(db: Database):
         try:
             await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS openai_api_key TEXT;")
             await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS openai_model TEXT DEFAULT 'gpt-4o-mini';")
+            # Müşteri asistanı ayarları
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS customer_assistant_openai_api_key TEXT;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS customer_assistant_openai_model TEXT DEFAULT 'gpt-4o-mini';")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS customer_assistant_tts_voice_id TEXT;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS customer_assistant_tts_speech_rate NUMERIC(3,2) DEFAULT 1.0;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS customer_assistant_tts_provider TEXT DEFAULT 'system';")
+            # İşletme asistanı ayarları
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_openai_api_key TEXT;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_openai_model TEXT DEFAULT 'gpt-4o-mini';")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_tts_voice_id TEXT;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_tts_speech_rate NUMERIC(3,2) DEFAULT 1.0;")
+            await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_tts_provider TEXT DEFAULT 'system';")
         except Exception:
             pass
         

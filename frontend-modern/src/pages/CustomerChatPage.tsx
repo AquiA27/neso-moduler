@@ -496,21 +496,21 @@ export default function CustomerChatPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 flex flex-col">
       {/* Header */}
-      <div className="bg-primary-800/50 backdrop-blur-sm border-b border-white/10 p-4">
-        <div className="mx-auto flex max-w-4xl flex-col gap-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-3">
+      <div className="bg-primary-800/50 backdrop-blur-sm border-b border-white/10 p-2 md:p-4">
+        <div className="mx-auto flex max-w-4xl flex-col gap-2 md:gap-3 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2 md:gap-3">
             <button
               onClick={handleBack}
-              className="rounded-lg p-2 transition-colors hover:bg-white/10"
+              className="rounded-lg p-1.5 md:p-2 transition-colors hover:bg-white/10"
             >
-              <ArrowLeft className="h-5 w-5 text-white" />
+              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5 text-white" />
             </button>
             <div>
-              <h1 className="text-lg font-semibold text-white sm:text-xl">Neso Asistanı</h1>
-              <div className="flex flex-wrap items-center gap-2">
-                {masa && <p className="text-sm text-white/70">Masa: {masa}</p>}
+              <h1 className="text-base md:text-lg font-semibold text-white sm:text-xl">Neso Asistanı</h1>
+              <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                {masa && <p className="text-xs md:text-sm text-white/70">Masa: {masa}</p>}
                 {detectedLanguage && (
-                  <span className="rounded bg-white/10 px-2 py-1 text-xs text-white/50">
+                  <span className="rounded bg-white/10 px-1.5 py-0.5 md:px-2 md:py-1 text-xs text-white/50">
                     {detectedLanguage.toUpperCase()}
                   </span>
                 )}
