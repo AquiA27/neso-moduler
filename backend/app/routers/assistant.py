@@ -1854,7 +1854,6 @@ async def handle_voice_command(
         return response_data
 
     except Exception as e:
-        import logging
         # Check if it's a speech_recognition error
         if sr and isinstance(e, sr.UnknownValueError):
             raise HTTPException(status_code=400, detail="Ses anlaşılamadı.")
@@ -1881,7 +1880,6 @@ async def chat_smart(payload: ChatRequest):
     previous_lang = _session_languages.get(conversation_id, None)
     if previous_lang and detected_lang != previous_lang:
         # Müşteri farklı bir dilde yazmaya başladı, dili değiştir
-        import logging
         logging.info(f"[LANGUAGE] Language changed from {previous_lang} to {detected_lang} for conversation {conversation_id}")
         _session_languages[conversation_id] = detected_lang
     elif not previous_lang:
@@ -1922,7 +1920,6 @@ async def chat_smart(payload: ChatRequest):
     sensitive_business_signal = _has_sensitive_business_query(text)
 
     # ÇOK ERKEN VE KESİN GREETING KONTROLÜ - HER ŞEYDEN ÖNCE
-    import logging
     text_clean = text.lower().strip()
     # Noktalama işaretlerini temizle
     text_clean_pure = text_clean.strip(".,!?;:()[]{}").strip()
@@ -2306,7 +2303,6 @@ async def chat_smart(payload: ChatRequest):
     
     # Sadece açık sipariş istekleri için parse yap
     if is_likely_order:
-        import logging
         logging.info(f"[PARSE] is_likely_order=True, parsing text: '{text}'")
         pairs = _extract_candidates(text)
         logging.info(f"[PARSE] Extracted pairs: {pairs}")
@@ -2610,7 +2606,6 @@ async def chat_smart(payload: ChatRequest):
         not_matched = [nm for nm in not_matched if normalize_name(nm) not in all_variations]
         
     else:
-        import logging
         logging.info(f"[PARSE] is_likely_order=False, skipping parse for text: '{text}'")
 
     # Greeting, matematik ve genel sohbet kelimelerini not_matched'den çıkar - daha kapsamlı liste
@@ -2665,7 +2660,6 @@ async def chat_smart(payload: ChatRequest):
         # Stok arama: direkt key, normalize key, ürün adı normalize
         stok = stock_map.get(key) or stock_map.get(stok_key_normalized) or stock_map.get(_normalize_stock_key(key))
         
-        import logging
         logging.info(f"[STOCK] Checking stock for key='{key}', urun='{urun_adi}', normalized='{stok_key_normalized}': stok={stok}, adet={adet}")
         
         # Stok None ise (veritabanında yok) fallback stock kullanılıyor, yetersiz sayılmaz
@@ -3754,7 +3748,6 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
     missing_variations_in_scope = 'missing_variations_in_cart' in locals() and missing_variations_in_cart
     
     if aggregated and not missing_variations_in_scope:
-        import logging
         if order_summary:
             logging.info(f"[ORDER] Parse successful, order created (#{order_summary['id']}), using default_reply instead of LLM")
             reply_text = default_reply or f"Harika! {masa} masası için siparişinizi oluşturdum. Toplam {order_summary['tutar']:.2f} TL. Afiyet olsun!"
