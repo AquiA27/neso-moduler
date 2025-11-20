@@ -1863,8 +1863,7 @@ async def handle_voice_command(
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_smart(payload: ChatRequest):
-    try:
-        text = (payload.text or "").strip()
+    text = (payload.text or "").strip()
         if not text:
             raise HTTPException(status_code=400, detail="Bos metin")
 
@@ -1890,43 +1889,43 @@ async def chat_smart(payload: ChatRequest):
         sube_id = int(payload.sube_id or 1)
         masa = payload.masa.strip() if payload.masa and isinstance(payload.masa, str) else None
 
-    # Get tenant_id from sube_id
-    tenant_id: Optional[int] = None
-    try:
-        sube_row = await db.fetch_one(
-            "SELECT isletme_id FROM subeler WHERE id = :id",
-            {"id": sube_id}
-        )
-        if sube_row:
-            sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
-            tenant_id = sube_dict.get("isletme_id")
-            logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
-    except Exception as e:
-        logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
+        # Get tenant_id from sube_id
+        tenant_id: Optional[int] = None
+        try:
+            sube_row = await db.fetch_one(
+                "SELECT isletme_id FROM subeler WHERE id = :id",
+                {"id": sube_id}
+            )
+            if sube_row:
+                sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+                tenant_id = sube_dict.get("isletme_id")
+                logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
+        except Exception as e:
+            logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
 
-    # Check if user is providing table number in the message
-    detected_table = _detect_table_number(text)
-    if detected_table and not masa:
-        masa = detected_table
+        # Check if user is providing table number in the message
+        detected_table = _detect_table_number(text)
+        if detected_table and not masa:
+            masa = detected_table
 
-    ctx = await context_manager.get(conversation_id)
-    if not masa and ctx.masa:
-        masa = ctx.masa
-    await context_manager.update(conversation_id, sube_id=sube_id, masa=masa)
+        ctx = await context_manager.get(conversation_id)
+        if not masa and ctx.masa:
+            masa = ctx.masa
+        await context_manager.update(conversation_id, sube_id=sube_id, masa=masa)
 
-    hunger_signal = _detect_hunger_signal(text)
-    sensitive_business_signal = _has_sensitive_business_query(text)
+        hunger_signal = _detect_hunger_signal(text)
+        sensitive_business_signal = _has_sensitive_business_query(text)
 
-    # ÇOK ERKEN VE KESİN GREETING KONTROLÜ - HER ŞEYDEN ÖNCE
-    text_clean = text.lower().strip()
-    # Noktalama işaretlerini temizle
-    text_clean_pure = text_clean.strip(".,!?;:()[]{}").strip()
-    
-    # Basit greeting kelimeleri - direkt eşleşme
-    simple_greetings_exact = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "hosgeldin", "hos geldin", "günaydın"}
-    
-    # Tek kelime ve tam eşleşme kontrolü
-    if text_clean_pure in simple_greetings_exact and not hunger_signal:
+        # ÇOK ERKEN VE KESİN GREETING KONTROLÜ - HER ŞEYDEN ÖNCE
+        text_clean = text.lower().strip()
+        # Noktalama işaretlerini temizle
+        text_clean_pure = text_clean.strip(".,!?;:()[]{}").strip()
+        
+        # Basit greeting kelimeleri - direkt eşleşme
+        simple_greetings_exact = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "hosgeldin", "hos geldin", "günaydın"}
+        
+        # Tek kelime ve tam eşleşme kontrolü
+        if text_clean_pure in simple_greetings_exact and not hunger_signal:
         logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
         try:
             # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
