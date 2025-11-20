@@ -1865,9 +1865,9 @@ async def handle_voice_command(
 async def chat_smart(payload: ChatRequest):
     text = (payload.text or "").strip()
     if not text:
-            raise HTTPException(status_code=400, detail="Bos metin")
+        raise HTTPException(status_code=400, detail="Bos metin")
 
-        conversation_id = payload.conversation_id or uuid4().hex
+    conversation_id = payload.conversation_id or uuid4().hex
         history_snapshot = list(_session_messages(conversation_id))
 
         # Dil algılama - müşterinin diline göre cevap ver
@@ -2073,15 +2073,15 @@ async def chat_smart(payload: ChatRequest):
 
     business_profile = await _load_business_profile(sube_id)
     menu_items = await _load_menu_details(sube_id)
-        if not menu_items:
-            reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
-            _append_session(conversation_id, "user", text)
-            _append_session(conversation_id, "assistant", reply)
-            return await _build_chat_response(
-                reply=reply,
-                conversation_id=conversation_id,
-                detected_language=detected_lang,
-            )
+    if not menu_items:
+        reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
+        _append_session(conversation_id, "user", text)
+        _append_session(conversation_id, "assistant", reply)
+        return await _build_chat_response(
+            reply=reply,
+            conversation_id=conversation_id,
+            detected_language=detected_lang,
+        )
 
         recipe_map_norm, recipe_detail_map = await _load_recipe_map(sube_id)
 
@@ -3850,28 +3850,16 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
                 f"KULLANICI varyasyon belirtmediği için '{auto_urun}' ürünü varsayılan '{auto_var}' seçeneği ile siparişe eklenecek."
             )
 
-        return await _build_chat_response(
-            reply=reply_text,
-            order=order_summary,
-            shortages=final_shortages,
-            not_matched=final_not_matched,
-            suggestions=suggestions,
-            conversation_id=conversation_id,
-            detected_language=detected_lang,
-            tenant_id=tenant_id,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"[CHAT] Unhandled error in chat_smart: {e}", exc_info=True)
-        # Hata durumunda basit bir mesaj döndür
-        reply = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
-        return await _build_chat_response(
-            reply=reply,
-            conversation_id=conversation_id or uuid4().hex,
-            detected_language="tr",
-            tenant_id=None,
-        )
+    return await _build_chat_response(
+        reply=reply_text,
+        order=order_summary,
+        shortages=final_shortages,
+        not_matched=final_not_matched,
+        suggestions=suggestions,
+        conversation_id=conversation_id,
+        detected_language=detected_lang,
+        tenant_id=tenant_id,
+    )
 
 
 # ---- Asistan Ayarları ----
