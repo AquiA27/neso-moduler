@@ -1863,8 +1863,7 @@ async def handle_voice_command(
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_smart(payload: ChatRequest):
-    try:
-        text = (payload.text or "").strip()
+    text = (payload.text or "").strip()
         if not text:
             raise HTTPException(status_code=400, detail="Bos metin")
 
@@ -2032,48 +2031,48 @@ async def chat_smart(payload: ChatRequest):
                 tenant_id=tenant_id,
             )
 
-        skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
-        intent_result = intent_classifier.predict(text, sube_id=sube_id, masa=masa)
-        structured_response = None
-        if not skip_structured_for_milky:
-            structured_response = await _handle_structured_intent(
-                intent_result=intent_result,
-                conversation_id=conversation_id,
-                sube_id=sube_id,
-                masa=masa,
-                detected_language=detected_lang,
-                original_text=text,
-                tenant_id=tenant_id,
-            )
-        if structured_response:
-            return structured_response
-        if text_clean_pure in simple_greetings_exact and not hunger_signal:
-            business_profile = await _load_business_profile(sube_id)
-            menu_items = await _load_menu_details(sube_id)
-            if menu_items:
-                sample = _pick_menu_samples(menu_items, 4)
-                venue = business_profile.get("sube_ad") if business_profile else None
-                reply = "Merhaba"
-                if venue:
-                    reply += f", {venue} şubemize hoş geldiniz"
-                else:
-                    reply += "! Hoş geldiniz"
-                if sample and len(sample) > 0:
-                    reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
-                else:
-                    reply += "! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Ne istersiniz?"
-                _append_session(conversation_id, "user", text)
-                _append_session(conversation_id, "assistant", reply)
-                return await _build_chat_response(
-                    reply=reply,
-                    conversation_id=conversation_id,
-                    suggestions=sample if sample else None,
-                    detected_language=detected_lang,
-                    tenant_id=tenant_id,
-                )
-
+    skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
+    intent_result = intent_classifier.predict(text, sube_id=sube_id, masa=masa)
+    structured_response = None
+    if not skip_structured_for_milky:
+        structured_response = await _handle_structured_intent(
+            intent_result=intent_result,
+            conversation_id=conversation_id,
+            sube_id=sube_id,
+            masa=masa,
+            detected_language=detected_lang,
+            original_text=text,
+            tenant_id=tenant_id,
+        )
+    if structured_response:
+        return structured_response
+    if text_clean_pure in simple_greetings_exact and not hunger_signal:
         business_profile = await _load_business_profile(sube_id)
         menu_items = await _load_menu_details(sube_id)
+        if menu_items:
+            sample = _pick_menu_samples(menu_items, 4)
+            venue = business_profile.get("sube_ad") if business_profile else None
+            reply = "Merhaba"
+            if venue:
+                reply += f", {venue} şubemize hoş geldiniz"
+            else:
+                reply += "! Hoş geldiniz"
+            if sample and len(sample) > 0:
+                reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
+            else:
+                reply += "! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Ne istersiniz?"
+            _append_session(conversation_id, "user", text)
+            _append_session(conversation_id, "assistant", reply)
+            return await _build_chat_response(
+                reply=reply,
+                conversation_id=conversation_id,
+                suggestions=sample if sample else None,
+                detected_language=detected_lang,
+                tenant_id=tenant_id,
+            )
+
+    business_profile = await _load_business_profile(sube_id)
+    menu_items = await _load_menu_details(sube_id)
         if not menu_items:
             reply = "Şu an menümüzde ürün bulunamadı. Lütfen daha sonra tekrar deneyin."
             _append_session(conversation_id, "user", text)
