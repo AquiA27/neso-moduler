@@ -1863,7 +1863,8 @@ async def handle_voice_command(
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_smart(payload: ChatRequest):
-    text = (payload.text or "").strip()
+    try:
+        text = (payload.text or "").strip()
         if not text:
             raise HTTPException(status_code=400, detail="Bos metin")
 
@@ -1926,7 +1927,7 @@ async def chat_smart(payload: ChatRequest):
         
         # Tek kelime ve tam eşleşme kontrolü
         if text_clean_pure in simple_greetings_exact and not hunger_signal:
-        logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
+            logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
         try:
             # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
             business_profile = await _load_business_profile(sube_id)
@@ -2031,10 +2032,10 @@ async def chat_smart(payload: ChatRequest):
                 tenant_id=tenant_id,
             )
 
-    skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
-    intent_result = intent_classifier.predict(text, sube_id=sube_id, masa=masa)
-    structured_response = None
-    if not skip_structured_for_milky:
+        skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
+        intent_result = intent_classifier.predict(text, sube_id=sube_id, masa=masa)
+        structured_response = None
+        if not skip_structured_for_milky:
         structured_response = await _handle_structured_intent(
             intent_result=intent_result,
             conversation_id=conversation_id,
