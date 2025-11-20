@@ -1863,31 +1863,32 @@ async def handle_voice_command(
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_smart(payload: ChatRequest):
-    text = (payload.text or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="Bos metin")
+    try:
+        text = (payload.text or "").strip()
+        if not text:
+            raise HTTPException(status_code=400, detail="Bos metin")
 
-    conversation_id = payload.conversation_id or uuid4().hex
-    history_snapshot = list(_session_messages(conversation_id))
+        conversation_id = payload.conversation_id or uuid4().hex
+        history_snapshot = list(_session_messages(conversation_id))
 
-    # Dil algılama - müşterinin diline göre cevap ver
-    detected_lang = _detect_language(text)
-    
-    # Konuşma geçmişinde dil varsa kontrol et
-    previous_lang = _session_languages.get(conversation_id, None)
-    if previous_lang and detected_lang != previous_lang:
-        # Müşteri farklı bir dilde yazmaya başladı, dili değiştir
-        logging.info(f"[LANGUAGE] Language changed from {previous_lang} to {detected_lang} for conversation {conversation_id}")
-        _session_languages[conversation_id] = detected_lang
-    elif not previous_lang:
-        # İlk mesaj veya dil belirlenmemiş, algılanan dili kullan
-        _session_languages[conversation_id] = detected_lang
-    else:
-        # Aynı dil, önceki dili kullan
-        detected_lang = previous_lang
+        # Dil algılama - müşterinin diline göre cevap ver
+        detected_lang = _detect_language(text)
+        
+        # Konuşma geçmişinde dil varsa kontrol et
+        previous_lang = _session_languages.get(conversation_id, None)
+        if previous_lang and detected_lang != previous_lang:
+            # Müşteri farklı bir dilde yazmaya başladı, dili değiştir
+            logging.info(f"[LANGUAGE] Language changed from {previous_lang} to {detected_lang} for conversation {conversation_id}")
+            _session_languages[conversation_id] = detected_lang
+        elif not previous_lang:
+            # İlk mesaj veya dil belirlenmemiş, algılanan dili kullan
+            _session_languages[conversation_id] = detected_lang
+        else:
+            # Aynı dil, önceki dili kullan
+            detected_lang = previous_lang
 
-    sube_id = int(payload.sube_id or 1)
-    masa = payload.masa.strip() if payload.masa else None
+        sube_id = int(payload.sube_id or 1)
+        masa = payload.masa.strip() if payload.masa and isinstance(payload.masa, str) else None
 
     # Get tenant_id from sube_id
     tenant_id: Optional[int] = None
@@ -1902,6 +1903,8 @@ async def chat_smart(payload: ChatRequest):
             logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
     except Exception as e:
         logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
+    
+    try:
 
     # Check if user is providing table number in the message
     detected_table = _detect_table_number(text)
@@ -3850,16 +3853,28 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
                 f"KULLANICI varyasyon belirtmediği için '{auto_urun}' ürünü varsayılan '{auto_var}' seçeneği ile siparişe eklenecek."
             )
 
-    return await _build_chat_response(
-        reply=reply_text,
-        order=order_summary,
-        shortages=final_shortages,
-        not_matched=final_not_matched,
-        suggestions=suggestions,
-        conversation_id=conversation_id,
-        detected_language=detected_lang,
-        tenant_id=tenant_id,
-    )
+        return await _build_chat_response(
+            reply=reply_text,
+            order=order_summary,
+            shortages=final_shortages,
+            not_matched=final_not_matched,
+            suggestions=suggestions,
+            conversation_id=conversation_id,
+            detected_language=detected_lang,
+            tenant_id=tenant_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"[CHAT] Unhandled error in chat_smart: {e}", exc_info=True)
+        # Hata durumunda basit bir mesaj döndür
+        reply = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
+        return await _build_chat_response(
+            reply=reply,
+            conversation_id=conversation_id or uuid4().hex,
+            detected_language="tr",
+            tenant_id=None,
+        )
 
 
 # ---- Asistan Ayarları ----
