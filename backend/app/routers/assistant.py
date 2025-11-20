@@ -1868,10 +1868,10 @@ async def chat_smart(payload: ChatRequest):
         raise HTTPException(status_code=400, detail="Bos metin")
 
     conversation_id = payload.conversation_id or uuid4().hex
-        history_snapshot = list(_session_messages(conversation_id))
+    history_snapshot = list(_session_messages(conversation_id))
 
-        # Dil algılama - müşterinin diline göre cevap ver
-        detected_lang = _detect_language(text)
+    # Dil algılama - müşterinin diline göre cevap ver
+    detected_lang = _detect_language(text)
         
         # Konuşma geçmişinde dil varsa kontrol et
         previous_lang = _session_languages.get(conversation_id, None)
