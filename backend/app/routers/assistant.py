@@ -684,6 +684,7 @@ async def _build_chat_response(
     suggestions: Optional[List[str]] = None,
     conversation_id: Optional[str] = None,
     detected_language: Optional[str] = None,
+    tenant_id: Optional[int] = None,
 ) -> ChatResponse:
     audio_base64: Optional[str] = None
     if settings.ASSISTANT_ENABLE_TTS and reply:
@@ -1893,6 +1894,20 @@ async def chat_smart(payload: ChatRequest):
     sube_id = int(payload.sube_id or 1)
     masa = payload.masa.strip() if payload.masa else None
 
+    # Get tenant_id from sube_id
+    tenant_id: Optional[int] = None
+    try:
+        sube_row = await db.fetch_one(
+            "SELECT isletme_id FROM subeler WHERE id = :id",
+            {"id": sube_id}
+        )
+        if sube_row:
+            sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+            tenant_id = sube_dict.get("isletme_id")
+            logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
+    except Exception as e:
+        logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
+
     # Check if user is providing table number in the message
     detected_table = _detect_table_number(text)
     if detected_table and not masa:
@@ -1929,6 +1944,7 @@ async def chat_smart(payload: ChatRequest):
                 reply=reply,
                 conversation_id=conversation_id,
                 detected_language=detected_lang,
+                tenant_id=tenant_id,
             )
         
         sample = _pick_menu_samples(menu_items, 4)
@@ -1946,6 +1962,7 @@ async def chat_smart(payload: ChatRequest):
             conversation_id=conversation_id,
             suggestions=sample,
             detected_language=detected_lang,
+            tenant_id=tenant_id,
         )
     
     # Kelimelere ayır ve kontrol et
@@ -1966,6 +1983,7 @@ async def chat_smart(payload: ChatRequest):
                 reply=reply,
                 conversation_id=conversation_id,
                 detected_language=detected_lang,
+                tenant_id=tenant_id,
             )
         
         sample = _pick_menu_samples(menu_items, 4)
@@ -1984,6 +2002,7 @@ async def chat_smart(payload: ChatRequest):
             conversation_id=conversation_id,
             suggestions=sample,
             detected_language=detected_lang,
+            tenant_id=tenant_id,
         )
 
     skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
@@ -1997,6 +2016,7 @@ async def chat_smart(payload: ChatRequest):
             masa=masa,
             detected_language=detected_lang,
             original_text=text,
+            tenant_id=tenant_id,
         )
     if structured_response:
         return structured_response
@@ -2019,6 +2039,7 @@ async def chat_smart(payload: ChatRequest):
                 conversation_id=conversation_id,
                 suggestions=sample,
                 detected_language=detected_lang,
+                tenant_id=tenant_id,
             )
 
     business_profile = await _load_business_profile(sube_id)
@@ -3812,6 +3833,7 @@ SEN (NESO): "Kafeinli, sütsüz ve soğuk içeceklerimizden Soğuk Americano var
         suggestions=suggestions,
         conversation_id=conversation_id,
         detected_language=detected_lang,
+        tenant_id=tenant_id,
     )
 
 
@@ -4071,6 +4093,7 @@ async def _handle_structured_intent(
     masa: Optional[str],
     detected_language: str,
     original_text: str,
+    tenant_id: Optional[int] = None,
 ) -> Optional[ChatResponse]:
     intent = intent_result.intent
     if not intent:
@@ -4081,6 +4104,20 @@ async def _handle_structured_intent(
         masa = masa_from_text
 
     await context_manager.update(conversation_id, sube_id=sube_id, masa=masa)
+    
+    # Get tenant_id from sube_id if not provided
+    if tenant_id is None:
+        try:
+            sube_row = await db.fetch_one(
+                "SELECT isletme_id FROM subeler WHERE id = :id",
+                {"id": sube_id}
+            )
+            if sube_row:
+                sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+                tenant_id = sube_dict.get("isletme_id")
+        except Exception as e:
+            logging.warning(f"[STRUCTURED_INTENT] Failed to get tenant_id from sube_id={sube_id}: {e}")
+    
     keywords_raw = intent_result.entities.get("keywords", "")
     keyword_list = [kw for kw in keywords_raw.split(",") if kw]
 
@@ -4103,6 +4140,7 @@ async def _handle_structured_intent(
                     reply=reply,
                     conversation_id=conversation_id,
                     detected_language=detected_language,
+                    tenant_id=tenant_id,
                 )
 
             request = DataQueryRequest(
@@ -4130,6 +4168,7 @@ async def _handle_structured_intent(
                 reply=reply,
                 conversation_id=conversation_id,
                 detected_language=detected_language,
+                tenant_id=tenant_id,
             )
 
         if intent == "menu_liste":
@@ -4223,6 +4262,7 @@ async def _handle_structured_intent(
                 conversation_id=conversation_id,
                 suggestions=suggestions,
                 detected_language=detected_language,
+                tenant_id=tenant_id,
             )
 
         if intent == "aktif_adisyonlar":
@@ -4235,6 +4275,7 @@ async def _handle_structured_intent(
                     reply=reply,
                     conversation_id=conversation_id,
                     detected_language=detected_language,
+                    tenant_id=tenant_id,
                 )
 
             request = DataQueryRequest(
@@ -4262,6 +4303,7 @@ async def _handle_structured_intent(
                 reply=reply,
                 conversation_id=conversation_id,
                 detected_language=detected_language,
+                tenant_id=tenant_id,
             )
 
         if intent == "satis_ozet":
@@ -4285,6 +4327,7 @@ async def _handle_structured_intent(
                 reply=reply,
                 conversation_id=conversation_id,
                 detected_language=detected_language,
+                tenant_id=tenant_id,
             )
 
     except DataAccessError as exc:
