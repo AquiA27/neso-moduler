@@ -1864,7 +1864,7 @@ async def handle_voice_command(
 @router.post("/chat", response_model=ChatResponse)
 async def chat_smart(payload: ChatRequest):
     text = (payload.text or "").strip()
-        if not text:
+    if not text:
             raise HTTPException(status_code=400, detail="Bos metin")
 
         conversation_id = payload.conversation_id or uuid4().hex
