@@ -438,9 +438,6 @@ async def create_order_from_text(
     _: Dict[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
-    import json
-    import logging
-    
     try:
         # Parse order manually (aynı mantık ama bağımsız çalıştır)
         rows = await db.fetch_all(
