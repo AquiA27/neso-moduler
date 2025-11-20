@@ -1363,11 +1363,11 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         const response = await customizationApi.get(selectedTenant);
         const primary = response.data.primary_color || themePresets.green.primary;
         const secondary = response.data.secondary_color || themePresets.green.secondary;
-        // API key'i maskelenmiş olarak göster (sadece ilk 8 ve son 4 karakter)
-        const apiKey = response.data.openai_api_key || '';
-        const maskedApiKey = apiKey && apiKey.length > 12 
-          ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`
-          : apiKey || '';
+        // API key'leri maskelenmiş olarak göster
+        const maskApiKey = (key: string | undefined) => {
+          if (!key) return '';
+          return key.length > 12 ? `${key.substring(0, 8)}...${key.substring(key.length - 4)}` : key;
+        };
         
         setFormData({
           domain: response.data.domain || '',
@@ -1378,8 +1378,20 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
           email: response.data.email || '',
           telefon: response.data.telefon || '',
           adres: response.data.adres || '',
-          openai_api_key: maskedApiKey,
+          openai_api_key: maskApiKey(response.data.openai_api_key),
           openai_model: response.data.openai_model || 'gpt-4o-mini',
+          // Müşteri asistanı ayarları
+          customer_assistant_openai_api_key: maskApiKey(response.data.customer_assistant_openai_api_key),
+          customer_assistant_openai_model: response.data.customer_assistant_openai_model || 'gpt-4o-mini',
+          customer_assistant_tts_voice_id: response.data.customer_assistant_tts_voice_id || '',
+          customer_assistant_tts_speech_rate: typeof response.data.customer_assistant_tts_speech_rate === 'number' ? response.data.customer_assistant_tts_speech_rate : parseFloat(String(response.data.customer_assistant_tts_speech_rate || '1.0')) || 1.0,
+          customer_assistant_tts_provider: response.data.customer_assistant_tts_provider || 'system',
+          // İşletme asistanı ayarları
+          business_assistant_openai_api_key: maskApiKey(response.data.business_assistant_openai_api_key),
+          business_assistant_openai_model: response.data.business_assistant_openai_model || 'gpt-4o-mini',
+          business_assistant_tts_voice_id: response.data.business_assistant_tts_voice_id || '',
+          business_assistant_tts_speech_rate: typeof response.data.business_assistant_tts_speech_rate === 'number' ? response.data.business_assistant_tts_speech_rate : parseFloat(String(response.data.business_assistant_tts_speech_rate || '1.0')) || 1.0,
+          business_assistant_tts_provider: response.data.business_assistant_tts_provider || 'system',
         });
         setExists(true);
       } catch (err: any) {
@@ -1452,24 +1464,36 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       const response = await customizationApi.get(selectedTenant);
       const primary = response.data.primary_color || themePresets.green.primary;
       const secondary = response.data.secondary_color || themePresets.green.secondary;
-        // API key'i maskelenmiş olarak göster
-        const apiKey = response.data.openai_api_key || '';
-        const maskedApiKey = apiKey && apiKey.length > 12 
-          ? `${apiKey.substring(0, 8)}...${apiKey.substring(apiKey.length - 4)}`
-          : apiKey || '';
-        
-        setFormData({
-          domain: response.data.domain || '',
-          app_name: response.data.app_name || '',
-          logo_url: response.data.logo_url || '',
-          theme: getThemeFromColors(primary, secondary),
-          footer_text: response.data.footer_text || '',
-          email: response.data.email || '',
-          telefon: response.data.telefon || '',
-          adres: response.data.adres || '',
-          openai_api_key: maskedApiKey,
-          openai_model: response.data.openai_model || 'gpt-4o-mini',
-        });
+      // API key'leri maskelenmiş olarak göster
+      const maskApiKey = (key: string | undefined) => {
+        if (!key) return '';
+        return key.length > 12 ? `${key.substring(0, 8)}...${key.substring(key.length - 4)}` : key;
+      };
+      
+      setFormData({
+        domain: response.data.domain || '',
+        app_name: response.data.app_name || '',
+        logo_url: response.data.logo_url || '',
+        theme: getThemeFromColors(primary, secondary),
+        footer_text: response.data.footer_text || '',
+        email: response.data.email || '',
+        telefon: response.data.telefon || '',
+        adres: response.data.adres || '',
+        openai_api_key: maskApiKey(response.data.openai_api_key),
+        openai_model: response.data.openai_model || 'gpt-4o-mini',
+        // Müşteri asistanı ayarları
+        customer_assistant_openai_api_key: maskApiKey(response.data.customer_assistant_openai_api_key),
+        customer_assistant_openai_model: response.data.customer_assistant_openai_model || 'gpt-4o-mini',
+        customer_assistant_tts_voice_id: response.data.customer_assistant_tts_voice_id || '',
+        customer_assistant_tts_speech_rate: typeof response.data.customer_assistant_tts_speech_rate === 'number' ? response.data.customer_assistant_tts_speech_rate : (parseFloat(String(response.data.customer_assistant_tts_speech_rate || '1.0')) || 1.0),
+        customer_assistant_tts_provider: response.data.customer_assistant_tts_provider || 'system',
+        // İşletme asistanı ayarları
+        business_assistant_openai_api_key: maskApiKey(response.data.business_assistant_openai_api_key),
+        business_assistant_openai_model: response.data.business_assistant_openai_model || 'gpt-4o-mini',
+        business_assistant_tts_voice_id: response.data.business_assistant_tts_voice_id || '',
+        business_assistant_tts_speech_rate: typeof response.data.business_assistant_tts_speech_rate === 'number' ? response.data.business_assistant_tts_speech_rate : (parseFloat(String(response.data.business_assistant_tts_speech_rate || '1.0')) || 1.0),
+        business_assistant_tts_provider: response.data.business_assistant_tts_provider || 'system',
+      });
       
       onRefresh();
     } catch (err: any) {
@@ -1672,8 +1696,8 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                   label="TTS Konuşma Hızı (Müşteri Asistanı)"
                   type="number"
                   step="0.1"
-                  min="0.5"
-                  max="2.0"
+                  min={0.5}
+                  max={2.0}
                   value={formData.customer_assistant_tts_speech_rate.toString()}
                   onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_tts_speech_rate: parseFloat(value) || 1.0 }))}
                   placeholder="1.0"
@@ -2372,7 +2396,7 @@ function Field({
   helpText,
 }: {
   label: string;
-  value: any;
+  value: string | number;
   onChange: (value: string) => void;
   placeholder?: string;
   required?: boolean;
