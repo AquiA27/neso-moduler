@@ -1872,60 +1872,60 @@ async def chat_smart(payload: ChatRequest):
 
     # Dil algılama - müşterinin diline göre cevap ver
     detected_lang = _detect_language(text)
-        
-        # Konuşma geçmişinde dil varsa kontrol et
-        previous_lang = _session_languages.get(conversation_id, None)
-        if previous_lang and detected_lang != previous_lang:
-            # Müşteri farklı bir dilde yazmaya başladı, dili değiştir
-            logging.info(f"[LANGUAGE] Language changed from {previous_lang} to {detected_lang} for conversation {conversation_id}")
-            _session_languages[conversation_id] = detected_lang
-        elif not previous_lang:
-            # İlk mesaj veya dil belirlenmemiş, algılanan dili kullan
-            _session_languages[conversation_id] = detected_lang
-        else:
-            # Aynı dil, önceki dili kullan
-            detected_lang = previous_lang
+    
+    # Konuşma geçmişinde dil varsa kontrol et
+    previous_lang = _session_languages.get(conversation_id, None)
+    if previous_lang and detected_lang != previous_lang:
+        # Müşteri farklı bir dilde yazmaya başladı, dili değiştir
+        logging.info(f"[LANGUAGE] Language changed from {previous_lang} to {detected_lang} for conversation {conversation_id}")
+        _session_languages[conversation_id] = detected_lang
+    elif not previous_lang:
+        # İlk mesaj veya dil belirlenmemiş, algılanan dili kullan
+        _session_languages[conversation_id] = detected_lang
+    else:
+        # Aynı dil, önceki dili kullan
+        detected_lang = previous_lang
 
-        sube_id = int(payload.sube_id or 1)
-        masa = payload.masa.strip() if payload.masa and isinstance(payload.masa, str) else None
+    sube_id = int(payload.sube_id or 1)
+    masa = payload.masa.strip() if payload.masa and isinstance(payload.masa, str) else None
 
-        # Get tenant_id from sube_id
-        tenant_id: Optional[int] = None
-        try:
-            sube_row = await db.fetch_one(
-                "SELECT isletme_id FROM subeler WHERE id = :id",
-                {"id": sube_id}
-            )
-            if sube_row:
-                sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
-                tenant_id = sube_dict.get("isletme_id")
-                logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
-        except Exception as e:
-            logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
+    # Get tenant_id from sube_id
+    tenant_id: Optional[int] = None
+    try:
+        sube_row = await db.fetch_one(
+            "SELECT isletme_id FROM subeler WHERE id = :id",
+            {"id": sube_id}
+        )
+        if sube_row:
+            sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+            tenant_id = sube_dict.get("isletme_id")
+            logging.info(f"[CHAT] sube_id={sube_id}, tenant_id={tenant_id}")
+    except Exception as e:
+        logging.warning(f"[CHAT] Failed to get tenant_id from sube_id={sube_id}: {e}")
 
-        # Check if user is providing table number in the message
-        detected_table = _detect_table_number(text)
-        if detected_table and not masa:
-            masa = detected_table
+    # Check if user is providing table number in the message
+    detected_table = _detect_table_number(text)
+    if detected_table and not masa:
+        masa = detected_table
 
-        ctx = await context_manager.get(conversation_id)
-        if not masa and ctx.masa:
-            masa = ctx.masa
-        await context_manager.update(conversation_id, sube_id=sube_id, masa=masa)
+    ctx = await context_manager.get(conversation_id)
+    if not masa and ctx.masa:
+        masa = ctx.masa
+    await context_manager.update(conversation_id, sube_id=sube_id, masa=masa)
 
-        hunger_signal = _detect_hunger_signal(text)
-        sensitive_business_signal = _has_sensitive_business_query(text)
+    hunger_signal = _detect_hunger_signal(text)
+    sensitive_business_signal = _has_sensitive_business_query(text)
 
-        # ÇOK ERKEN VE KESİN GREETING KONTROLÜ - HER ŞEYDEN ÖNCE
-        text_clean = text.lower().strip()
-        # Noktalama işaretlerini temizle
-        text_clean_pure = text_clean.strip(".,!?;:()[]{}").strip()
-        
-        # Basit greeting kelimeleri - direkt eşleşme
-        simple_greetings_exact = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "hosgeldin", "hos geldin", "günaydın"}
-        
-        # Tek kelime ve tam eşleşme kontrolü
-        if text_clean_pure in simple_greetings_exact and not hunger_signal:
+    # ÇOK ERKEN VE KESİN GREETING KONTROLÜ - HER ŞEYDEN ÖNCE
+    text_clean = text.lower().strip()
+    # Noktalama işaretlerini temizle
+    text_clean_pure = text_clean.strip(".,!?;:()[]{}").strip()
+    
+    # Basit greeting kelimeleri - direkt eşleşme
+    simple_greetings_exact = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "hosgeldin", "hos geldin", "günaydın"}
+    
+    # Tek kelime ve tam eşleşme kontrolü
+    if text_clean_pure in simple_greetings_exact and not hunger_signal:
             logging.info(f"[GREETING] EXACT MATCH detected: '{text}' -> returning greeting immediately")
         try:
             # Menüyü yükle çünkü greeting cevabında örnekler göstereceğiz
