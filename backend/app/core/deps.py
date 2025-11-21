@@ -391,16 +391,25 @@ async def get_sube_id(
             {"tid": effective_tenant_id},
         )
         if row:
-            sube_id = row["id"]
+            # row'u dict'e çevir (Record objesi olabilir)
+            row_dict = dict(row) if hasattr(row, 'keys') else row
+            sube_id = row_dict.get("id") if isinstance(row_dict, dict) else (getattr(row, "id", None) if row else None)
             import logging
             logging.info(f"[get_sube_id] Kullanıcı (role={role}) için tenant {effective_tenant_id}'nin şubesi bulundu: {sube_id}")
         else:
-            # Tenant'ın şubesi yoksa, varsayılan şube kullan
+            # Tenant'ın şubesi yoksa, hata ver (varsayılan şube kullanma)
             import logging
-            logging.warning(f"[get_sube_id] Kullanıcı (role={role}) için tenant {effective_tenant_id}'nin şubesi bulunamadı, varsayılan şube kullanılacak")
-            sube_id = 1  # DEMO varsayılanı
+            logging.error(f"[get_sube_id] Kullanıcı (role={role}) için tenant {effective_tenant_id}'nin aktif şubesi bulunamadı")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Tenant {effective_tenant_id} için aktif şube bulunamadı. Lütfen yöneticinizle iletişime geçin.",
+            )
     
     if sube_id is None:
+        # Eğer super_admin değilse ve tenant_id de yoksa, varsayılan şube kullan
+        if not is_super_admin:
+            import logging
+            logging.warning(f"[get_sube_id] Kullanıcı (role={role}) için sube_id ve tenant_id belirtilmemiş, varsayılan şube kullanılacak")
         sube_id = 1  # DEMO varsayılanı
 
     # Şube aktif mi ve tenant_id kontrolü
