@@ -326,7 +326,11 @@ async def get_sube_id(
     effective_tenant_id = switched_tenant_id if switched_tenant_id else tenant_id
     
     role = (current.get("role") or "").lower()
+    username = current.get("username", "unknown")
     is_super_admin = role == "super_admin"
+    
+    import logging
+    logging.info(f"[get_sube_id] Başlangıç: username={username}, role={role}, sube_id={sube_id}, tenant_id={tenant_id}, switched_tenant_id={switched_tenant_id}, effective_tenant_id={effective_tenant_id}")
     
     # Super admin tenant switching yapıyorsa, şubenin o tenant'a ait olduğunu kontrol et
     if is_super_admin and effective_tenant_id and sube_id is not None:
