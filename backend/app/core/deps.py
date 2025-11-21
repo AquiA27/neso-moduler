@@ -416,10 +416,6 @@ async def get_sube_id(
             logging.warning(f"[get_sube_id] Kullanıcı (role={role}) için sube_id ve tenant_id belirtilmemiş, varsayılan şube kullanılacak")
         sube_id = 1  # DEMO varsayılanı
 
-    # Şube aktif mi ve tenant_id kontrolü
-    query = "SELECT id, isletme_id FROM subeler WHERE id = :id AND aktif = TRUE"
-    params = {"id": sube_id}
-    
     # Super admin tenant switching yapıyorsa (effective_tenant_id varsa), şubenin o tenant'a ait olduğunu kontrol et
     # Ama "Tüm İşletmeler" seçildiğinde (effective_tenant_id null) tenant kontrolü yapma
     # Ayrıca, eğer tenant'ın şubesi yoksa (yukarıda bulunamadıysa), tenant kontrolü yapma
@@ -507,8 +503,20 @@ async def get_sube_id(
                     detail=f"Tenant {effective_tenant_id} için aktif şube bulunamadı. Lütfen yöneticinizle iletişime geçin.",
                 )
     
+    # Şube aktif mi ve tenant_id kontrolü
+    # NOT: query ve params'ı burada tanımlıyoruz çünkü normal kullanıcı kontrolünden sonra sube_id güncellenmiş olabilir
+    import logging
+    logging.info(f"[get_sube_id] Final şube kontrolü: sube_id={sube_id}")
+    query = "SELECT id, isletme_id FROM subeler WHERE id = :id AND aktif = TRUE"
+    params = {"id": sube_id}
+    
     # Önce şubenin var olup olmadığını kontrol et
-    row = await db.fetch_one(query, params)
+    try:
+        row = await db.fetch_one(query, params)
+        logging.info(f"[get_sube_id] Şube sorgusu sonucu: row={row}")
+    except Exception as e:
+        logging.error(f"[get_sube_id] Şube sorgusu hatası: {e}", exc_info=True)
+        row = None
     if not row:
         # Şube yok veya pasif
         raise HTTPException(
