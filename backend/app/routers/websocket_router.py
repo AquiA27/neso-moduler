@@ -71,7 +71,40 @@ async def websocket_endpoint_auth(
     
     try:
         # Verify token and get user
-        user = await get_current_user(token)
+        # WebSocket için token'ı direkt decode ediyoruz (OAuth2 scheme çalışmaz)
+        from ..core.security import decode_token
+        from ..db.database import db
+        from fastapi import HTTPException, status
+        
+        try:
+            payload = decode_token(token)
+            sub = payload.get("sub")
+            if not sub:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token (no sub)")
+            
+            # User'ı DB'den al
+            row = await db.fetch_one(
+                "SELECT id, username, role, aktif, tenant_id FROM users WHERE username = :u",
+                {"u": sub},
+            )
+            if not row or row["aktif"] is False:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid credentials")
+            
+            # Record objesini dict'e çevir
+            user_dict = dict(row) if hasattr(row, 'keys') else row
+            user = {
+                "id": user_dict.get("id") if isinstance(user_dict, dict) else (getattr(row, "id", None) if row else None),
+                "username": user_dict.get("username") if isinstance(user_dict, dict) else (getattr(row, "username", None) if row else None),
+                "role": user_dict.get("role") if isinstance(user_dict, dict) else (getattr(row, "role", None) if row else None),
+                "aktif": user_dict.get("aktif") if isinstance(user_dict, dict) else (getattr(row, "aktif", None) if row else None),
+                "tenant_id": user_dict.get("tenant_id") if isinstance(user_dict, dict) else (getattr(row, "tenant_id", None) if row else None),
+            }
+        except Exception as e:
+            logger.error(f"WebSocket auth error: {e}", exc_info=True)
+            await websocket.accept()
+            await websocket.send_json({"type": "error", "message": "Authentication failed"})
+            await websocket.close()
+            return
         
         await manager.connect(websocket, connection_id)
         
