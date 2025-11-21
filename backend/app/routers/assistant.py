@@ -3851,16 +3851,28 @@ async def chat_smart(payload: ChatRequest):
                     f"KULLANICI varyasyon belirtmediği için '{auto_urun}' ürünü varsayılan '{auto_var}' seçeneği ile siparişe eklenecek."
                 )
 
-            return await _build_chat_response(
-                reply=reply_text,
-                order=order_summary,
-                shortages=final_shortages,
-                not_matched=final_not_matched,
-                suggestions=suggestions,
-                conversation_id=conversation_id,
-                detected_language=detected_lang,
-                tenant_id=tenant_id,
-            )
+        return await _build_chat_response(
+            reply=reply_text,
+            order=order_summary,
+            shortages=final_shortages,
+            not_matched=final_not_matched,
+            suggestions=suggestions,
+            conversation_id=conversation_id,
+            detected_language=detected_lang,
+            tenant_id=tenant_id,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"[CHAT] Unhandled error in chat_smart: {e}", exc_info=True)
+        conversation_id_for_error = payload.conversation_id if hasattr(payload, 'conversation_id') and payload.conversation_id else uuid4().hex
+        reply = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
+        return await _build_chat_response(
+            reply=reply,
+            conversation_id=conversation_id_for_error,
+            detected_language="tr",
+            tenant_id=None,
+        )
     except HTTPException:
         raise
     except Exception as e:
