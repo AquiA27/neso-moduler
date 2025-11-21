@@ -379,6 +379,27 @@ async def get_sube_id(
             logging.warning(f"[get_sube_id] Tenant {effective_tenant_id} için şube bulunamadı, varsayılan şube kullanılacak")
             sube_id = 1  # DEMO varsayılanı - ama aşağıda tenant kontrolü yapılmayacak
     
+    # Normal kullanıcılar (garson, operator, vb.) için: sube_id belirtilmemişse ve tenant_id varsa, o tenant'ın ilk şubesini bul
+    if sube_id is None and not is_super_admin and effective_tenant_id:
+        row = await db.fetch_one(
+            """
+            SELECT id FROM subeler 
+            WHERE isletme_id = :tid AND aktif = TRUE 
+            ORDER BY id ASC 
+            LIMIT 1
+            """,
+            {"tid": effective_tenant_id},
+        )
+        if row:
+            sube_id = row["id"]
+            import logging
+            logging.info(f"[get_sube_id] Kullanıcı (role={role}) için tenant {effective_tenant_id}'nin şubesi bulundu: {sube_id}")
+        else:
+            # Tenant'ın şubesi yoksa, varsayılan şube kullan
+            import logging
+            logging.warning(f"[get_sube_id] Kullanıcı (role={role}) için tenant {effective_tenant_id}'nin şubesi bulunamadı, varsayılan şube kullanılacak")
+            sube_id = 1  # DEMO varsayılanı
+    
     if sube_id is None:
         sube_id = 1  # DEMO varsayılanı
 
