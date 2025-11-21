@@ -99,8 +99,9 @@ function Layout() {
 
   const handleLogout = useCallback(() => {
     logout();
-    navigate('/login');
-  }, [logout, navigate]);
+    // Tüm storage'ı temizle ve login sayfasına yönlendir
+    window.location.href = '/login';
+  }, [logout]);
 
   const toggleNav = useCallback(() => setNavOpen((prev) => !prev), []);
 
