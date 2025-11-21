@@ -428,6 +428,8 @@ async def get_sube_id(
     # Normal kullanıcılar için: Gönderilen sube_id'nin tenant'a ait olup olmadığını kontrol et
     # Eğer değilse, tenant'ın kendi şubesini bul
     if not is_super_admin and effective_tenant_id and sube_id is not None:
+        import logging
+        logging.info(f"[get_sube_id] Normal kullanıcı için şube kontrolü başlıyor: sube_id={sube_id}, effective_tenant_id={effective_tenant_id}")
         # Gönderilen sube_id'nin tenant'a ait olup olmadığını kontrol et
         sube_check = await db.fetch_one(
             "SELECT id, isletme_id FROM subeler WHERE id = :sid AND aktif = TRUE",
