@@ -425,6 +425,50 @@ async def get_sube_id(
     # Ayrıca, eğer tenant'ın şubesi yoksa (yukarıda bulunamadıysa), tenant kontrolü yapma
     tenant_check_needed = is_super_admin and effective_tenant_id
     
+    # Normal kullanıcılar için: Gönderilen sube_id'nin tenant'a ait olup olmadığını kontrol et
+    # Eğer değilse, tenant'ın kendi şubesini bul
+    if not is_super_admin and effective_tenant_id and sube_id is not None:
+        # Gönderilen sube_id'nin tenant'a ait olup olmadığını kontrol et
+        sube_check = await db.fetch_one(
+            "SELECT id, isletme_id FROM subeler WHERE id = :sid AND aktif = TRUE",
+            {"sid": sube_id},
+        )
+        if sube_check:
+            # sube_check'ü dict'e çevir
+            sube_check_dict = dict(sube_check) if hasattr(sube_check, 'keys') else sube_check
+            sube_isletme_id = sube_check_dict.get("isletme_id") if isinstance(sube_check_dict, dict) else (getattr(sube_check, "isletme_id", None) if sube_check else None)
+            
+            # Şube var, tenant'a ait mi kontrol et
+            if sube_isletme_id != effective_tenant_id:
+                # Gönderilen sube_id başka tenant'a ait, tenant'ın kendi şubesini bul
+                import logging
+                logging.warning(f"[get_sube_id] Gönderilen sube_id={sube_id} tenant {effective_tenant_id}'e ait değil (isletme_id={sube_isletme_id}), tenant'ın şubesi aranıyor...")
+                tenant_sube_row = await db.fetch_one(
+                    """
+                    SELECT id FROM subeler 
+                    WHERE isletme_id = :tid AND aktif = TRUE 
+                    ORDER BY id ASC 
+                    LIMIT 1
+                    """,
+                    {"tid": effective_tenant_id},
+                )
+                if tenant_sube_row:
+                    # tenant_sube_row'u dict'e çevir
+                    tenant_sube_dict = dict(tenant_sube_row) if hasattr(tenant_sube_row, 'keys') else tenant_sube_row
+                    new_sube_id = tenant_sube_dict.get("id") if isinstance(tenant_sube_dict, dict) else (getattr(tenant_sube_row, "id", None) if tenant_sube_row else None)
+                    if new_sube_id:
+                        sube_id = new_sube_id
+                        import logging
+                        logging.info(f"[get_sube_id] Tenant {effective_tenant_id}'nin şubesi bulundu: {sube_id}")
+                else:
+                    # Tenant'ın şubesi yok, hata ver
+                    import logging
+                    logging.error(f"[get_sube_id] Tenant {effective_tenant_id} için aktif şube bulunamadı")
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Tenant {effective_tenant_id} için aktif şube bulunamadı. Lütfen yöneticinizle iletişime geçin.",
+                    )
+    
     # Önce şubenin var olup olmadığını kontrol et
     row = await db.fetch_one(query, params)
     if not row:
