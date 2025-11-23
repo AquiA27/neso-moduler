@@ -138,18 +138,24 @@ async def admin_ozet(
         WITH sp AS (
           SELECT COUNT(*) AS adet, COALESCE(SUM(tutar),0) AS ciro
           FROM siparisler s
-          WHERE {siparis_flt} AND s.durum <> 'iptal'
+          WHERE {siparis_flt} AND s.durum = 'odendi'
         ),
         ip AS (
           SELECT COUNT(*) AS iptal
           FROM siparisler s
           WHERE {siparis_flt} AND s.durum = 'iptal'
+        ),
+        tum_sp AS (
+          SELECT COUNT(*) AS adet
+          FROM siparisler s
+          WHERE {siparis_flt} AND s.durum <> 'iptal'
         )
         SELECT sp.adet AS siparis_sayisi,
                sp.ciro AS ciro,
                CASE WHEN sp.adet>0 THEN sp.ciro/sp.adet ELSE 0 END AS ortalama_siparis,
-               ip.iptal AS iptal_sayisi
-        FROM sp, ip
+               ip.iptal AS iptal_sayisi,
+               tum_sp.adet AS toplam_siparis_sayisi
+        FROM sp, ip, tum_sp
         """
         logging.info(f"Executing query with params: {params}")
         row = await db.fetch_one(q, params) or {"siparis_sayisi": 0, "ciro": 0, "ortalama_siparis": 0, "iptal_sayisi": 0}
@@ -223,14 +229,14 @@ async def admin_trend(
         flt += " AND sube_id = :sid"
         params["sid"] = sube_id
 
-    # Her gün için veri topla
+    # Her gün için veri topla (sadece ödenen siparişler - ciro gerçekten ödenen tutardır)
     q = f"""
     SELECT 
         DATE(created_at) AS gun,
         COUNT(*) AS siparis_adedi,
         COALESCE(SUM(tutar), 0) AS ciro
     FROM siparisler
-    WHERE {flt} AND durum <> 'iptal'
+    WHERE {flt} AND durum = 'odendi'
     GROUP BY DATE(created_at)
     ORDER BY gun
     """

@@ -12,7 +12,8 @@ async def gunluk_istatistik(current_user: str = Depends(get_current_user)):
       COUNT(*) AS siparis_adedi,
       COALESCE(SUM(tutar),0) AS ciro
     FROM siparisler
-    WHERE created_at::date = (NOW() AT TIME ZONE 'UTC')::date;
+    WHERE created_at::date = (NOW() AT TIME ZONE 'UTC')::date
+      AND durum = 'odendi';
     """
     row = await db.fetch_one(q)
     return {"gun": str(row["gun"]), "siparis_adedi": int(row["siparis_adedi"]), "ciro": float(row["ciro"])}

@@ -227,29 +227,38 @@ async def _hesap_ozet_core(masa: str, sube_id: int) -> Dict[str, Any]:
 
 async def _finalize_hazir_siparisler(masa: str, sube_id: int) -> List[int]:
     """
-    Masadaki 'hazir' durumundaki siparişleri 'odendi' durumuna çeker ve stoktan düşer.
-    NOT: Sadece 'hazir' durumundaki siparişler için stok düşülür.
-    'yeni' ve 'hazirlaniyor' durumundaki siparişler henüz hazır olmadığı için stok düşülmez.
+    Masadaki aktif siparişleri 'odendi' durumuna çeker ve stoktan düşer.
+    NOT: Tüm aktif siparişler ('yeni', 'hazirlaniyor', 'hazir') için stok düşülür.
+    Ödeme alındığında artık siparişler hazır olup olmadığına bakılmaksızın stoktan düşülmelidir.
     Donus olarak kapanan siparis ID'lerini verir.
     """
     import logging
     
-    # Sadece 'hazir' durumundaki siparişleri bul (stok düşürme için sadece hazır olanlar önemli)
+    # Tüm aktif siparişleri bul (stok düşürme için ödeme alındığında tüm aktif siparişler düşülmeli)
+    # ÖNEMLİ: Artık sadece 'hazir' değil, tüm aktif siparişler finalize ediliyor
     ready_orders = await db.fetch_all(
         """
         SELECT id, sepet, durum
         FROM siparisler
-        WHERE sube_id = :sid AND masa = :masa AND durum = 'hazir'
+        WHERE sube_id = :sid AND masa = :masa AND durum IN ('yeni', 'hazirlaniyor', 'hazir')
         ORDER BY created_at ASC, id ASC
         """,
         {"sid": sube_id, "masa": masa},
     )
     
     if not ready_orders:
-        logging.info(f"Masa {masa} icin hazir durumda siparis bulunamadi, stok dusurme yapilmayacak (sube_id={sube_id})")
+        logging.info(f"Masa {masa} icin aktif siparis bulunamadi, stok dusurme yapilmayacak (sube_id={sube_id})")
         return []
     
-    logging.info(f"Masa {masa} icin {len(ready_orders)} hazir siparis bulundu, stok dusuluyor...")
+    durum_dagilimi = {}
+    for r in ready_orders:
+        durum = r.get("durum", "bilinmeyen")
+        durum_dagilimi[durum] = durum_dagilimi.get(durum, 0) + 1
+    
+    logging.info(
+        f"Masa {masa} icin {len(ready_orders)} aktif siparis bulundu (durum dagilimi: {durum_dagilimi}), "
+        f"stok dusuluyor... (sube_id={sube_id})"
+    )
 
     # ÖNEMLİ: Stok düşürme işlemi sipariş durumu değişmeden ÖNCE yapılmalı
     logging.info(f"Masa {masa} icin stok dusurme islemi baslatiliyor...")
@@ -279,6 +288,21 @@ async def _finalize_hazir_siparisler(masa: str, sube_id: int) -> List[int]:
         {"sid": sube_id, "ids": ids},
     )
     logging.info(f"Masa {masa} icin {len(ids)} siparis 'odendi' durumuna gecirildi")
+    
+    # Cache invalidation: Analytics ve admin istatistiklerini temizle
+    # Önemli: Ödeme sonrası ciro değiştiği için cache'i temizlemeliyiz
+    if ids:  # Sadece sipariş kapatıldıysa cache'i temizle
+        try:
+            from ..core.cache import cache
+            # Analytics cache'lerini temizle (analytics:ozet, analytics:saatlik vb.)
+            await cache.delete_pattern("analytics:*")
+            # İstatistik cache'lerini temizle
+            await cache.delete_pattern("istatistik:*")
+            logging.info(f"[CACHE_INVALIDATION] Analytics ve istatistik cache'leri temizlendi (masa={masa}, sube_id={sube_id}, finalized_count={len(ids)})")
+        except Exception as e:
+            logging.warning(f"[CACHE_INVALIDATION] Cache temizleme hatası: {e}", exc_info=True)
+            # Cache hatası ödeme işlemini engellemez
+    
     return ids
 
 # ------ Ular ------
@@ -551,12 +575,12 @@ async def ozet_gunluk(
     _: Mapping[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
-    # Gnlk sipari cirosu (iptaller hari)
+    # Gnlk sipari cirosu (sadece ödenen siparişler - ciro gerçekten ödenen tutardır)
     ciro = await db.fetch_one(
         """
         SELECT COALESCE(SUM(tutar),0) AS ciro
         FROM siparisler
-        WHERE created_at::date = CURRENT_DATE AND durum <> 'iptal' AND sube_id = :sid
+        WHERE created_at::date = CURRENT_DATE AND durum = 'odendi' AND sube_id = :sid
         """,
         {"sid": sube_id},
     )
@@ -1161,14 +1185,15 @@ async def _dus_stok_recepte(
     - Birim dönüşümü yapılır (ml/litre, gr/kg)
     """
     try:
-        # Masadaki hazir siparislerin sepetlerini topla
+        # Masadaki aktif siparislerin sepetlerini topla
+        # ÖNEMLİ: Artık sadece 'hazir' değil, tüm aktif siparişler ('yeni', 'hazirlaniyor', 'hazir') işleniyor
         rows = siparis_rows
         if rows is None:
             rows = await db.fetch_all(
                 """
                 SELECT sepet
                 FROM siparisler
-                WHERE sube_id = :sid AND masa = :masa AND durum = 'hazir'
+                WHERE sube_id = :sid AND masa = :masa AND durum IN ('yeni', 'hazirlaniyor', 'hazir')
                 """,
                 {"sid": sube_id, "masa": masa},
             )
@@ -1221,16 +1246,18 @@ async def _dus_stok_recepte(
             # Debug log - reçete bulunamazsa uyar
             if not recs:
                 import logging
+                mevcut_receteler_str = ", ".join([normalize_name(str(r['urun']).strip()) for r in all_recs[:10]])
                 logging.warning(
-                    f"Recete bulunamadi: urun_key='{urun_key}', siparis_adet={siparis_adet}, "
+                    f"[STOK_DUSME] Recete bulunamadi: urun_key='{urun_key}', siparis_adet={siparis_adet}, "
                     f"masa='{masa}', sube_id={sube_id}. "
-                    f"Mevcut receteler (ilk 5): {[normalize_name(str(r['urun']).strip()) for r in all_recs[:5]]}"
+                    f"Mevcut receteler (ilk 10): {mevcut_receteler_str}. "
+                    f"Fallback mekanizmasi deneniyor..."
                 )
             else:
                 import logging
                 logging.info(
-                    f"Recete bulundu: urun_key='{urun_key}', siparis_adet={siparis_adet}, "
-                    f"recete_sayisi={len(recs)}"
+                    f"[STOK_DUSME] Recete bulundu: urun_key='{urun_key}', siparis_adet={siparis_adet}, "
+                    f"recete_sayisi={len(recs)}, masa='{masa}', sube_id={sube_id}"
                 )
             
             if recs:
@@ -1303,11 +1330,17 @@ async def _dus_stok_recepte(
                         )
                         import logging
                         logging.info(
-                            f"Stok dusuldu: stok_adi='{stok_adi}', dusulecek={dusulecek_miktar} {recete_birim or 'birim'}, "
-                            f"urun='{urun_key}', siparis_adet={siparis_adet}, masa='{masa}' (sube_id={sube_id})"
+                            f"[STOK_DUSME] Stok dusuldu (recete ile): stok_adi='{stok_adi}', "
+                            f"dusulecek={dusulecek_miktar} {stok_birim or recete_birim or 'birim'}, "
+                            f"recete_miktar={recete_miktar} {recete_birim or 'birim'}, "
+                            f"siparis_adet={siparis_adet}, urun='{urun_key}', masa='{masa}', sube_id={sube_id}, "
+                            f"UPDATE result={result}"
                         )
             else:
                 # Reçete tanımlı değil: Ürün adı = Stok adı ise direkt düş (basit fallback)
+                import logging
+                
+                # Önce normalize edilmiş isimle kontrol et
                 stok_row = await db.fetch_one(
                     """
                     SELECT ad FROM stok_kalemleri 
@@ -1316,15 +1349,43 @@ async def _dus_stok_recepte(
                     """,
                     {"sid": sube_id, "urun": urun_key},
                 )
+                
+                # Bulunamazsa, normalize edilmiş isimle kontrol et
+                if not stok_row:
+                    # Tüm stok kalemlerini çek ve normalize ederek karşılaştır
+                    all_stok = await db.fetch_all(
+                        """
+                        SELECT ad FROM stok_kalemleri 
+                        WHERE sube_id = :sid
+                        """,
+                        {"sid": sube_id},
+                    )
+                    for stok_item in all_stok:
+                        stok_normalized = normalize_name(str(stok_item["ad"]).strip())
+                        if stok_normalized == urun_key:
+                            stok_row = stok_item
+                            break
+                
                 if stok_row:
                     stok_adi = stok_row["ad"]
-                    await db.execute(
+                    result = await db.execute(
                         """
                         UPDATE stok_kalemleri
                            SET mevcut = GREATEST(0, (mevcut - :adet))
                          WHERE sube_id = :sid AND ad = :stok_adi
                         """,
                         {"sid": sube_id, "stok_adi": stok_adi, "adet": siparis_adet},
+                    )
+                    logging.info(
+                        f"[STOK_DUSME] Fallback: Stok dusuldu (recete yok): stok_adi='{stok_adi}', "
+                        f"dusulecek_adet={siparis_adet}, urun='{urun_key}', masa='{masa}', sube_id={sube_id}"
+                    )
+                else:
+                    # Stok kalemi de bulunamadı
+                    logging.warning(
+                        f"[STOK_DUSME] Stok kalemi bulunamadi: urun_key='{urun_key}', siparis_adet={siparis_adet}, "
+                        f"masa='{masa}', sube_id={sube_id}. "
+                        f"Stok dusurme yapilamadi - recete tanimli degil ve stok kalemi bulunamadi."
                     )
                     
     except Exception as e:

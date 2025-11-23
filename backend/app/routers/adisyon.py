@@ -670,6 +670,20 @@ async def adisyon_kapat(
 
         # Toplamları güncelle
         await _update_adisyon_totals(adisyon_id, sube_id)
+        
+        # Cache invalidation: Analytics ve istatistiklerini temizle
+        # Önemli: Adisyon kapatıldığında ciro değiştiği için cache'i temizlemeliyiz
+        if finalized_ids:  # Sadece sipariş kapatıldıysa cache'i temizle
+            try:
+                from ..core.cache import cache
+                # Analytics cache'lerini temizle (analytics:ozet, analytics:saatlik vb.)
+                await cache.delete_pattern("analytics:*")
+                # İstatistik cache'lerini temizle
+                await cache.delete_pattern("istatistik:*")
+                logging.info(f"[CACHE_INVALIDATION] Analytics ve istatistik cache'leri temizlendi (adisyon_id={adisyon_id}, sube_id={sube_id}, finalized_count={len(finalized_ids)})")
+            except Exception as e:
+                logging.warning(f"[CACHE_INVALIDATION] Cache temizleme hatası: {e}", exc_info=True)
+                # Cache hatası adisyon kapatma işlemini engellemez
     
     return {"message": "Adisyon başarıyla kapatıldı", "finalized_orders": len(finalized_ids)}
 
