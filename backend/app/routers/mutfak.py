@@ -167,7 +167,7 @@ async def poll(
 @router.patch(
     "/durum/{id}",
     response_model=SiparisRow,
-    dependencies=[Depends(require_roles({"admin", "operator", "mutfak", "barista"}))]
+    dependencies=[Depends(require_roles({"admin", "operator", "mutfak", "barista", "garson"}))]
 )
 async def durum_guncelle(
     id: int,
