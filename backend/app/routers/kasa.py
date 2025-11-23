@@ -252,7 +252,11 @@ async def _finalize_hazir_siparisler(masa: str, sube_id: int) -> List[int]:
     
     durum_dagilimi = {}
     for r in ready_orders:
-        durum = r.get("durum", "bilinmeyen")
+        try:
+            # Database record'da .get() yok, direkt erişim yap
+            durum = r["durum"] if r["durum"] is not None else "bilinmeyen"
+        except (KeyError, AttributeError):
+            durum = "bilinmeyen"
         durum_dagilimi[durum] = durum_dagilimi.get(durum, 0) + 1
     
     logging.info(
@@ -702,10 +706,10 @@ async def acik_masalar(
     """
     
     if not tumu:
-        # Sadece bakiye > 0 veya hazır siparişi olanları göster
-        # Ayrıca aktif siparişi olanları da göster (yeni, hazirlaniyor, hazir)
+        # Sadece bakiye > 0 veya aktif siparişi olanları göster
+        # ÖNEMLİ: Bakiye = 0 ise ve aktif sipariş yoksa masayı gösterme
         sql += """
-      AND (a.bakiye > 0 OR EXISTS (
+      AND (a.bakiye > 0.01 OR EXISTS (
         SELECT 1 FROM siparisler
         WHERE adisyon_id = a.id AND durum IN ('yeni', 'hazirlaniyor', 'hazir')
       ))
