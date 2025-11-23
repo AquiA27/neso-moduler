@@ -463,30 +463,56 @@ async def odeme_ekle(
             logging.warning(f"Adisyon toplamları güncellenirken hata: {e}", exc_info=True)
         # Bakiye sıfırlandıysa hazir siparisleri kapat ve stoktan dus
         # Transaction içinde yapılmalı ki atomik olsun
+        finalized_ids = []
         try:
             # Adisyon sistemine göre: Güncel bakiyeyi adisyon tablosundan al (eski ödemeler dahil edilmemeli)
-            adisyon_final_check = await db.fetch_one(
-                "SELECT bakiye FROM adisyons WHERE id = :aid",
-                {"aid": adisyon_id},
-            )
-            yeni_bakiye = float(adisyon_final_check["bakiye"] or 0) if adisyon_final_check else 0.0
+            if adisyon_id:
+                adisyon_final_check = await db.fetch_one(
+                    "SELECT bakiye FROM adisyons WHERE id = :aid",
+                    {"aid": adisyon_id},
+                )
+                yeni_bakiye = float(adisyon_final_check["bakiye"] or 0) if adisyon_final_check else 0.0
+            else:
+                # Adisyon yoksa bakiye hesapla (eski sistem)
+                ozet_after = await _hesap_ozet_core(payload.masa, sube_id)
+                yeni_bakiye = float(ozet_after.get("bakiye", 0) if isinstance(ozet_after, dict) else (ozet_after["bakiye"] if "bakiye" in ozet_after else 0))
+            
             logging.info(
                 f"Ödeme eklendi: masa={payload.masa}, tutar={final_tutar:.2f} TL, "
-                f"iskonto={iskonto_orani}%, yeni_bakiye={yeni_bakiye:.2f} TL, sube_id={sube_id}"
+                f"iskonto={iskonto_orani}%, yeni_bakiye={yeni_bakiye:.2f} TL, adisyon_id={adisyon_id}, sube_id={sube_id}"
             )
             # Floating point hassasiyeti için 0.01 TL tolerans
             if abs(yeni_bakiye) < 0.01:
                 logging.info(f"Masa {payload.masa} bakiyesi sıfır, siparişler otomatik finalize ediliyor...")
                 finalized_ids = await _finalize_hazir_siparisler(payload.masa, sube_id)
                 logging.info(f"Masa {payload.masa} için {len(finalized_ids)} sipariş finalize edildi")
-                await db.execute(
-                    """
-                    UPDATE adisyons
-                    SET durum = 'kapali', kapanis_zamani = NOW(), bakiye = 0
-                    WHERE id = :aid
-                    """,
-                    {"aid": adisyon_id},
-                )
+                
+                # Adisyon varsa kapat
+                if adisyon_id:
+                    await db.execute(
+                        """
+                        UPDATE adisyons
+                        SET durum = 'kapali', kapanis_zamani = NOW(), bakiye = 0
+                        WHERE id = :aid
+                        """,
+                        {"aid": adisyon_id},
+                    )
+                    logging.info(f"Adisyon #{adisyon_id} kapatıldı (masa={payload.masa})")
+                    await _update_adisyon_totals(adisyon_id, sube_id)
+                else:
+                    # Adisyon yoksa, eğer adisyon oluşturulmamışsa oluştur ve kapat
+                    from ..routers.adisyon import _get_or_create_adisyon
+                    temp_adisyon_id = await _get_or_create_adisyon(payload.masa, sube_id)
+                    await db.execute(
+                        """
+                        UPDATE adisyons
+                        SET durum = 'kapali', kapanis_zamani = NOW(), bakiye = 0
+                        WHERE id = :aid
+                        """,
+                        {"aid": temp_adisyon_id},
+                    )
+                    logging.info(f"Geçici adisyon #{temp_adisyon_id} oluşturuldu ve kapatıldı (masa={payload.masa})")
+                
                 # Masayı boşalt - masanın durumunu 'bos' yap
                 await db.execute(
                     """
@@ -496,8 +522,7 @@ async def odeme_ekle(
                     """,
                     {"sid": sube_id, "masa": payload.masa},
                 )
-                logging.info(f"Masa '{payload.masa}' durumu 'bos' olarak güncellendi (adisyon #{adisyon_id} otomatik kapatıldı)")
-                await _update_adisyon_totals(adisyon_id, sube_id)
+                logging.info(f"Masa '{payload.masa}' durumu 'bos' olarak güncellendi")
                 auto_closed = True
                 remaining_balance = 0.0
             else:
@@ -666,11 +691,11 @@ async def acik_masalar(
       a.odeme_toplam,
       a.bakiye,
       a.id AS adisyon_id,
-      -- Hazır sipariş sayısını da ekle
+      -- Hazır sipariş sayısını da ekle (tüm aktif siparişler)
       COALESCE((
         SELECT COUNT(*)
         FROM siparisler
-        WHERE adisyon_id = a.id AND durum = 'hazir'
+        WHERE adisyon_id = a.id AND durum IN ('yeni', 'hazirlaniyor', 'hazir')
       ), 0) AS hazir_count
     FROM adisyons a
     WHERE a.sube_id = :sid AND a.durum = 'acik'
@@ -678,10 +703,11 @@ async def acik_masalar(
     
     if not tumu:
         # Sadece bakiye > 0 veya hazır siparişi olanları göster
+        # Ayrıca aktif siparişi olanları da göster (yeni, hazirlaniyor, hazir)
         sql += """
       AND (a.bakiye > 0 OR EXISTS (
         SELECT 1 FROM siparisler
-        WHERE adisyon_id = a.id AND durum = 'hazir'
+        WHERE adisyon_id = a.id AND durum IN ('yeni', 'hazirlaniyor', 'hazir')
       ))
         """
     
