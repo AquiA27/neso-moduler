@@ -10,13 +10,10 @@ interface Message {
 }
 
 export default function BIAssistantPage() {
-  const tenantCustomization = useAuthStore((state) => state.tenantCustomization);
-  const businessName = tenantCustomization?.app_name || 'İşletme';
-  
   const [messages, setMessages] = useState<Message[]>([
     {
       type: 'assistant',
-      text: `Merhaba! Ben Neso ${businessName} İşletme Asistanınız. Bugün size nasıl yardımcı olabilirim?`,
+      text: 'Merhaba! Ben Neso Fıstık Kafe İşletme Asistanınız. Bugün size nasıl yardımcı olabilirim?',
       timestamp: new Date(),
     },
   ]);

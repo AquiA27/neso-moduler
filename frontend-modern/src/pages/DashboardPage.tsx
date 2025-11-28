@@ -70,12 +70,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const theme = useAuthStore((state) => state.theme);
-  const tenantCustomization = useAuthStore((state) => state.tenantCustomization);
   const [summaryPeriod, setSummaryPeriod] = useState<'gunluk' | 'haftalik' | 'aylik'>('gunluk');
   const queryClient = useQueryClient();
-  
-  // İşletme adını belirle
-  const businessName = tenantCustomization?.app_name || 'İşletme';
 
   const formatCurrency = useCallback((value: number, fractionDigits = 2) =>
     value.toLocaleString('tr-TR', {
@@ -367,7 +363,7 @@ export default function DashboardPage() {
           <div className="space-y-3 w-full md:max-w-xl">
             <span className="chip">{PERIOD_LABELS[summaryPeriod]} Özet</span>
             <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#0C3832] dark:text-emerald-50">
-              {businessName} Performans Panosu
+              Fıstık Kafe Performans Panosu
             </h2>
           </div>
           <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
