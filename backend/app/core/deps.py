@@ -568,3 +568,92 @@ async def get_sube_id(
     # Şube erişim izni
     await enforce_user_sube_access(current["username"], sube_id)
     return sube_id
+
+
+# ---------------------------
+# API Key Authentication (Public API için)
+# ---------------------------
+async def get_api_key_business(
+    api_key: str = Header(..., alias="X-API-Key", description="API Key for authentication"),
+) -> Dict[str, Any]:
+    """
+    API key ile işletme bilgisini doğrular.
+    Public API endpoint'leri için kullanılır.
+    """
+    import logging
+    import secrets
+    
+    # API key formatını kontrol et (neso_ prefix'i olmalı)
+    if not api_key.startswith("neso_"):
+        logging.warning(f"[API_KEY] Invalid API key format: {api_key[:10]}...")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key format",
+        )
+    
+    # API key'i veritabanından kontrol et
+    try:
+        api_key_row = await db.fetch_one(
+            """
+            SELECT 
+                ak.id,
+                ak.isletme_id,
+                ak.aktif,
+                ak.rate_limit_per_minute,
+                i.ad as isletme_adi,
+                i.aktif as isletme_aktif
+            FROM api_keys ak
+            JOIN isletmeler i ON ak.isletme_id = i.id
+            WHERE ak.api_key = :api_key
+            """,
+            {"api_key": api_key},
+        )
+        
+        if not api_key_row:
+            logging.warning(f"[API_KEY] API key not found: {api_key[:15]}...")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid API key",
+            )
+        
+        # API key aktif mi kontrol et
+        if not api_key_row.get("aktif"):
+            logging.warning(f"[API_KEY] API key inactive: isletme_id={api_key_row.get('isletme_id')}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="API key is inactive",
+            )
+        
+        # İşletme aktif mi kontrol et
+        if not api_key_row.get("isletme_aktif"):
+            logging.warning(f"[API_KEY] Business inactive: isletme_id={api_key_row.get('isletme_id')}")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Business is inactive",
+            )
+        
+        # Son kullanım zamanını güncelle
+        await db.execute(
+            """
+            UPDATE api_keys
+            SET last_used_at = NOW()
+            WHERE id = :id
+            """,
+            {"id": api_key_row["id"]},
+        )
+        
+        return {
+            "api_key_id": api_key_row["id"],
+            "isletme_id": api_key_row["isletme_id"],
+            "isletme_adi": api_key_row["isletme_adi"],
+            "rate_limit_per_minute": api_key_row.get("rate_limit_per_minute", 60),
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.error(f"[API_KEY] Error validating API key: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Error validating API key",
+        )

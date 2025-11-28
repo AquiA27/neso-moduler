@@ -297,6 +297,31 @@ export const superadminApi = {
     return apiClient.delete(`/superadmin/tenants/${id}`);
   },
   
+  // API Keys
+  apiKeyCreate: async (tenantId: number, data: { isletme_id: number; key_name?: string; rate_limit_per_minute?: number }) => {
+    return apiClient.post(`/superadmin/tenants/${tenantId}/api-key`, data);
+  },
+  
+  apiKeyGet: async (tenantId: number) => {
+    return apiClient.get(`/superadmin/tenants/${tenantId}/api-key`);
+  },
+  
+  apiKeyUpdate: async (tenantId: number, data: { aktif?: boolean; rate_limit_per_minute?: number; key_name?: string }) => {
+    return apiClient.patch(`/superadmin/tenants/${tenantId}/api-key`, data);
+  },
+  
+  apiKeyRegenerate: async (tenantId: number) => {
+    return apiClient.post(`/superadmin/tenants/${tenantId}/api-key/regenerate`);
+  },
+  
+  apiUsage: async (tenantId: number, options?: { start_date?: string; end_date?: string }) => {
+    const params = new URLSearchParams();
+    if (options?.start_date) params.append('start_date', options.start_date);
+    if (options?.end_date) params.append('end_date', options.end_date);
+    const queryString = params.toString();
+    return apiClient.get(`/superadmin/tenants/${tenantId}/api-usage${queryString ? `?${queryString}` : ''}`);
+  },
+  
   // Users
   usersList: async (options?: { includePassive?: boolean }) => {
     const params = options?.includePassive ? { include_passive: true } : undefined;

@@ -227,22 +227,40 @@ CREATE TABLE IF NOT EXISTS notification_history (
 );
 """
 
+CREATE_API_KEYS = """
+CREATE TABLE IF NOT EXISTS api_keys (
+    id BIGSERIAL PRIMARY KEY,
+    isletme_id BIGINT NOT NULL REFERENCES isletmeler(id) ON DELETE CASCADE,
+    api_key TEXT NOT NULL UNIQUE, -- Unique API key (e.g., 'neso_xxx...')
+    key_name TEXT, -- İsteğe bağlı açıklayıcı isim
+    aktif BOOLEAN DEFAULT TRUE,
+    rate_limit_per_minute INT DEFAULT 60, -- Dakika başına istek limiti
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ, -- Son kullanım zamanı
+    UNIQUE (isletme_id) -- Her işletme için tek aktif API key (opsiyonel: kaldırılabilir)
+);
+"""
+
 CREATE_API_USAGE_LOGS = """
 CREATE TABLE IF NOT EXISTS api_usage_logs (
     id BIGSERIAL PRIMARY KEY,
     isletme_id BIGINT NOT NULL REFERENCES isletmeler(id) ON DELETE CASCADE,
-    api_type TEXT NOT NULL, -- 'openai', 'google', 'azure', vb.
-    model TEXT, -- Model adı (örn: 'gpt-4o-mini')
-    endpoint TEXT, -- API endpoint (örn: '/v1/chat/completions')
-    prompt_tokens INT DEFAULT 0, -- Girdi token sayısı
-    completion_tokens INT DEFAULT 0, -- Çıktı token sayısı
-    total_tokens INT DEFAULT 0, -- Toplam token sayısı
-    cost_usd NUMERIC(10,6) DEFAULT 0, -- Maliyet (USD)
+    api_key_id BIGINT REFERENCES api_keys(id) ON DELETE SET NULL, -- API key referansı
+    api_type TEXT NOT NULL, -- 'rest_api', 'openai', 'google', 'azure', vb.
+    endpoint TEXT NOT NULL, -- API endpoint (örn: '/public/siparis', '/v1/chat/completions')
+    method TEXT DEFAULT 'POST', -- HTTP method
     request_count INT DEFAULT 1, -- İstek sayısı
     response_time_ms INT, -- Yanıt süresi (milisaniye)
     status TEXT DEFAULT 'success', -- 'success', 'error', 'rate_limited'
+    status_code INT, -- HTTP status code
     error_message TEXT, -- Hata mesajı (varsa)
-    metadata JSONB DEFAULT '{}'::jsonb, -- Ek metadata
+    model TEXT, -- Model adı (LLM için)
+    prompt_tokens INT DEFAULT 0, -- Girdi token sayısı (LLM için)
+    completion_tokens INT DEFAULT 0, -- Çıktı token sayısı (LLM için)
+    total_tokens INT DEFAULT 0, -- Toplam token sayısı (LLM için)
+    cost_usd NUMERIC(10,6) DEFAULT 0, -- Maliyet (USD)
+    cost_tl NUMERIC(10,2) DEFAULT 0, -- Maliyet (TL) - sipariş başına ücret
+    metadata JSONB DEFAULT '{}'::jsonb, -- Ek metadata (sube_id, masa, vb.)
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 """
@@ -401,10 +419,17 @@ CREATE INDEX IF NOT EXISTS idx_payments_created_at ON payments (created_at);
 CREATE INDEX IF NOT EXISTS idx_tenant_customizations_isletme ON tenant_customizations (isletme_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_customizations_domain ON tenant_customizations (domain);
 
+-- API keys index'leri
+CREATE INDEX IF NOT EXISTS idx_api_keys_isletme ON api_keys (isletme_id);
+CREATE INDEX IF NOT EXISTS idx_api_keys_api_key ON api_keys (api_key);
+CREATE INDEX IF NOT EXISTS idx_api_keys_isletme_aktif ON api_keys (isletme_id, aktif) WHERE aktif = TRUE;
+
 -- API usage logs index'leri
 CREATE INDEX IF NOT EXISTS idx_api_usage_logs_isletme ON api_usage_logs (isletme_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_logs_isletme_created ON api_usage_logs (isletme_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_api_key ON api_usage_logs (api_key_id);
 CREATE INDEX IF NOT EXISTS idx_api_usage_logs_api_type ON api_usage_logs (api_type);
+CREATE INDEX IF NOT EXISTS idx_api_usage_logs_endpoint ON api_usage_logs (endpoint);
 CREATE INDEX IF NOT EXISTS idx_api_usage_logs_status ON api_usage_logs (status);
 CREATE INDEX IF NOT EXISTS idx_api_usage_logs_created_at ON api_usage_logs (created_at DESC);
 
@@ -589,6 +614,7 @@ async def create_tables(db: Database):
     await db.execute(CREATE_BACKUP_HISTORY)
     await db.execute(CREATE_PUSH_SUBSCRIPTIONS)
     await db.execute(CREATE_NOTIFICATION_HISTORY)
+    await db.execute(CREATE_API_KEYS)
     await db.execute(CREATE_API_USAGE_LOGS)
     # İndeksler (parça parça, hata yutsa da devam)
     for stmt in [s.strip() for s in CREATE_INDEXES.split(';') if s.strip()]:

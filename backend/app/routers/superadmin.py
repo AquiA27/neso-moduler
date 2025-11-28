@@ -1040,3 +1040,305 @@ async def dashboard_stats(_: Dict[str, Any] = Depends(get_current_user)):
         },
     }
 
+
+# ---------------------------
+# API Key Yönetimi
+# ---------------------------
+import secrets
+from datetime import datetime, timedelta
+
+class ApiKeyOut(BaseModel):
+    id: int
+    isletme_id: int
+    api_key: str  # Maskelenmiş olarak döner (ilk 8 ve son 4 karakter)
+    key_name: Optional[str]
+    aktif: bool
+    rate_limit_per_minute: int
+    created_at: str
+    last_used_at: Optional[str]
+
+class ApiKeyCreateIn(BaseModel):
+    isletme_id: int
+    key_name: Optional[str] = None
+    rate_limit_per_minute: int = 60
+
+class ApiKeyUpdateIn(BaseModel):
+    aktif: Optional[bool] = None
+    rate_limit_per_minute: Optional[int] = None
+    key_name: Optional[str] = None
+
+
+def _generate_api_key() -> str:
+    """Güvenli API key oluşturur: neso_xxxxxxxxxxxx formatında"""
+    random_part = secrets.token_urlsafe(32)  # 32 byte = 43 karakter base64
+    return f"neso_{random_part}"
+
+
+def _mask_api_key(api_key: str) -> str:
+    """API key'i maskeler: ilk 8 ve son 4 karakteri gösterir"""
+    if not api_key or len(api_key) < 12:
+        return "***"
+    return f"{api_key[:8]}...{api_key[-4:]}"
+
+
+class ApiKeyCreateOut(BaseModel):
+    id: int
+    isletme_id: int
+    api_key: str  # İlk oluşturmada gerçek key, sonrasında maskelenmiş
+    key_name: Optional[str]
+    aktif: bool
+    rate_limit_per_minute: int
+    created_at: str
+    last_used_at: Optional[str]
+    is_new: bool = False  # Yeni oluşturuldu mu?
+
+
+@router.post("/tenants/{tenant_id}/api-key", response_model=ApiKeyCreateOut)
+async def create_api_key(
+    tenant_id: int,
+    payload: ApiKeyCreateIn,
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """İşletme için API key oluşturur veya mevcut olanı döner"""
+    import logging
+    
+    # İşletme var mı kontrol et
+    isletme = await db.fetch_one(
+        "SELECT id, ad FROM isletmeler WHERE id = :id",
+        {"id": tenant_id}
+    )
+    if not isletme:
+        raise HTTPException(status_code=404, detail="İşletme bulunamadı")
+    
+    # Payload'daki isletme_id ile tenant_id eşleşmeli
+    if payload.isletme_id != tenant_id:
+        raise HTTPException(status_code=400, detail="İşletme ID eşleşmiyor")
+    
+    # Mevcut API key var mı kontrol et
+    existing = await db.fetch_one(
+        "SELECT * FROM api_keys WHERE isletme_id = :iid",
+        {"iid": tenant_id}
+    )
+    
+    if existing:
+        # Mevcut API key'i döndür (maskelenmiş)
+        return {
+            "id": existing["id"],
+            "isletme_id": existing["isletme_id"],
+            "api_key": _mask_api_key(existing["api_key"]),
+            "key_name": existing.get("key_name"),
+            "aktif": existing["aktif"],
+            "rate_limit_per_minute": existing.get("rate_limit_per_minute", 60),
+            "created_at": existing["created_at"].isoformat() if hasattr(existing["created_at"], "isoformat") else str(existing["created_at"]),
+            "last_used_at": existing["last_used_at"].isoformat() if existing.get("last_used_at") and hasattr(existing["last_used_at"], "isoformat") else (str(existing["last_used_at"]) if existing.get("last_used_at") else None),
+            "is_new": False,
+        }
+    
+    # Yeni API key oluştur
+    api_key = _generate_api_key()
+    
+    try:
+        row = await db.fetch_one(
+            """
+            INSERT INTO api_keys (isletme_id, api_key, key_name, aktif, rate_limit_per_minute)
+            VALUES (:iid, :api_key, :key_name, TRUE, :rate_limit)
+            RETURNING id, isletme_id, api_key, key_name, aktif, rate_limit_per_minute, created_at, last_used_at
+            """,
+            {
+                "iid": tenant_id,
+                "api_key": api_key,
+                "key_name": payload.key_name,
+                "rate_limit": payload.rate_limit_per_minute,
+            }
+        )
+        
+        logging.info(f"[API_KEY] Created API key for tenant_id={tenant_id}")
+        
+        # İlk oluşturmada gerçek key'i döndür
+        return {
+            "id": row["id"],
+            "isletme_id": row["isletme_id"],
+            "api_key": row["api_key"],  # Gerçek key (ilk seferde)
+            "key_name": row.get("key_name"),
+            "aktif": row["aktif"],
+            "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
+            "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+            "last_used_at": row["last_used_at"].isoformat() if row.get("last_used_at") and hasattr(row["last_used_at"], "isoformat") else (str(row["last_used_at"]) if row.get("last_used_at") else None),
+            "is_new": True,  # Yeni oluşturuldu
+        }
+        
+    except Exception as e:
+        logging.error(f"[API_KEY] Error creating API key: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"API key oluşturulamadı: {str(e)}")
+
+
+@router.get("/tenants/{tenant_id}/api-key", response_model=ApiKeyOut)
+async def get_api_key(
+    tenant_id: int,
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """İşletme için mevcut API key'i döner (maskelenmiş)"""
+    row = await db.fetch_one(
+        "SELECT * FROM api_keys WHERE isletme_id = :iid",
+        {"iid": tenant_id}
+    )
+    
+    if not row:
+        raise HTTPException(status_code=404, detail="API key bulunamadı")
+    
+    return {
+        "id": row["id"],
+        "isletme_id": row["isletme_id"],
+        "api_key": _mask_api_key(row["api_key"]),
+        "key_name": row.get("key_name"),
+        "aktif": row["aktif"],
+        "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
+        "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+        "last_used_at": row["last_used_at"].isoformat() if row.get("last_used_at") and hasattr(row["last_used_at"], "isoformat") else (str(row["last_used_at"]) if row.get("last_used_at") else None),
+    }
+
+
+@router.patch("/tenants/{tenant_id}/api-key", response_model=ApiKeyOut)
+async def update_api_key(
+    tenant_id: int,
+    payload: ApiKeyUpdateIn,
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """API key'i günceller (aktif/pasif, rate limit, isim)"""
+    # API key var mı kontrol et
+    existing = await db.fetch_one(
+        "SELECT * FROM api_keys WHERE isletme_id = :iid",
+        {"iid": tenant_id}
+    )
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="API key bulunamadı")
+    
+    # Güncelleme alanlarını hazırla
+    updates = []
+    params = {"iid": tenant_id}
+    
+    if payload.aktif is not None:
+        updates.append("aktif = :aktif")
+        params["aktif"] = payload.aktif
+    
+    if payload.rate_limit_per_minute is not None:
+        updates.append("rate_limit_per_minute = :rate_limit")
+        params["rate_limit"] = payload.rate_limit_per_minute
+    
+    if payload.key_name is not None:
+        updates.append("key_name = :key_name")
+        params["key_name"] = payload.key_name
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="Güncellenecek alan belirtilmedi")
+    
+    # Güncelle
+    update_sql = f"""
+        UPDATE api_keys
+        SET {', '.join(updates)}
+        WHERE isletme_id = :iid
+        RETURNING id, isletme_id, api_key, key_name, aktif, rate_limit_per_minute, created_at, last_used_at
+    """
+    
+    row = await db.fetch_one(update_sql, params)
+    
+    return {
+        "id": row["id"],
+        "isletme_id": row["isletme_id"],
+        "api_key": _mask_api_key(row["api_key"]),
+        "key_name": row.get("key_name"),
+        "aktif": row["aktif"],
+        "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
+        "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+        "last_used_at": row["last_used_at"].isoformat() if row.get("last_used_at") and hasattr(row["last_used_at"], "isoformat") else (str(row["last_used_at"]) if row.get("last_used_at") else None),
+    }
+
+
+@router.post("/tenants/{tenant_id}/api-key/regenerate", response_model=ApiKeyCreateOut)
+async def regenerate_api_key(
+    tenant_id: int,
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """API key'i yeniden oluşturur (eski key'i geçersiz kılar)"""
+    # Mevcut API key var mı kontrol et
+    existing = await db.fetch_one(
+        "SELECT id FROM api_keys WHERE isletme_id = :iid",
+        {"iid": tenant_id}
+    )
+    
+    if not existing:
+        raise HTTPException(status_code=404, detail="API key bulunamadı")
+    
+    # Yeni API key oluştur
+    new_api_key = _generate_api_key()
+    
+    row = await db.fetch_one(
+        """
+        UPDATE api_keys
+        SET api_key = :new_key, last_used_at = NULL
+        WHERE isletme_id = :iid
+        RETURNING id, isletme_id, api_key, key_name, aktif, rate_limit_per_minute, created_at, last_used_at
+        """,
+        {"iid": tenant_id, "new_key": new_api_key}
+    )
+    
+    # Yeniden oluşturmada gerçek key'i döndür
+    return {
+        "id": row["id"],
+        "isletme_id": row["isletme_id"],
+        "api_key": row["api_key"],  # Gerçek key (yeniden oluşturmada)
+        "key_name": row.get("key_name"),
+        "aktif": row["aktif"],
+        "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
+        "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+        "last_used_at": row["last_used_at"].isoformat() if row.get("last_used_at") and hasattr(row["last_used_at"], "isoformat") else (str(row["last_used_at"]) if row.get("last_used_at") else None),
+        "is_new": True,  # Yeniden oluşturuldu
+    }
+
+
+@router.get("/tenants/{tenant_id}/api-usage")
+async def get_api_usage(
+    tenant_id: int,
+    start_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    end_date: Optional[str] = Query(None, description="YYYY-MM-DD"),
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """İşletme için API kullanım özeti ve maliyeti döner"""
+    from ..services.api_tracking import get_api_usage_summary
+    
+    # İşletme var mı kontrol et
+    isletme = await db.fetch_one(
+        "SELECT id FROM isletmeler WHERE id = :id",
+        {"id": tenant_id}
+    )
+    if not isletme:
+        raise HTTPException(status_code=404, detail="İşletme bulunamadı")
+    
+    # Tarih aralığını parse et
+    start_dt = None
+    end_dt = None
+    
+    if start_date:
+        try:
+            start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Geçersiz start_date formatı (YYYY-MM-DD olmalı)")
+    
+    if end_date:
+        try:
+            end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+            # End date'in sonunu ekle (23:59:59)
+            end_dt = end_dt + timedelta(days=1) - timedelta(seconds=1)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Geçersiz end_date formatı (YYYY-MM-DD olmalı)")
+    
+    # API kullanım özetini al
+    summary = await get_api_usage_summary(
+        isletme_id=tenant_id,
+        start_date=start_dt,
+        end_date=end_dt,
+    )
+    
+    return summary
+

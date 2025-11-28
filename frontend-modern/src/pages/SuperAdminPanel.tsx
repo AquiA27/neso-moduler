@@ -7,7 +7,7 @@ import {
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
-  Trash2, Activity
+  Trash2, Activity, Key, Copy, RefreshCw, Eye, EyeOff
 } from 'lucide-react';
 
 interface Tenant {
@@ -943,6 +943,9 @@ function TenantDetailTab({
         </div>
       </div>
 
+      {/* API Key Management */}
+      <ApiKeyManagementSection tenantId={isletme.id} />
+
       {/* Customization */}
       {customization && (
         <div className="bg-white border border-gray-200 rounded-lg p-6">
@@ -1266,6 +1269,361 @@ function PaymentsTab({
           </table>
         </div>
       )}
+    </div>
+  );
+}
+
+// API Key Management Section (used in TenantDetailTab)
+function ApiKeyManagementSection({ tenantId }: { tenantId: number; onRefresh?: () => void }) {
+  const [apiKey, setApiKey] = useState<{
+    id: number;
+    isletme_id: number;
+    api_key: string;
+    key_name?: string;
+    aktif: boolean;
+    rate_limit_per_minute: number;
+    created_at: string;
+    last_used_at?: string;
+    is_new?: boolean;
+  } | null>(null);
+  const [realApiKey, setRealApiKey] = useState<string | null>(null); // Gerçek key sadece ilk oluşturmada saklanır
+  const [loading, setLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [regenerating, setRegenerating] = useState(false);
+  const [updating, setUpdating] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [apiUsage, setApiUsage] = useState<any>(null);
+  const [usageLoading, setUsageLoading] = useState(false);
+  const [usagePeriod, setUsagePeriod] = useState<'7' | '30' | '90' | '365'>('30');
+
+  const loadApiKey = useCallback(async () => {
+    setLoading(true);
+    try {
+      const response = await superadminApi.apiKeyGet(tenantId);
+      setApiKey(response.data);
+    } catch (error: any) {
+      if (error.response?.status === 404) {
+        // API key yok, oluşturulabilir
+        setApiKey(null);
+      } else {
+        console.error('Error loading API key:', error);
+        alert('API key yüklenirken hata oluştu');
+      }
+    } finally {
+      setLoading(false);
+    }
+  }, [tenantId]);
+
+  const loadApiUsage = useCallback(async () => {
+    setUsageLoading(true);
+    try {
+      const endDate = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - parseInt(usagePeriod));
+      
+      const response = await (superadminApi.apiUsage as any)(
+        tenantId,
+        {
+          start_date: startDate.toISOString().split('T')[0],
+          end_date: endDate.toISOString().split('T')[0],
+        }
+      );
+      setApiUsage(response.data);
+    } catch (error) {
+      console.error('Error loading API usage:', error);
+    } finally {
+      setUsageLoading(false);
+    }
+  }, [tenantId, usagePeriod]);
+
+  useEffect(() => {
+    loadApiKey();
+    loadApiUsage();
+  }, [loadApiKey, loadApiUsage]);
+
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      const response = await superadminApi.apiKeyCreate(tenantId, {
+        isletme_id: tenantId,
+        rate_limit_per_minute: 60,
+      });
+      // Yeni oluşturulduysa gerçek key'i sakla
+      if (response.data.is_new && response.data.api_key) {
+        setRealApiKey(response.data.api_key);
+      }
+      setApiKey(response.data);
+      alert('API key başarıyla oluşturuldu. Lütfen key\'i kopyalayın, bir daha gösterilmeyecek!');
+    } catch (error: any) {
+      alert(`API key oluşturulamadı: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleRegenerate = async () => {
+    if (!confirm('API key yeniden oluşturulacak. Eski key artık çalışmayacak. Devam etmek istiyor musunuz?')) {
+      return;
+    }
+    setRegenerating(true);
+    try {
+      const response = await superadminApi.apiKeyRegenerate(tenantId);
+      // Yeniden oluşturulduysa gerçek key'i sakla
+      if (response.data.is_new && response.data.api_key) {
+        setRealApiKey(response.data.api_key);
+      }
+      setApiKey(response.data);
+      alert('API key başarıyla yeniden oluşturuldu. Lütfen yeni key\'i kopyalayın, bir daha gösterilmeyecek!');
+    } catch (error: any) {
+      alert(`API key yeniden oluşturulamadı: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setRegenerating(false);
+    }
+  };
+
+  const handleUpdate = async (updates: { aktif?: boolean; rate_limit_per_minute?: number }) => {
+    setUpdating(true);
+    try {
+      await superadminApi.apiKeyUpdate(tenantId, updates);
+      await loadApiKey();
+      alert('API key güncellendi');
+    } catch (error: any) {
+      alert(`API key güncellenemedi: ${error.response?.data?.detail || error.message}`);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      {/* API Key Info */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Key className="w-5 h-5 mr-2 text-blue-600" />
+            API Key Yönetimi
+          </h3>
+          <button
+            onClick={loadApiKey}
+            className="text-gray-600 hover:text-gray-900 transition-colors"
+            title="Yenile"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+          </div>
+        ) : !apiKey ? (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Bu işletme için henüz API key oluşturulmamış.
+            </p>
+            <button
+              onClick={handleCreate}
+              disabled={creating}
+              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+            >
+              {creating ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                  Oluşturuluyor...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  API Key Oluştur
+                </>
+              )}
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">API Key</label>
+              <div className="flex items-center space-x-2">
+                <div className="flex-1 flex items-center bg-gray-50 border border-gray-300 rounded-lg px-3 py-2">
+                  <code className="text-sm text-gray-800 flex-1 font-mono break-all">
+                    {realApiKey && showApiKey ? realApiKey : (realApiKey ? realApiKey : apiKey.api_key)}
+                  </code>
+                  {realApiKey && (
+                    <button
+                      onClick={() => setShowApiKey(!showApiKey)}
+                      className="ml-2 text-gray-600 hover:text-gray-900"
+                      title={showApiKey ? 'Gizle' : 'Göster'}
+                    >
+                      {showApiKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  )}
+                </div>
+                <button
+                  onClick={() => {
+                    const keyToCopy = realApiKey || apiKey.api_key;
+                    navigator.clipboard.writeText(keyToCopy).then(() => {
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                    });
+                  }}
+                  className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center"
+                  title="Kopyala"
+                >
+                  {copied ? (
+                    <CheckCircle className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </button>
+              </div>
+              {realApiKey && (
+                <div className="mt-2 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-xs text-yellow-800 font-medium">
+                    ⚠️ Bu key'i güvenli bir yere kaydedin! Bu sayfayı yenilediğinizde gerçek key bir daha gösterilmeyecek.
+                  </p>
+                </div>
+              )}
+              {!realApiKey && (
+                <p className="text-xs text-gray-500 mt-1">
+                  API key maskelenmiş olarak gösteriliyor. Yeni key oluşturulduğunda gerçek key gösterilecek.
+                </p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
+                <div className="flex items-center space-x-2">
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${
+                    apiKey.aktif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {apiKey.aktif ? 'Aktif' : 'Pasif'}
+                  </span>
+                  <button
+                    onClick={() => handleUpdate({ aktif: !apiKey.aktif })}
+                    disabled={updating}
+                    className="text-xs text-blue-600 hover:text-blue-700"
+                  >
+                    {updating ? 'Güncelleniyor...' : 'Değiştir'}
+                  </button>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rate Limit</label>
+                <p className="text-sm text-gray-900">{apiKey.rate_limit_per_minute} / dakika</p>
+              </div>
+            </div>
+
+            {apiKey.last_used_at && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Son Kullanım</label>
+                <p className="text-sm text-gray-600">
+                  {new Date(apiKey.last_used_at).toLocaleString('tr-TR')}
+                </p>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-gray-200 flex space-x-2">
+              <button
+                onClick={handleRegenerate}
+                disabled={regenerating}
+                className="flex-1 px-4 py-2 bg-yellow-100 text-yellow-800 rounded-lg hover:bg-yellow-200 transition-colors disabled:opacity-50 flex items-center justify-center"
+              >
+                {regenerating ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-yellow-800 mr-2"></div>
+                    Yeniden Oluşturuluyor...
+                  </>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    API Key Yenile
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* API Usage Stats */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Activity className="w-5 h-5 mr-2 text-purple-600" />
+            API Kullanım İstatistikleri
+          </h3>
+          <select
+            value={usagePeriod}
+            onChange={(e) => setUsagePeriod(e.target.value as '7' | '30' | '90' | '365')}
+            className="text-xs px-2 py-1 border border-gray-300 rounded focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="7">Son 7 Gün</option>
+            <option value="30">Son 30 Gün</option>
+            <option value="90">Son 90 Gün</option>
+            <option value="365">Son 1 Yıl</option>
+          </select>
+        </div>
+
+        {usageLoading ? (
+          <div className="text-center py-8">
+            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600"></div>
+          </div>
+        ) : !apiUsage ? (
+          <div className="text-center py-8 text-gray-500 text-sm">
+            API kullanım verisi yüklenemedi.
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-blue-50 rounded-lg p-4">
+                <p className="text-xs text-blue-600 font-medium">Toplam İstek</p>
+                <p className="text-2xl font-bold text-blue-900 mt-1">
+                  {apiUsage.total_requests?.toLocaleString('tr-TR') || 0}
+                </p>
+              </div>
+              <div className="bg-green-50 rounded-lg p-4">
+                <p className="text-xs text-green-600 font-medium">Toplam Maliyet</p>
+                <p className="text-2xl font-bold text-green-900 mt-1">
+                  ₺{(apiUsage.total_cost_tl || 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+
+            {apiUsage.endpoint_stats && apiUsage.endpoint_stats.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Endpoint İstatistikleri</p>
+                <div className="space-y-2">
+                  {apiUsage.endpoint_stats.slice(0, 5).map((stat: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between text-xs bg-gray-50 rounded px-3 py-2">
+                      <span className="text-gray-700 font-mono">{stat.endpoint}</span>
+                      <span className="text-gray-600">{stat.total_requests} istek</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {apiUsage.daily_usage && apiUsage.daily_usage.length > 0 && (
+              <div>
+                <p className="text-sm font-medium text-gray-700 mb-2">Günlük Kullanım</p>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {apiUsage.daily_usage.slice(0, 7).map((daily: any, idx: number) => (
+                    <div key={idx} className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600">
+                        {new Date(daily.date).toLocaleDateString('tr-TR', { day: '2-digit', month: 'short' })}
+                      </span>
+                      <span className="text-gray-900 font-medium">{daily.total_requests} istek</span>
+                      <span className="text-green-600">₺{daily.total_cost_tl?.toFixed(2) || '0.00'}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
