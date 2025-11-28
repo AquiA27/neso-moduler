@@ -1186,15 +1186,20 @@ async def get_api_key(
     if not row:
         raise HTTPException(status_code=404, detail="API key bulunamadı")
     
+    # Record objesi için doğrudan erişim
+    key_name = row["key_name"] if "key_name" in row and row["key_name"] is not None else None
+    rate_limit = row["rate_limit_per_minute"] if "rate_limit_per_minute" in row and row["rate_limit_per_minute"] is not None else 60
+    last_used_at = row["last_used_at"] if "last_used_at" in row else None
+    
     return {
         "id": row["id"],
         "isletme_id": row["isletme_id"],
         "api_key": _mask_api_key(row["api_key"]),
-        "key_name": row.get("key_name"),
+        "key_name": key_name,
         "aktif": row["aktif"],
-        "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
+        "rate_limit_per_minute": rate_limit,
         "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
-        "last_used_at": row["last_used_at"].isoformat() if row.get("last_used_at") and hasattr(row["last_used_at"], "isoformat") else (str(row["last_used_at"]) if row.get("last_used_at") else None),
+        "last_used_at": last_used_at.isoformat() if last_used_at and hasattr(last_used_at, "isoformat") else (str(last_used_at) if last_used_at else None),
     }
 
 

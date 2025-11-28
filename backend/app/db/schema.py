@@ -265,6 +265,11 @@ CREATE TABLE IF NOT EXISTS api_usage_logs (
 );
 """
 
+ALTER_API_USAGE_LOGS_COMPAT = """
+ALTER TABLE api_usage_logs ADD COLUMN IF NOT EXISTS cost_tl NUMERIC(10,2) DEFAULT 0;
+ALTER TABLE api_usage_logs ADD COLUMN IF NOT EXISTS cost_usd NUMERIC(10,6) DEFAULT 0;
+"""
+
 CREATE_USER_SUBE_IZIN = """
 CREATE TABLE IF NOT EXISTS user_sube_izinleri (
     username TEXT NOT NULL,
@@ -616,6 +621,12 @@ async def create_tables(db: Database):
     await db.execute(CREATE_NOTIFICATION_HISTORY)
     await db.execute(CREATE_API_KEYS)
     await db.execute(CREATE_API_USAGE_LOGS)
+    # API Usage Logs için eksik kolonları ekle
+    for stmt in [s.strip() for s in ALTER_API_USAGE_LOGS_COMPAT.split(';') if s.strip()]:
+        try:
+            await db.execute(stmt)
+        except Exception:
+            pass  # Kolonlar zaten varsa hata olabilir
     # İndeksler (parça parça, hata yutsa da devam)
     for stmt in [s.strip() for s in CREATE_INDEXES.split(';') if s.strip()]:
         try:
