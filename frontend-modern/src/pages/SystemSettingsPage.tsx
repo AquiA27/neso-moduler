@@ -58,7 +58,12 @@ const SETTINGS: SettingGroup[] = [
 ];
 
 export default function SystemSettingsPage() {
-  const { theme, setTheme } = useAuthStore((state) => ({ theme: state.theme, setTheme: state.setTheme }));
+  const { theme, setTheme, tenantCustomization } = useAuthStore((state) => ({ 
+    theme: state.theme, 
+    setTheme: state.setTheme,
+    tenantCustomization: state.tenantCustomization,
+  }));
+  const businessName = tenantCustomization?.app_name || 'İşletme';
   const [toggles, setToggles] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
     SETTINGS.forEach((group) => {
@@ -80,7 +85,7 @@ export default function SystemSettingsPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-bold text-white">Ayarlar</h1>
         <p className="text-white/70 max-w-2xl">
-          Fıstık Kafe deneyimini işletmenize göre şekillendirin. Tema, bildirim ve operasyonel
+          {businessName} deneyimini işletmenize göre şekillendirin. Tema, bildirim ve operasyonel
           ayarlarınızı buradan yönetebilirsiniz.
         </p>
       </header>

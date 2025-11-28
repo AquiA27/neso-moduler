@@ -72,10 +72,12 @@ function Layout() {
   
   // Logo ve app name'i belirle (memoize edilmiş)
   const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
-  const displayName = useMemo(() => 
-    tenantCustomization?.app_name || (user?.role === 'super_admin' ? 'Neso Modüler' : 'Fıstık Kafe Yönetim Paneli'),
-    [tenantCustomization?.app_name, user?.role]
-  );
+  const displayName = useMemo(() => {
+    if (tenantCustomization?.app_name) {
+      return user?.role === 'super_admin' ? 'Neso Modüler' : `${tenantCustomization.app_name} Yönetim Paneli`;
+    }
+    return user?.role === 'super_admin' ? 'Neso Modüler' : 'Yönetim Paneli';
+  }, [tenantCustomization?.app_name, user?.role]);
   
   // Header arka plan rengini hesapla
   const headerBackground = useMemo(() => {
