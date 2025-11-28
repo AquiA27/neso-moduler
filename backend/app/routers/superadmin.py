@@ -363,40 +363,58 @@ async def users_list(
 
 
 @router.post("/users/upsert")
-async def users_upsert(payload: UserUpsertIn, _: Dict[str, Any] = Depends(get_current_user)):
+async def users_upsert(
+    payload: UserUpsertIn, 
+    current_user: Dict[str, Any] = Depends(get_current_user)
+):
+    """
+    Super admin için kullanıcı ekle/güncelle.
+    Tenant switching yapıyorsa switched_tenant_id kullanılır.
+    """
+    from ..core.security import hash_password
+    
+    # Super admin tenant switching yapıyorsa switched_tenant_id kullan
+    switched_tenant_id = current_user.get("switched_tenant_id")
+    tenant_id = switched_tenant_id  # Super admin tenant switching yapıyorsa tenant_id set et
+    
     # Şifre hash sütunu varsa kullan, yoksa geç
     params = {
         "u": payload.username,
         "r": payload.role,
         "a": payload.aktif,
+        "tid": tenant_id,
     }
+    
     if payload.password:
         try:
-            from ..core.security import hash_password
             params["h"] = hash_password(payload.password)
             await db.execute(
                 """
-                INSERT INTO users (username, sifre_hash, role, aktif)
-                VALUES (:u, :h, :r, :a)
+                INSERT INTO users (username, sifre_hash, role, aktif, tenant_id)
+                VALUES (:u, :h, :r, :a, :tid)
                 ON CONFLICT (username) DO UPDATE
                    SET role = EXCLUDED.role,
                        aktif = EXCLUDED.aktif,
-                       sifre_hash = EXCLUDED.sifre_hash
+                       sifre_hash = EXCLUDED.sifre_hash,
+                       tenant_id = EXCLUDED.tenant_id
                 """,
                 params,
             )
             return {"ok": True}
-        except Exception:
+        except Exception as e:
             # Şema sifre_hash içermiyorsa ikinci deneme
+            import logging
+            logging.warning(f"[USER_UPSERT] Error with password hash: {e}")
             pass
 
     await db.execute(
         """
-        INSERT INTO users (username, role, aktif)
-        VALUES (:u, :r, :a)
+        INSERT INTO users (username, role, aktif, tenant_id)
+        VALUES (:u, :r, :a, :tid)
         ON CONFLICT (username) DO UPDATE
            SET role = EXCLUDED.role,
-               aktif = EXCLUDED.aktif
+               aktif = EXCLUDED.aktif,
+               tenant_id = EXCLUDED.tenant_id
         """,
         params,
     )

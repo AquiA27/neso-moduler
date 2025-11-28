@@ -34,6 +34,7 @@ class RegisterRequest(BaseModel):
     username: str = Field(..., min_length=3, max_length=50, description="Username (3-50 characters)")
     password: str = Field(..., min_length=8, description="Password (min 8 chars)")
     role: Optional[str] = Field("operator", description="User role: operator, admin, super_admin")
+    tenant_id: Optional[int] = Field(None, description="Tenant ID (required for super_admin, auto-set for admin)")
 
 
 class PasswordChangeRequest(BaseModel):
@@ -191,15 +192,42 @@ async def register(
             detail="Username already exists"
         )
 
+    # Determine tenant_id:
+    # - If current user is admin, use their tenant_id
+    # - If current user is super_admin, use tenant_id from request (or None for super_admin users)
+    tenant_id = None
+    if current_user["role"] == "admin":
+        # Admin users can only create users for their own tenant
+        tenant_id = current_user.get("tenant_id")
+        if not tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Admin users must have a tenant_id"
+            )
+    elif current_user["role"] == "super_admin":
+        # Super admin can specify tenant_id or create super_admin users (tenant_id=None)
+        tenant_id = request.tenant_id
+        # If creating a non-super_admin user, tenant_id is required
+        if request.role != "super_admin" and not tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="tenant_id is required when creating non-super_admin users"
+            )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only admins can register new users"
+        )
+
     # Hash password and insert user
     hashed = hash_password(request.password)
     user = await db.fetch_one(
         """
-        INSERT INTO users (username, sifre_hash, role, aktif)
-        VALUES (:u, :h, :r, TRUE)
+        INSERT INTO users (username, sifre_hash, role, tenant_id, aktif)
+        VALUES (:u, :h, :r, :tid, TRUE)
         RETURNING id, username, role, aktif
         """,
-        {"u": request.username, "h": hashed, "r": request.role}
+        {"u": request.username, "h": hashed, "r": request.role, "tid": tenant_id}
     )
 
     return UserResponse(**user)
