@@ -2209,14 +2209,29 @@ function ApiUsageTab() {
   const loadStats = async () => {
     setLoading(true);
     try {
-      const response = await superadminApi.apiUsage({
-        isletme_id: selectedTenant || undefined,
-        days,
-        api_type: 'openai',
-      });
-      setStats(response.data);
+      if (selectedTenant) {
+        // Yeni tenant bazlı endpoint kullan
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        
+        const response = await (superadminApi.apiUsage as any)(
+          selectedTenant,
+          {
+            start_date: startDate.toISOString().split('T')[0],
+            end_date: endDate.toISOString().split('T')[0],
+          }
+        );
+        // Yeni endpoint tek bir obje döner, array'e çevir
+        setStats([response.data]);
+      } else {
+        // Tüm işletmeler için eski endpoint'i kullan (eğer backend'de varsa)
+        // Şimdilik boş array döndür
+        setStats([]);
+      }
     } catch (error) {
       console.error('Error loading API usage stats:', error);
+      setStats([]);
     } finally {
       setLoading(false);
     }

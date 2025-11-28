@@ -380,15 +380,6 @@ export const superadminApi = {
   dashboardStats: async () => {
     return apiClient.get('/superadmin/dashboard/stats');
   },
-  
-  // API Usage Stats
-  apiUsage: async (params?: { isletme_id?: number; days?: number; api_type?: string }) => {
-    const searchParams = new URLSearchParams();
-    if (params?.isletme_id) searchParams.append('isletme_id', String(params.isletme_id));
-    if (params?.days) searchParams.append('days', String(params.days));
-    if (params?.api_type) searchParams.append('api_type', params.api_type);
-    return apiClient.get(`/superadmin/api-usage?${searchParams.toString()}`);
-  },
 };
 
 // Subscription API
