@@ -65,40 +65,35 @@ async def get_customization(
     
     has_openai_columns = column_check is not None
     
-    # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları çek
-    if has_openai_columns:
-        row = await db.fetch_one(
-            """
-            SELECT id, isletme_id, domain, app_name, logo_url, primary_color,
-                   secondary_color, footer_text, email, telefon, adres, 
-                   openai_api_key, openai_model, meta_settings,
-                   created_at, updated_at
-            FROM tenant_customizations
-            WHERE isletme_id = :id
-            """,
-            {"id": isletme_id},
-        )
-    else:
-        row = await db.fetch_one(
-            """
-            SELECT id, isletme_id, domain, app_name, logo_url, primary_color,
-                   secondary_color, footer_text, email, telefon, adres, 
-                   meta_settings, created_at, updated_at
-            FROM tenant_customizations
-            WHERE isletme_id = :id
-            """,
-            {"id": isletme_id},
-        )
-        # Kolonlar yoksa None olarak ekle
-        if row:
-            row_dict = dict(row) if hasattr(row, 'keys') else row
+    # Assistant kolonlarını kontrol et
+    from .customization_helper import check_assistant_columns, get_select_fields, add_default_assistant_fields
+    has_assistant_columns = await check_assistant_columns()
+    
+    # SELECT fields'i helper'dan al
+    select_fields = get_select_fields(has_openai_columns, has_assistant_columns)
+    
+    row = await db.fetch_one(
+        f"""
+        SELECT {select_fields}
+        FROM tenant_customizations
+        WHERE isletme_id = :id
+        """,
+        {"id": isletme_id},
+    )
+    
+    # Kolonlar yoksa varsayılan değerleri ekle
+    if row:
+        row_dict = dict(row) if hasattr(row, 'keys') else row
+        if not has_openai_columns:
             row_dict["openai_api_key"] = None
             row_dict["openai_model"] = "gpt-4o-mini"
-            row = row_dict
+        row_dict = add_default_assistant_fields(row_dict, has_assistant_columns)
+        row = row_dict
     
     if not row:
         # Varsayılan değerler döndür
-        return {
+        from .customization_helper import add_default_assistant_fields
+        default_result = {
             "id": 0,
             "isletme_id": isletme_id,
             "domain": None,
@@ -116,6 +111,8 @@ async def get_customization(
             "created_at": datetime.utcnow(),
             "updated_at": datetime.utcnow(),
         }
+        default_result = add_default_assistant_fields(default_result, has_assistant_columns)
+        return default_result
     
     import json
     result = dict(row) if hasattr(row, 'keys') else row
@@ -268,6 +265,10 @@ async def update_customization(
     
     has_openai_columns = column_check is not None
     
+    # Assistant kolonlarını kontrol et
+    from .customization_helper import check_assistant_columns
+    has_assistant_columns = await check_assistant_columns()
+    
     import json
     data = payload.model_dump(exclude={"isletme_id"}, exclude_unset=False)
     data["isletme_id"] = isletme_id
@@ -284,17 +285,40 @@ async def update_customization(
     if has_openai_columns:
         fields_to_update.extend(["openai_api_key", "openai_model"])
     
+    # Assistant kolonlarını ekle
+    if has_assistant_columns.get("customer_assistant_openai_api_key"):
+        fields_to_update.extend([
+            "customer_assistant_openai_api_key",
+            "customer_assistant_openai_model",
+            "customer_assistant_tts_voice_id",
+            "customer_assistant_tts_speech_rate",
+            "customer_assistant_tts_provider",
+        ])
+    if has_assistant_columns.get("business_assistant_openai_api_key"):
+        fields_to_update.extend([
+            "business_assistant_openai_api_key",
+            "business_assistant_openai_model",
+            "business_assistant_tts_voice_id",
+            "business_assistant_tts_speech_rate",
+            "business_assistant_tts_provider",
+        ])
+    
     for field in fields_to_update:
         if field in data and data[field] is not None:
             # Boş string'leri None'a çevir (opsiyonel alanlar için)
-            if field in ["domain", "app_name", "logo_url", "footer_text", "email", "telefon", "adres", "openai_api_key"]:
+            optional_string_fields = [
+                "domain", "app_name", "logo_url", "footer_text", "email", "telefon", "adres",
+                "openai_api_key", "customer_assistant_openai_api_key", "business_assistant_openai_api_key",
+                "customer_assistant_tts_voice_id", "business_assistant_tts_voice_id"
+            ]
+            if field in optional_string_fields:
                 if data[field] == "":
                     update_fields.append(f"{field} = NULL")
                 else:
                     update_fields.append(f"{field} = :{field}")
                     update_values[field] = data[field]
             else:
-                # primary_color, secondary_color, openai_model, meta_settings her zaman güncellenmeli
+                # primary_color, secondary_color, openai_model, meta_settings, speech_rate, provider her zaman güncellenmeli
                 update_fields.append(f"{field} = :{field}")
                 update_values[field] = data[field]
     
@@ -302,10 +326,8 @@ async def update_customization(
         raise HTTPException(400, "Güncellenecek alan yok")
     
     # RETURNING kısmını da kolon varlığına göre ayarla
-    if has_openai_columns:
-        returning_fields = "id, isletme_id, domain, app_name, logo_url, primary_color, secondary_color, footer_text, email, telefon, adres, openai_api_key, openai_model, meta_settings, created_at, updated_at"
-    else:
-        returning_fields = "id, isletme_id, domain, app_name, logo_url, primary_color, secondary_color, footer_text, email, telefon, adres, meta_settings, created_at, updated_at"
+    from .customization_helper import get_select_fields
+    returning_fields = get_select_fields(has_openai_columns, has_assistant_columns)
     
     query = f"""
         UPDATE tenant_customizations

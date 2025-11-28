@@ -271,6 +271,7 @@ export default function SuperAdminPanel() {
               subscriptions={filteredSubscriptions}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
+              onRefresh={loadData}
             />
           )}
 
@@ -999,11 +1000,13 @@ function TenantDetailTab({
 function SubscriptionsTab({ 
   subscriptions, 
   searchTerm, 
-  onSearchChange 
+  onSearchChange,
+  onRefresh,
 }: { 
   subscriptions: Subscription[]; 
   searchTerm: string; 
   onSearchChange: (value: string) => void;
+  onRefresh: () => void;
 }) {
   return (
     <div>
@@ -1051,6 +1054,31 @@ function SubscriptionsTab({
             sonrakiYenileme = new Date(bitis).toLocaleDateString('tr-TR');
           }
           
+          const handleStatusChange = async (newStatus: 'active' | 'suspended' | 'cancelled') => {
+            let confirmMessage = '';
+            if (newStatus === 'suspended') {
+              confirmMessage = `${sub.isletme_ad || `İşletme #${sub.isletme_id}`} aboneliğini geçici olarak durdurmak (askıya almak) istediğinizden emin misiniz?`;
+            } else if (newStatus === 'cancelled') {
+              confirmMessage = `${sub.isletme_ad || `İşletme #${sub.isletme_id}`} aboneliğini kalıcı olarak sonlandırmak istediğinizden emin misiniz?\n\nBu işlem sonrasında abonelik durumu 'cancelled' olacaktır.`;
+            } else if (newStatus === 'active') {
+              confirmMessage = `${sub.isletme_ad || `İşletme #${sub.isletme_id}`} aboneliğini yeniden aktifleştirmek istediğinizden emin misiniz?`;
+            }
+
+            if (!confirm(confirmMessage)) return;
+
+            try {
+              const bitisTarihi = newStatus === 'cancelled'
+                ? new Date().toISOString()
+                : sub.bitis_tarihi || undefined;
+
+              await subscriptionApi.updateStatus(sub.isletme_id, newStatus, bitisTarihi);
+              alert('Abonelik durumu güncellendi');
+              onRefresh();
+            } catch (error: any) {
+              alert(`Abonelik durumu güncellenemedi: ${error.response?.data?.detail || error.message}`);
+            }
+          };
+
           return (
             <div key={sub.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow bg-white">
               <div className="flex items-center justify-between mb-4">
@@ -1101,6 +1129,33 @@ function SubscriptionsTab({
                     <p className="font-medium text-gray-900">{sub.max_kullanicilar}</p>
                   </div>
                 </div>
+              </div>
+              {/* Abonelik Durumu Aksiyonları */}
+              <div className="mt-4 pt-3 border-t border-gray-200 flex flex-wrap gap-2">
+                {(sub.status === 'active') && (
+                  <button
+                    onClick={() => handleStatusChange('suspended')}
+                    className="px-3 py-1.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-lg hover:bg-yellow-200 transition-colors"
+                  >
+                    Aboneliği Durdur
+                  </button>
+                )}
+                {(sub.status === 'suspended') && (
+                  <button
+                    onClick={() => handleStatusChange('active')}
+                    className="px-3 py-1.5 bg-green-100 text-green-800 text-xs font-medium rounded-lg hover:bg-green-200 transition-colors"
+                  >
+                    Yeniden Başlat
+                  </button>
+                )}
+                {sub.status !== 'cancelled' && (
+                  <button
+                    onClick={() => handleStatusChange('cancelled')}
+                    className="px-3 py-1.5 bg-red-100 text-red-800 text-xs font-medium rounded-lg hover:bg-red-200 transition-colors"
+                  >
+                    Aboneliği Bitir
+                  </button>
+                )}
               </div>
             </div>
           );
