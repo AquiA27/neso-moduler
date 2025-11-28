@@ -48,7 +48,10 @@ function Layout() {
       
       // Subdomain yoksa veya bulunamadıysa tenant_id'den yükle
       if (!effectiveTenantId) {
-        setTenantCustomization(null);
+        // Super admin ise null bırak, normal kullanıcı için fallback
+        if (user?.role !== 'super_admin') {
+          setTenantCustomization(null);
+        }
         return;
       }
       
@@ -63,19 +66,24 @@ function Layout() {
         });
       } catch (error) {
         console.warn('Tenant customization yüklenemedi:', error);
-        setTenantCustomization(null);
+        // Hata durumunda null set etme, fallback kullanılsın
       }
     };
     
-    loadCustomization();
-  }, [tenantId, selectedTenantId, setTenantCustomization]);
+    // Sadece user varsa yükle (login olduktan sonra)
+    if (user) {
+      loadCustomization();
+    }
+  }, [tenantId, selectedTenantId, user, setTenantCustomization]);
   
   // Logo ve app name'i belirle (memoize edilmiş)
   const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
-  const displayName = useMemo(() => 
-    tenantCustomization?.app_name || (user?.role === 'super_admin' ? 'Neso Modüler' : 'Fıstık Kafe Yönetim Paneli'),
-    [tenantCustomization?.app_name, user?.role]
-  );
+  const displayName = useMemo(() => {
+    if (tenantCustomization?.app_name) {
+      return user?.role === 'super_admin' ? 'Neso Modüler' : `${tenantCustomization.app_name} Yönetim Paneli`;
+    }
+    return user?.role === 'super_admin' ? 'Neso Modüler' : 'Yönetim Paneli';
+  }, [tenantCustomization?.app_name, user?.role]);
   
   // Header arka plan rengini hesapla
   const headerBackground = useMemo(() => {
