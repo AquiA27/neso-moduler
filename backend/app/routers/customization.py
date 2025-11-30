@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 from datetime import datetime
+from pathlib import Path
+import secrets
 from ..core.deps import require_roles, get_current_user
+from ..core.config import settings
 from ..db.database import db
 from .customization_helper import check_assistant_columns, get_select_fields, add_default_assistant_fields
 
@@ -418,4 +421,112 @@ async def get_customization_by_domain(
             result["meta_settings"] = {}
     
     return result
+
+
+def resolve_media_path(url: Optional[str]) -> Optional[Path]:
+    """Media URL'ini dosya yolu olarak çözümler"""
+    if not url:
+        return None
+    if url.startswith('http://') or url.startswith('https://'):
+        return None  # External URL, local path'e çevrilemez
+    # URL'den media root'u çıkar
+    if url.startswith(settings.MEDIA_URL):
+        relative = url[len(settings.MEDIA_URL):].lstrip('/')
+        return Path(settings.MEDIA_ROOT) / relative
+    # Zaten relative path ise
+    if url.startswith('/'):
+        url = url[1:]
+    return Path(settings.MEDIA_ROOT) / url
+
+
+@router.post("/isletme/{isletme_id}/logo/upload")
+async def upload_logo(
+    isletme_id: int,
+    file: UploadFile = File(...),
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Logo yükle (Super admin only)"""
+    if user.get("role") != "super_admin":
+        raise HTTPException(403, "Sadece super admin logo yükleyebilir")
+    
+    # İşletme kontrolü
+    isletme = await db.fetch_one(
+        "SELECT id FROM isletmeler WHERE id = :id",
+        {"id": isletme_id},
+    )
+    if not isletme:
+        raise HTTPException(404, "İşletme bulunamadı")
+    
+    # Dosya tipi kontrolü
+    allowed_types = {
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
+        "image/gif": ".gif",
+        "image/svg+xml": ".svg",
+    }
+    content_type = (file.content_type or "").lower()
+    extension = allowed_types.get(content_type)
+    original_suffix = Path(file.filename or "").suffix.lower()
+    if not extension:
+        if original_suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}:
+            extension = ".jpg" if original_suffix in {".jpg", ".jpeg"} else original_suffix
+        else:
+            raise HTTPException(status_code=400, detail="Desteklenmeyen dosya türü. Sadece JPG, PNG, WebP, GIF veya SVG yükleyebilirsiniz.")
+    
+    # Dosya boyutu kontrolü
+    content = await file.read()
+    max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Dosya boyutu çok büyük. Maksimum {settings.MAX_UPLOAD_SIZE_MB}MB yükleyebilirsiniz.",
+        )
+    
+    # Mevcut logo'yu kontrol et
+    existing = await db.fetch_one(
+        "SELECT id, logo_url FROM tenant_customizations WHERE isletme_id = :id",
+        {"id": isletme_id},
+    )
+    
+    # Dosyayı kaydet
+    media_dir = Path(settings.MEDIA_ROOT) / "logos"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    filename = f"logo_{isletme_id}_{secrets.token_hex(8)}{extension}"
+    file_path = (media_dir / filename).resolve()
+    
+    try:
+        with open(file_path, "wb") as out_file:
+            out_file.write(content)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Logo kaydedilemedi: {exc}") from exc
+    
+    # Eski logo'yu sil
+    if existing and existing.get("logo_url"):
+        old_path = resolve_media_path(existing["logo_url"])
+        if old_path and old_path.exists():
+            try:
+                if old_path.is_file():
+                    old_path.unlink()
+            except Exception:
+                pass
+    
+    relative_url = f"{settings.MEDIA_URL.rstrip('/')}/logos/{filename}"
+    
+    # Customization'ı güncelle veya oluştur
+    if existing:
+        await db.execute(
+            "UPDATE tenant_customizations SET logo_url = :url, updated_at = NOW() WHERE isletme_id = :id",
+            {"id": isletme_id, "url": relative_url},
+        )
+    else:
+        await db.execute(
+            """
+            INSERT INTO tenant_customizations (isletme_id, logo_url, created_at, updated_at)
+            VALUES (:id, :url, NOW(), NOW())
+            """,
+            {"id": isletme_id, "url": relative_url},
+        )
+    
+    return {"logo_url": relative_url}
 

@@ -8,7 +8,6 @@ from ..db.database import db
 router = APIRouter(
     prefix="/subscription",
     tags=["Subscription"],
-    dependencies=[Depends(require_roles({"super_admin"}))],
 )
 
 
@@ -43,9 +42,9 @@ class SubscriptionStatusUpdate(BaseModel):
 async def list_subscriptions(
     isletme_id: Optional[int] = Query(None, description="İşletme ID ile filtrele"),
     status: Optional[str] = Query(None, description="Durum ile filtrele"),
-    _: Dict[str, Any] = Depends(get_current_user),
+    _: Dict[str, Any] = Depends(require_roles({"super_admin"})),
 ):
-    """Tüm abonelikleri listele (işletme adı ile birlikte)"""
+    """Tüm abonelikleri listele (işletme adı ile birlikte) - Super admin only"""
     query = """
         SELECT s.id, s.isletme_id, i.ad as isletme_ad, s.plan_type, s.status, 
                s.max_subeler, s.max_kullanicilar, s.max_menu_items, s.ayllik_fiyat, 
@@ -74,9 +73,9 @@ async def list_subscriptions(
 @router.get("/{isletme_id}", response_model=SubscriptionOut)
 async def get_subscription(
     isletme_id: int,
-    _: Dict[str, Any] = Depends(get_current_user),
+    _: Dict[str, Any] = Depends(require_roles({"super_admin"})),
 ):
-    """İşletme aboneliğini getir"""
+    """İşletme aboneliğini getir - Super admin only"""
     row = await db.fetch_one(
         """
         SELECT id, isletme_id, plan_type, status, max_subeler, max_kullanicilar,
@@ -95,9 +94,9 @@ async def get_subscription(
 @router.post("/create", response_model=SubscriptionOut)
 async def create_subscription(
     payload: SubscriptionIn,
-    _: Dict[str, Any] = Depends(get_current_user),
+    _: Dict[str, Any] = Depends(require_roles({"super_admin"})),
 ):
-    """Yeni abonelik oluştur"""
+    """Yeni abonelik oluştur - Super admin only"""
     # İşletme kontrolü
     isletme = await db.fetch_one(
         "SELECT id FROM isletmeler WHERE id = :id",
@@ -144,9 +143,9 @@ async def create_subscription(
 async def update_subscription(
     isletme_id: int,
     payload: SubscriptionIn,
-    _: Dict[str, Any] = Depends(get_current_user),
+    _: Dict[str, Any] = Depends(require_roles({"super_admin"})),
 ):
-    """Abonelik güncelle"""
+    """Abonelik güncelle - Super admin only"""
     existing = await db.fetch_one(
         "SELECT id FROM subscriptions WHERE isletme_id = :id",
         {"id": isletme_id},
@@ -181,9 +180,9 @@ async def update_subscription(
 async def update_subscription_status(
     isletme_id: int,
     payload: SubscriptionStatusUpdate,
-    _: Dict[str, Any] = Depends(get_current_user),
+    _: Dict[str, Any] = Depends(require_roles({"super_admin"})),
 ):
-    """Abonelik durumunu güncelle"""
+    """Abonelik durumunu güncelle - Super admin only"""
     existing = await db.fetch_one(
         "SELECT id FROM subscriptions WHERE isletme_id = :id",
         {"id": isletme_id},
@@ -215,9 +214,9 @@ async def update_subscription_status(
 @router.get("/{isletme_id}/limits")
 async def get_subscription_limits(
     isletme_id: int,
-    _: Dict[str, Any] = Depends(get_current_user),
+    _: Dict[str, Any] = Depends(require_roles({"super_admin"})),
 ):
-    """İşletmenin abonelik limitlerini ve kullanımını getir"""
+    """İşletmenin abonelik limitlerini ve kullanımını getir - Super admin only"""
     sub = await db.fetch_one(
         """
         SELECT plan_type, status, max_subeler, max_kullanicilar, max_menu_items
@@ -261,5 +260,59 @@ async def get_subscription_limits(
             "menu_items": menu_count["count"] if menu_count else 0,
         },
     }
+
+
+@router.get("/my/status")
+async def get_my_subscription_status(
+    user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Mevcut tenant'ın abonelik durumunu getir (tenant bazlı)"""
+    tenant_id = user.get("tenant_id") or user.get("switched_tenant_id")
+    if not tenant_id:
+        # Super admin ise null döndür
+        if user.get("role") == "super_admin":
+            return None
+        raise HTTPException(400, "Tenant ID bulunamadı")
+    
+    sub = await db.fetch_one(
+        """
+        SELECT status, bitis_tarihi, plan_type
+        FROM subscriptions
+        WHERE isletme_id = :id
+        """,
+        {"id": tenant_id},
+    )
+    
+    if not sub:
+        return None
+    
+    from datetime import datetime, timezone
+    
+    result = {
+        "status": sub["status"],
+        "bitis_tarihi": sub["bitis_tarihi"],
+        "plan_type": sub.get("plan_type"),
+    }
+    
+    # Bitiş tarihine yakın mı kontrol et (7 gün içinde bitiyorsa uyarı göster)
+    if sub["bitis_tarihi"]:
+        try:
+            if isinstance(sub["bitis_tarihi"], str):
+                bitis = datetime.fromisoformat(sub["bitis_tarihi"].replace("Z", "+00:00"))
+            else:
+                bitis = sub["bitis_tarihi"]
+            
+            if isinstance(bitis, datetime):
+                if bitis.tzinfo is None:
+                    bitis = bitis.replace(tzinfo=timezone.utc)
+                
+                now = datetime.now(timezone.utc)
+                days_until_expiry = (bitis - now).days
+                result["days_until_expiry"] = days_until_expiry
+                result["expires_soon"] = 0 <= days_until_expiry <= 7
+        except Exception:
+            result["expires_soon"] = False
+    
+    return result
 
 

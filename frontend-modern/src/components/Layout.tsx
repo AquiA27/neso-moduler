@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { customizationApi } from '../lib/api';
+import { customizationApi, subscriptionApi } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
-import { Menu, Settings, LogOut } from 'lucide-react';
+import { Menu, Settings, LogOut, AlertTriangle, X } from 'lucide-react';
 import logo from '../assets/fistik-logo.svg';
 import TenantSwitcher from './TenantSwitcher';
 
@@ -19,6 +19,8 @@ function Layout() {
   const { user, logout, tenantId, tenantCustomization, setTenantCustomization, selectedTenantId } = useAuthStore();
   const navigate = useNavigate();
   const [navOpen, setNavOpen] = useState(false);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
+  const [showSubscriptionAlert, setShowSubscriptionAlert] = useState(true);
   
   // Tenant customization'ı yükle (tenant_id veya subdomain'den)
   useEffect(() => {
@@ -75,6 +77,30 @@ function Layout() {
       loadCustomization();
     }
   }, [tenantId, selectedTenantId, user, setTenantCustomization]);
+  
+  // Subscription durumunu kontrol et (super admin hariç)
+  useEffect(() => {
+    const checkSubscription = async () => {
+      // Super admin ise kontrol etme
+      if (user?.role === 'super_admin') {
+        return;
+      }
+      
+      try {
+        const response = await subscriptionApi.getMyStatus();
+        setSubscriptionStatus(response.data);
+      } catch (error: any) {
+        // 404 ise subscription yok demektir, uyarı gösterme
+        if (error.response?.status !== 404) {
+          console.warn('Subscription durumu kontrol edilemedi:', error);
+        }
+      }
+    };
+    
+    if (user && tenantId) {
+      checkSubscription();
+    }
+  }, [user, tenantId]);
   
   // Logo ve app name'i belirle (memoize edilmiş)
   const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
@@ -218,8 +244,61 @@ function Layout() {
     </>
   );
 
+  // Subscription uyarısı mesajı
+  const subscriptionAlertMessage = useMemo(() => {
+    if (!subscriptionStatus || !showSubscriptionAlert) return null;
+    
+    const status = subscriptionStatus.status;
+    const bitisTarihi = subscriptionStatus.bitis_tarihi;
+    const daysUntilExpiry = subscriptionStatus.days_until_expiry;
+    const expiresSoon = subscriptionStatus.expires_soon;
+    
+    if (status === 'suspended') {
+      return {
+        type: 'error',
+        message: 'Aboneliğiniz askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.',
+      };
+    }
+    
+    if (status === 'cancelled') {
+      return {
+        type: 'error',
+        message: 'Aboneliğiniz sonlandırılmıştır. Lütfen yöneticinizle iletişime geçin.',
+      };
+    }
+    
+    if (expiresSoon && daysUntilExpiry !== undefined) {
+      return {
+        type: 'warning',
+        message: `Aboneliğiniz ${daysUntilExpiry} gün içinde sona erecek. Lütfen yöneticinizle iletişime geçin.`,
+      };
+    }
+    
+    return null;
+  }, [subscriptionStatus, showSubscriptionAlert]);
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Subscription Uyarısı */}
+      {subscriptionAlertMessage && (
+        <div className={`${
+          subscriptionAlertMessage.type === 'error' 
+            ? 'bg-red-600 text-white' 
+            : 'bg-yellow-500 text-white'
+        } px-4 py-3 flex items-center justify-between`}>
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            <span>{subscriptionAlertMessage.message}</span>
+          </div>
+          <button
+            onClick={() => setShowSubscriptionAlert(false)}
+            className="hover:bg-white/20 rounded p-1"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      
       {/* Header */}
       <header 
         className="relative sticky top-0 z-50 border-b border-white/15 shadow-lg backdrop-blur-md"

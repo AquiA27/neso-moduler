@@ -39,6 +39,7 @@ export default function PublicMenuPage() {
   const [loading, setLoading] = useState(true);
   const [categories, setCategories] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [customization, setCustomization] = useState<{app_name?: string; logo_url?: string} | null>(null);
 
   useEffect(() => {
     const loadMasaFromQR = async () => {
@@ -60,6 +61,10 @@ export default function PublicMenuPage() {
         console.log('[QR] Masa bilgisi yüklendi:', data);
         setMasa(data.masa_adi || initialMasa);
         setSubeId(data.sube_id ? Number(data.sube_id) : 1);
+        // Customization bilgisini de kaydet
+        if (data.customization) {
+          setCustomization(data.customization);
+        }
       } catch (err) {
         console.error('QR kod masa bilgisi yüklenemedi:', err);
         setMasaError('Masa bilgisi alınamadı. Varsayılan menü gösteriliyor.');
@@ -173,7 +178,19 @@ export default function PublicMenuPage() {
             </button>
             <div className="flex-1 space-y-2 md:space-y-3">
               <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                <h1 className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight">Neso Menü</h1>
+                {customization?.logo_url && (
+                  <img
+                    src={resolveImageUrl(customization.logo_url)}
+                    alt={customization.app_name || 'Logo'}
+                    className="h-12 w-12 md:h-16 md:w-16 object-contain rounded-lg"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                )}
+                <h1 className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight">
+                  {customization?.app_name ? `${customization.app_name} Menü` : (subeId ? 'Menü' : 'Neso Menü')}
+                </h1>
                 <span className="px-2 py-0.5 md:px-3 md:py-1 text-xs font-semibold rounded-full bg-white/10 border border-white/15">
                   Şefin Önerileri
                 </span>

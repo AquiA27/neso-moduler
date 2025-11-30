@@ -374,6 +374,20 @@ async def get_masa_by_qr(qr_code: str):
             logging.warning(f"[PUBLIC_API] İşletme inactive for QR code: {qr_code[:20]}..., isletme_id={row_dict.get('isletme_id')}")
             raise HTTPException(status_code=404, detail="İşletme bulunamadı")
         
+        # Customization bilgisini de al
+        customization = await db.fetch_one(
+            """
+            SELECT app_name, logo_url, primary_color, secondary_color
+            FROM tenant_customizations
+            WHERE isletme_id = :iid
+            """,
+            {"iid": row_dict.get("isletme_id")},
+        )
+        
+        customization_dict = None
+        if customization:
+            customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
+        
         return {
             "id": row_dict["id"],
             "masa_adi": row_dict["masa_adi"],
@@ -382,6 +396,7 @@ async def get_masa_by_qr(qr_code: str):
             "kapasite": row_dict["kapasite"],
             "sube_id": row_dict["sube_id"],
             "isletme_id": row_dict.get("isletme_id"),  # Frontend için isletme_id de döndür
+            "customization": customization_dict,  # Customization bilgisini de döndür
         }
         
     except HTTPException:

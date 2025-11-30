@@ -423,6 +423,10 @@ export const subscriptionApi = {
   getLimits: async (isletme_id: number) => {
     return apiClient.get(`/subscription/${isletme_id}/limits`);
   },
+  
+  getMyStatus: async () => {
+    return apiClient.get('/subscription/my/status');
+  },
 };
 
 // Payment API
@@ -489,6 +493,16 @@ export const customizationApi = {
   
   getByDomain: async (domain: string) => {
     return publicApiClient.get(`/customization/domain/${domain}`);
+  },
+  
+  uploadLogo: async (isletme_id: number, file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return apiClient.post(`/customization/isletme/${isletme_id}/logo/upload`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
   },
 };
 

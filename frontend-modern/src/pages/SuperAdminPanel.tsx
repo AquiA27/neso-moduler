@@ -1725,6 +1725,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [exists, setExists] = useState(false);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
 
   const resetState = useCallback(() => {
     setFormData({
@@ -1988,12 +1989,68 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
           <section className="border border-gray-200 rounded-xl p-6 space-y-6">
             <h3 className="text-lg font-semibold text-gray-900">Marka Öğeleri</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <Field
-                label="Logo URL"
-                value={formData.logo_url}
-                onChange={(value) => setFormData((prev) => ({ ...prev, logo_url: value }))}
-                placeholder="https://..."
-              />
+              <div className="flex flex-col">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Logo</label>
+                {formData.logo_url && (
+                  <div className="mb-3">
+                    <img
+                      src={formData.logo_url.startsWith('http') ? formData.logo_url : `${import.meta.env?.VITE_API_URL || 'http://localhost:8000'}${formData.logo_url}`}
+                      alt="Logo"
+                      className="h-24 w-24 object-contain border border-gray-300 rounded-lg p-2 bg-gray-50"
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <label className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer text-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed" style={{ cursor: uploadingLogo ? 'not-allowed' : 'pointer' }}>
+                    {uploadingLogo ? 'Yükleniyor...' : formData.logo_url ? 'Değiştir' : 'Logo Yükle'}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                      className="hidden"
+                      disabled={uploadingLogo || !selectedTenant}
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !selectedTenant) return;
+                        setUploadingLogo(true);
+                        setError(null);
+                        try {
+                          const response = await customizationApi.uploadLogo(selectedTenant, file);
+                          setFormData((prev) => ({ ...prev, logo_url: response.data.logo_url }));
+                          setSuccess('Logo başarıyla yüklendi');
+                        } catch (err: any) {
+                          setError(err.response?.data?.detail || err.message || 'Logo yüklenemedi');
+                        } finally {
+                          setUploadingLogo(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                  </label>
+                  {formData.logo_url && (
+                    <button
+                      type="button"
+                      onClick={() => setFormData((prev) => ({ ...prev, logo_url: '' }))}
+                      className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+                    >
+                      Kaldır
+                    </button>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-gray-500">JPG, PNG, WebP, GIF veya SVG formatında, maksimum 5MB</p>
+                {formData.logo_url && (
+                  <div className="mt-3">
+                    <Field
+                      label="Logo URL (Manuel gir)"
+                      value={formData.logo_url}
+                      onChange={(value) => setFormData((prev) => ({ ...prev, logo_url: value }))}
+                      placeholder="https://..."
+                    />
+                  </div>
+                )}
+              </div>
               <div className="flex flex-col">
                 <label className="block text-sm font-medium text-gray-700 mb-3">Tema Paketi</label>
                 <div className="grid grid-cols-2 gap-3">
