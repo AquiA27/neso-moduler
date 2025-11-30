@@ -965,6 +965,22 @@ async def quick_setup(
                     "aciklama": f"İlk kurulum - Aylık abonelik ücreti ({payload.plan_type})",
                 },
             )
+        
+        # 7. API Key oluştur (işletme için otomatik API key)
+        api_key = _generate_api_key()
+        api_key_row = await db.fetch_one(
+            """
+            INSERT INTO api_keys (isletme_id, api_key, key_name, aktif, rate_limit_per_minute)
+            VALUES (:iid, :api_key, :key_name, TRUE, :rate_limit)
+            RETURNING id, api_key
+            """,
+            {
+                "iid": isletme_id,
+                "api_key": api_key,
+                "key_name": f"{payload.isletme_ad} - API Key",
+                "rate_limit": 60,  # Varsayılan rate limit
+            }
+        )
     
     return {
         "ok": True,
@@ -972,6 +988,7 @@ async def quick_setup(
         "sube_id": sube_id,
         "subscription_id": subscription["id"],
         "admin_username": payload.admin_username,
+        "api_key": api_key_row["api_key"],  # İlk kurulumda API key'i döndür
         "message": "İşletme başarıyla kuruldu",
     }
 
