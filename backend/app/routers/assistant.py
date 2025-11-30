@@ -3760,7 +3760,6 @@ async def chat_smart(payload: ChatRequest):
         else:
             # Parse başarısız veya sipariş oluşturulmadı, LLM'e sor
             try:
-                import logging
                 logging.info(f"[LLM] Calling LLM provider for text: '{text[:50]}...'")
             
                 # OpenAIProvider tuple döndürür (text, usage_info), diğerleri string
@@ -3800,7 +3799,6 @@ async def chat_smart(payload: ChatRequest):
                 if not reply_text or len(reply_text.strip()) == 0:
                     logging.warning("[LLM] Empty reply from LLM, using default")
             except Exception as e:
-                import logging
                 logging.error(f"[LLM] Error calling LLM provider: {e}", exc_info=True)
                 reply_text = ""
 
