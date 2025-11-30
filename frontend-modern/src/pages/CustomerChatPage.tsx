@@ -132,7 +132,10 @@ export default function CustomerChatPage() {
         try {
           setMasaLoading(true);
           const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
-          const response = await fetch(`${API_BASE_URL}/public/masa/${qrCode}`);
+          // QR kod'u URL encode et (özel karakterler için)
+          const encodedQRCode = encodeURIComponent(qrCode);
+          console.log('[QR] Loading masa info for QR code:', qrCode.substring(0, 20) + '...');
+          const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQRCode}`);
           if (response.ok) {
             const data = await response.json();
             console.log('[QR] Masa bilgisi yüklendi:', data);
@@ -142,6 +145,9 @@ export default function CustomerChatPage() {
               setSubeId(parseInt(data.sube_id, 10));
               console.log('[QR] sube_id güncellendi:', data.sube_id);
             }
+          } else {
+            const errorData = await response.json().catch(() => ({ detail: 'Masa bulunamadı' }));
+            console.error('[QR] Masa API error:', response.status, errorData);
           }
         } catch (err) {
           console.error('QR kod masa bilgisi yüklenemedi:', err);

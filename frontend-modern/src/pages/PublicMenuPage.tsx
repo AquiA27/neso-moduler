@@ -47,11 +47,17 @@ export default function PublicMenuPage() {
         setMasaLoading(true);
         setMasaError('');
         const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
-        const response = await fetch(`${API_BASE_URL}/public/masa/${qrCode}`);
+        // QR kod'u URL encode et (özel karakterler için)
+        const encodedQRCode = encodeURIComponent(qrCode);
+        console.log('[QR] Loading masa info for QR code:', qrCode.substring(0, 20) + '...');
+        const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQRCode}`);
         if (!response.ok) {
-          throw new Error('Masa bulunamadı');
+          const errorData = await response.json().catch(() => ({ detail: 'Masa bulunamadı' }));
+          console.error('[QR] Masa API error:', response.status, errorData);
+          throw new Error(errorData.detail || 'Masa bulunamadı');
         }
         const data = await response.json();
+        console.log('[QR] Masa bilgisi yüklendi:', data);
         setMasa(data.masa_adi || initialMasa);
         setSubeId(data.sube_id ? Number(data.sube_id) : 1);
       } catch (err) {
