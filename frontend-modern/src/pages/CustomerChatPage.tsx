@@ -17,7 +17,6 @@ export default function CustomerChatPage() {
   const [masa, setMasa] = useState(searchParams.get('masa') || '');
   const [masaLoading, setMasaLoading] = useState(false);
   const [subeId, setSubeId] = useState<number>(parseInt(searchParams.get('sube_id') || '1', 10));
-  const [customization, setCustomization] = useState<{app_name?: string; logo_url?: string} | null>(null);
   const qrCode = searchParams.get('qr');
   
   const [messages, setMessages] = useState<Message[]>([
@@ -145,10 +144,6 @@ export default function CustomerChatPage() {
             if (data.sube_id) {
               setSubeId(parseInt(data.sube_id, 10));
               console.log('[QR] sube_id güncellendi:', data.sube_id);
-            }
-            // Customization bilgisini de kaydet
-            if (data.customization) {
-              setCustomization(data.customization);
             }
           } else {
             const errorData = await response.json().catch(() => ({ detail: 'Masa bulunamadı' }));

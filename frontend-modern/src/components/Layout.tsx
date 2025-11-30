@@ -249,7 +249,6 @@ function Layout() {
     if (!subscriptionStatus || !showSubscriptionAlert) return null;
     
     const status = subscriptionStatus.status;
-    const bitisTarihi = subscriptionStatus.bitis_tarihi;
     const daysUntilExpiry = subscriptionStatus.days_until_expiry;
     const expiresSoon = subscriptionStatus.expires_soon;
     
