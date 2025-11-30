@@ -256,6 +256,8 @@ async def public_menu(sube_id: Optional[int] = Query(None, description="Şube ID
         if not sube_id:
             raise HTTPException(status_code=400, detail="sube_id parametresi gereklidir")
         
+        logging.info(f"[PUBLIC_API] Loading menu for sube_id: {sube_id}")
+        
         # Şube var mı ve aktif mi kontrol et
         sube_row = await db.fetch_one(
             """
@@ -268,12 +270,20 @@ async def public_menu(sube_id: Optional[int] = Query(None, description="Şube ID
         )
         
         if not sube_row:
+            logging.warning(f"[PUBLIC_API] Şube not found: sube_id={sube_id}")
             raise HTTPException(status_code=404, detail="Şube bulunamadı")
         
-        if not sube_row.get("sube_aktif"):
+        # Row'u dict'e çevir
+        sube_dict = dict(sube_row) if hasattr(sube_row, 'keys') else sube_row
+        
+        logging.info(f"[PUBLIC_API] Şube found: id={sube_dict.get('id')}, sube_aktif={sube_dict.get('sube_aktif')}, isletme_aktif={sube_dict.get('isletme_aktif')}")
+        
+        if not sube_dict.get("sube_aktif"):
+            logging.warning(f"[PUBLIC_API] Şube inactive: sube_id={sube_id}")
             raise HTTPException(status_code=404, detail="Şube aktif değil")
         
-        if not sube_row.get("isletme_aktif"):
+        if not sube_dict.get("isletme_aktif"):
+            logging.warning(f"[PUBLIC_API] İşletme inactive: sube_id={sube_id}, isletme_id={sube_dict.get('isletme_id')}")
             raise HTTPException(status_code=404, detail="İşletme aktif değil")
         
         # N+1 query düzeltmesi: Tek JOIN sorgusu ile tüm varyasyonları getir
@@ -334,6 +344,7 @@ async def get_masa_by_qr(qr_code: str):
     """
     try:
         # Masa bilgisini al - QR kod benzersiz olduğu için doğrudan sorgu yapabiliriz
+        logging.info(f"[PUBLIC_API] Looking up masa with QR code: {qr_code[:20]}...")
         row = await db.fetch_one(
             """
             SELECT m.id, m.masa_adi, m.qr_code, m.durum, m.kapasite, m.sube_id,
@@ -346,28 +357,36 @@ async def get_masa_by_qr(qr_code: str):
             {"qr_code": qr_code},
         )
         if not row:
+            logging.warning(f"[PUBLIC_API] Masa not found for QR code: {qr_code[:20]}...")
             raise HTTPException(status_code=404, detail="Masa bulunamadı")
+        
+        # Row'u dict'e çevir
+        row_dict = dict(row) if hasattr(row, 'keys') else row
+        
+        logging.info(f"[PUBLIC_API] Masa found: id={row_dict.get('id')}, sube_id={row_dict.get('sube_id')}, sube_aktif={row_dict.get('sube_aktif')}, isletme_aktif={row_dict.get('isletme_aktif')}")
         
         # Şube ve işletme aktif mi kontrol et
-        if not row.get("sube_aktif"):
+        if not row_dict.get("sube_aktif"):
+            logging.warning(f"[PUBLIC_API] Şube inactive for QR code: {qr_code[:20]}..., sube_id={row_dict.get('sube_id')}")
             raise HTTPException(status_code=404, detail="Masa bulunamadı")
         
-        if not row.get("isletme_aktif"):
+        if not row_dict.get("isletme_aktif"):
+            logging.warning(f"[PUBLIC_API] İşletme inactive for QR code: {qr_code[:20]}..., isletme_id={row_dict.get('isletme_id')}")
             raise HTTPException(status_code=404, detail="İşletme bulunamadı")
         
         return {
-            "id": row["id"],
-            "masa_adi": row["masa_adi"],
-            "qr_code": row["qr_code"],
-            "durum": row["durum"],
-            "kapasite": row["kapasite"],
-            "sube_id": row["sube_id"],
-            "isletme_id": row.get("isletme_id"),  # Frontend için isletme_id de döndür
+            "id": row_dict["id"],
+            "masa_adi": row_dict["masa_adi"],
+            "qr_code": row_dict["qr_code"],
+            "durum": row_dict["durum"],
+            "kapasite": row_dict["kapasite"],
+            "sube_id": row_dict["sube_id"],
+            "isletme_id": row_dict.get("isletme_id"),  # Frontend için isletme_id de döndür
         }
         
     except HTTPException:
         raise
     except Exception as e:
         error_msg = str(e)
-        logging.error(f"[PUBLIC_API] Error getting masa by QR: {e}", exc_info=True)
+        logging.error(f"[PUBLIC_API] Error getting masa by QR code '{qr_code}': {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
