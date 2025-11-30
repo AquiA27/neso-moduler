@@ -2730,7 +2730,8 @@ async def chat_smart(payload: ChatRequest):
                         items_with_variations.add(key)
                         logging.info(f"[VARIATION] Missing variation for '{urun_ad}' (x{adet}), will prompt user")
         
-            # Eğer eksik varyasyon varsa, kullanıcıya sor, sipariş oluşturma
+            # Eğer eksik varyasyon varsa, kullanıcıya sor
+            # ANCAK: Varyasyonsuz ürünler varsa onlar için sipariş oluştur
             if missing_variations_in_cart:
                 # Varyasyon eksik ürünler için LLM'e sor
                 for mv in missing_variations_in_cart:
@@ -2738,27 +2739,104 @@ async def chat_smart(payload: ChatRequest):
                     context_lines.append(f"KULLANICI '{mv['urun']}' (x{mv['adet']}) ISTEDI ANCAK BUNUN SECENEKLERİ VAR: {var_list}. KULLANICIYA BU SECENEKLERI SOR MALI.")
                     logging.info(f"[VARIATION] Missing variation for '{mv['urun']}': {mv['varyasyonlar']}")
             
-                # TÜM ürünleri session'a kaydet (varyasyonlu ve varyasyonsuz)
-                # SADECE varyasyonsuz ürünleri session'a kaydet (varyasyonlu olanlar için kullanıcıya sorulacak)
-                # Varyasyonlu ürünler conversation history'den gelecek
+                # Varyasyonsuz ve varyasyonlu ürünleri ayır
                 pending_items = {}
+                items_without_variation = {}
                 for key, adet in aggregated.items():
-                    # Sadece varyasyon gerektirmeyen ürünleri kaydet
                     if key not in items_with_variations:
+                        # Varyasyonsuz ürün - hemen siparişe ekle
+                        product_key = key.split("|", 1)[0] if "|" in key else key
+                        items_without_variation[product_key] = items_without_variation.get(product_key, 0) + adet
+                        logging.info(f"[VARIATION] Product without variation (will create order now): {product_key} x {adet}")
+                    else:
+                        # Varyasyonlu ürün - pending'e kaydet
                         product_key = key.split("|", 1)[0] if "|" in key else key
                         pending_items[product_key] = pending_items.get(product_key, 0) + adet
-                        logging.info(f"[SESSION] Adding to pending (no variation): {product_key} x {adet}")
-                    else:
-                        logging.info(f"[SESSION] Skipping pending for {key} (has variation, will be asked)")
+                        logging.info(f"[SESSION] Adding to pending (has variation): {product_key} x {adet}")
 
-                    # Context'e varyasyonsuz ürünleri ekle
-                    if key not in items_with_variations:
+                # Varyasyonsuz ürünler varsa onlar için sipariş oluştur
+                if items_without_variation:
+                    sepet = []
+                    for product_key, adet in items_without_variation.items():
+                        menu_item = next((item for item in menu_items if item["key"] == product_key), None)
                         urun_ad = name_map.get(product_key, product_key)
-                        context_lines.append(f"KULLANICI '{urun_ad}' (x{adet}) ISTEDI VE SECENEK GEREKMEDIGI ICIN SISTEM HAZIRDA TUTACAK. KULLANICI VARIYASYONLARI BELIRTTIKTEN SONRA TUM URUNLERI BIRLIKTE EKLEYECEK.")
+                        base_fiyat = float(price_map.get(product_key) or 0)
+                        kategori = category_map.get(product_key, "")
+                        
+                        sepet_item = {
+                            "urun": urun_ad,
+                            "adet": adet,
+                            "fiyat": base_fiyat,
+                            "kategori": kategori
+                        }
+                        sepet.append(sepet_item)
+                        logging.info(f"[VARIATION] Adding to cart (no variation): {urun_ad} x {adet}")
+                    
+                    tutar = sum(item["adet"] * item["fiyat"] for item in sepet)
+                    
+                    # Adisyon sistemi: Masada açık adisyon varsa al, yoksa oluştur
+                    from ..routers.adisyon import _get_or_create_adisyon, _update_adisyon_totals
+                    adisyon_id = await _get_or_create_adisyon(masa, sube_id)
+                    
+                    row = await db.fetch_one(
+                        """
+                        INSERT INTO siparisler (sube_id, masa, adisyon_id, sepet, durum, tutar)
+                        VALUES (:sid, :masa, :adisyon_id, CAST(:sepet AS JSONB), 'yeni', :tutar)
+                        RETURNING id, masa, durum, tutar, created_at
+                        """,
+                        {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
+                    )
+                    logging.info(f"[ORDER] Created partial order #{row['id']} with items without variation: {json_dumps(sepet)}")
+                    
+                    # Adisyon toplamlarını güncelle
+                    try:
+                        await _update_adisyon_totals(adisyon_id, sube_id)
+                    except Exception as e:
+                        logging.warning(f"Adisyon toplamları güncellenirken hata: {e}", exc_info=True)
+                    
+                    # Stok güncelle
+                    for product_key, adet in items_without_variation.items():
+                        stok_key = product_key
+                        new_value = stock_map.get(stok_key, 0) - adet
+                        _fallback_stock[(sube_id, stok_key)] = max(0.0, new_value)
+                        if stok_key in has_db_key:
+                            await db.execute(
+                                """
+                                UPDATE stok_kalemleri
+                                SET miktar = GREATEST(0, miktar - :adet)
+                                WHERE sube_id = :sid AND LOWER(kod) = LOWER(:kod)
+                                """,
+                                {"adet": adet, "sid": sube_id, "kod": name_map.get(stok_key, stok_key)},
+                            )
+                    
+                    # WebSocket broadcast
+                    from ..websocket.manager import manager, Topics
+                    await manager.broadcast({
+                        "type": "new_order",
+                        "order_id": row["id"],
+                        "masa": row["masa"],
+                        "durum": row["durum"],
+                        "sube_id": sube_id
+                    }, topic=Topics.KITCHEN)
+                    
+                    await manager.broadcast({
+                        "type": "order_added",
+                        "order_id": row["id"],
+                        "masa": row["masa"],
+                        "status": row["durum"],
+                        "sube_id": sube_id
+                    }, topic=Topics.ORDERS)
+                    
+                    sepet_desc = ", ".join(f"{item['urun']} x{item['adet']}" for item in sepet)
+                    context_lines.append(f"KULLANICI SİPARİŞ VERDİ. Varyasyonsuz ürünler için sipariş oluşturuldu: {sepet_desc}. Toplam {tutar:.2f} TL. Varyasyonlu ürünler için seçenek soruluyor.")
+                    
+                    # Order summary oluştur
+                    order_summary = {"id": row["id"], "masa": row["masa"], "durum": row["durum"], "tutar": float(row["tutar"]), "created_at": row["created_at"], "sepet": sepet}
 
-                # Tüm ürünleri session'a kaydet (varyasyonlu olanlar dahil)
-                _pending_aggregated[conversation_id] = pending_items
-                logging.info(f"[SESSION] Saved pending aggregated items (including products with missing variations): {pending_items}")
+                # Varyasyonlu ürünleri pending'e kaydet
+                if pending_items:
+                    _pending_aggregated[conversation_id] = pending_items
+                    logging.info(f"[SESSION] Saved pending aggregated items (products with missing variations): {pending_items}")
                 _pending_variations[conversation_id] = [dict(item) for item in missing_variations_in_cart]
              
                 context_lines.append("KULLANICI SİPARİŞ VERDİ ANCAK BAZI ÜRÜNLER İÇİN SEÇENEK BELİRTİLMEDİ. MÜŞTERİYE KISA VE NET BİR ŞEKİLDE SEÇENEKLERİ SOR. PASİF OLMA, DİREKT SEÇENEKLERİ SUN.")
@@ -2768,7 +2846,13 @@ async def chat_smart(payload: ChatRequest):
                     var_list = ", ".join(mv["varyasyonlar"])
                     # Ürün adını ve adetini regex'e uygun formatta yaz (conversation history'den bulabilmek için)
                     missing_vars_text.append(f"'{mv['urun']}' (x{mv['adet']}) için: {var_list}")
-                default_reply = f"Merhaba! Şu ürünler için seçenek belirtmediniz: {'; '.join(missing_vars_text)}. Lütfen tercihinizi belirtir misiniz?"
+                
+                if items_without_variation:
+                    # Varyasyonsuz ürünler sipariş edildi, sadece varyasyonlu ürünler için sor
+                    sepet_desc = ", ".join(f"{name_map.get(k, k)} x{v}" for k, v in items_without_variation.items())
+                    default_reply = f"Harika! {sepet_desc} için siparişinizi oluşturdum. Ancak şu ürünler için seçenek belirtmediniz: {'; '.join(missing_vars_text)}. Lütfen tercihinizi belirtir misiniz?"
+                else:
+                    default_reply = f"Merhaba! Şu ürünler için seçenek belirtmediniz: {'; '.join(missing_vars_text)}. Lütfen tercihinizi belirtir misiniz?"
                 logging.info(f"[VARIATION] default_reply with product counts: {default_reply}")
                 # LLM çağrısı yapılacak
             else:
