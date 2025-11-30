@@ -247,42 +247,34 @@ async def public_create_order(
 
 
 @router.get("/menu")
-async def public_menu(
-    sube_id: Optional[int] = None,
-    api_business: Dict[str, Any] = Depends(get_api_key_business),
-):
+async def public_menu(sube_id: Optional[int] = Query(None, description="Şube ID (zorunlu)")):
     """
-    API key ile korumalı menü listeleme endpoint'i.
-    İşletme verileri API key'den gelir, sube_id ise işletmenin ilk aktif şubesi olur.
+    Public menü listeleme endpoint'i (API key gerekmez).
+    sube_id parametresi zorunludur. Şube aktif olmalı ve işletme aktif olmalı.
     """
-    start_time = time.time()
-    isletme_id = api_business["isletme_id"]
-    api_key_id = api_business["api_key_id"]
-    
     try:
-        # İşletmenin şubelerini kontrol et
-        if sube_id:
-            # Belirtilen şubenin işletmeye ait olduğunu kontrol et
-            sube_check = await db.fetch_one(
-                "SELECT id FROM subeler WHERE id = :sid AND isletme_id = :iid AND aktif = TRUE",
-                {"sid": sube_id, "iid": isletme_id},
-            )
-            if not sube_check:
-                raise HTTPException(status_code=404, detail="Şube bulunamadı veya bu işletmeye ait değil")
-        else:
-            # İşletmenin ilk aktif şubesini al
-            sube_row = await db.fetch_one(
-                """
-                SELECT id FROM subeler
-                WHERE isletme_id = :iid AND aktif = TRUE
-                ORDER BY id ASC
-                LIMIT 1
-                """,
-                {"iid": isletme_id},
-            )
-            if not sube_row:
-                raise HTTPException(status_code=404, detail="İşletme için aktif şube bulunamadı")
-            sube_id = sube_row["id"]
+        if not sube_id:
+            raise HTTPException(status_code=400, detail="sube_id parametresi gereklidir")
+        
+        # Şube var mı ve aktif mi kontrol et
+        sube_row = await db.fetch_one(
+            """
+            SELECT s.id, s.isletme_id, s.aktif as sube_aktif, i.aktif as isletme_aktif
+            FROM subeler s
+            JOIN isletmeler i ON s.isletme_id = i.id
+            WHERE s.id = :sid
+            """,
+            {"sid": sube_id},
+        )
+        
+        if not sube_row:
+            raise HTTPException(status_code=404, detail="Şube bulunamadı")
+        
+        if not sube_row.get("sube_aktif"):
+            raise HTTPException(status_code=404, detail="Şube aktif değil")
+        
+        if not sube_row.get("isletme_aktif"):
+            raise HTTPException(status_code=404, detail="İşletme aktif değil")
         
         # N+1 query düzeltmesi: Tek JOIN sorgusu ile tüm varyasyonları getir
         rows = await db.fetch_all(
@@ -324,101 +316,44 @@ async def public_menu(
         
         items = list(items_dict.values())
         
-        response_time_ms = int((time.time() - start_time) * 1000)
-        
-        # API kullanımını logla (menü listeleme ücretsiz)
-        await log_api_usage(
-            isletme_id=isletme_id,
-            api_key_id=api_key_id,
-            api_type="rest_api",
-            endpoint="/public/menu",
-            method="GET",
-            status="success",
-            status_code=200,
-            response_time_ms=response_time_ms,
-            metadata={"sube_id": sube_id},
-            cost_tl=0.0,  # Menü listeleme ücretsiz
-        )
-        
         return items
         
-    except HTTPException as he:
-        # HTTPException'ları tekrar fırlat
-        response_time_ms = int((time.time() - start_time) * 1000)
-        await log_api_usage(
-            isletme_id=isletme_id,
-            api_key_id=api_key_id,
-            api_type="rest_api",
-            endpoint="/public/menu",
-            method="GET",
-            status="error",
-            status_code=he.status_code,
-            response_time_ms=response_time_ms,
-            error_message=he.detail,
-            metadata={"sube_id": sube_id},
-            cost_tl=0.0,
-        )
+    except HTTPException:
         raise
     except Exception as e:
-        # Diğer hataları logla ve fırlat
-        response_time_ms = int((time.time() - start_time) * 1000)
         error_msg = str(e)
         logging.error(f"[PUBLIC_API] Error getting menu: {e}", exc_info=True)
-        await log_api_usage(
-            isletme_id=isletme_id,
-            api_key_id=api_key_id,
-            api_type="rest_api",
-            endpoint="/public/menu",
-            method="GET",
-            status="error",
-            status_code=500,
-            response_time_ms=response_time_ms,
-            error_message=error_msg,
-            metadata={"sube_id": sube_id},
-            cost_tl=0.0,
-        )
         raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
 
 
 @router.get("/masa/{qr_code}")
-async def get_masa_by_qr(
-    qr_code: str,
-    api_business: Dict[str, Any] = Depends(get_api_key_business),
-):
-    """QR kod ile masa bilgisini al (API key ile korumalı endpoint)"""
-    start_time = time.time()
-    isletme_id = api_business["isletme_id"]
-    api_key_id = api_business["api_key_id"]
-    
+async def get_masa_by_qr(qr_code: str):
+    """
+    QR kod ile masa bilgisini al (Public endpoint - API key gerekmez).
+    QR kod benzersiz olduğu için masa bilgisinden şube ve işletme bilgisine erişilebilir.
+    """
     try:
-        # Masa bilgisini al ve işletmeye ait olduğunu kontrol et
+        # Masa bilgisini al - QR kod benzersiz olduğu için doğrudan sorgu yapabiliriz
         row = await db.fetch_one(
             """
-            SELECT m.id, m.masa_adi, m.qr_code, m.durum, m.kapasite, m.sube_id
+            SELECT m.id, m.masa_adi, m.qr_code, m.durum, m.kapasite, m.sube_id,
+                   s.isletme_id, s.aktif as sube_aktif, i.aktif as isletme_aktif
             FROM masalar m
             JOIN subeler s ON m.sube_id = s.id
-            WHERE m.qr_code = :qr_code AND s.isletme_id = :iid
+            JOIN isletmeler i ON s.isletme_id = i.id
+            WHERE m.qr_code = :qr_code
             """,
-            {"qr_code": qr_code, "iid": isletme_id},
+            {"qr_code": qr_code},
         )
         if not row:
             raise HTTPException(status_code=404, detail="Masa bulunamadı")
         
-        response_time_ms = int((time.time() - start_time) * 1000)
+        # Şube ve işletme aktif mi kontrol et
+        if not row.get("sube_aktif"):
+            raise HTTPException(status_code=404, detail="Masa bulunamadı")
         
-        # API kullanımını logla (masa sorgulama ücretsiz)
-        await log_api_usage(
-            isletme_id=isletme_id,
-            api_key_id=api_key_id,
-            api_type="rest_api",
-            endpoint=f"/public/masa/{qr_code}",
-            method="GET",
-            status="success",
-            status_code=200,
-            response_time_ms=response_time_ms,
-            metadata={"qr_code": qr_code, "sube_id": row["sube_id"]},
-            cost_tl=0.0,  # Masa sorgulama ücretsiz
-        )
+        if not row.get("isletme_aktif"):
+            raise HTTPException(status_code=404, detail="İşletme bulunamadı")
         
         return {
             "id": row["id"],
@@ -427,41 +362,12 @@ async def get_masa_by_qr(
             "durum": row["durum"],
             "kapasite": row["kapasite"],
             "sube_id": row["sube_id"],
+            "isletme_id": row.get("isletme_id"),  # Frontend için isletme_id de döndür
         }
         
-    except HTTPException as he:
-        # HTTPException'ları tekrar fırlat
-        response_time_ms = int((time.time() - start_time) * 1000)
-        await log_api_usage(
-            isletme_id=isletme_id,
-            api_key_id=api_key_id,
-            api_type="rest_api",
-            endpoint=f"/public/masa/{qr_code}",
-            method="GET",
-            status="error",
-            status_code=he.status_code,
-            response_time_ms=response_time_ms,
-            error_message=he.detail,
-            metadata={"qr_code": qr_code},
-            cost_tl=0.0,
-        )
+    except HTTPException:
         raise
     except Exception as e:
-        # Diğer hataları logla ve fırlat
-        response_time_ms = int((time.time() - start_time) * 1000)
         error_msg = str(e)
-        logging.error(f"[PUBLIC_API] Error getting masa: {e}", exc_info=True)
-        await log_api_usage(
-            isletme_id=isletme_id,
-            api_key_id=api_key_id,
-            api_type="rest_api",
-            endpoint=f"/public/masa/{qr_code}",
-            method="GET",
-            status="error",
-            status_code=500,
-            response_time_ms=response_time_ms,
-            error_message=error_msg,
-            metadata={"qr_code": qr_code},
-            cost_tl=0.0,
-        )
+        logging.error(f"[PUBLIC_API] Error getting masa by QR: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Internal server error: {error_msg}")
