@@ -1944,10 +1944,13 @@ async def chat_smart(payload: ChatRequest):
                     )
             
                 sample = _pick_menu_samples(menu_items, 4)
-                venue = business_profile.get("sube_ad") if business_profile else None
+                isletme_ad = business_profile.get("isletme_ad") if business_profile else None
+                sube_ad = business_profile.get("sube_ad") if business_profile else None
                 reply = "Merhaba"
-                if venue:
-                    reply += f", {venue} şubemize hoş geldiniz"
+                if isletme_ad:
+                    reply += f", {isletme_ad}'ye hoş geldiniz"
+                elif sube_ad:
+                    reply += f", {sube_ad} şubemize hoş geldiniz"
                 else:
                     reply += "! Hoş geldiniz"
                 if sample and len(sample) > 0:
@@ -2000,10 +2003,13 @@ async def chat_smart(payload: ChatRequest):
                     )
             
                 sample = _pick_menu_samples(menu_items, 4)
-                venue = business_profile.get("sube_ad") if business_profile else None
+                isletme_ad = business_profile.get("isletme_ad") if business_profile else None
+                sube_ad = business_profile.get("sube_ad") if business_profile else None
                 reply = "Merhaba"
-                if venue:
-                    reply += f", {venue} şubemize hoş geldiniz"
+                if isletme_ad:
+                    reply += f", {isletme_ad}'ye hoş geldiniz"
+                elif sube_ad:
+                    reply += f", {sube_ad} şubemize hoş geldiniz"
                 else:
                     reply += "! Hoş geldiniz"
                 if sample and len(sample) > 0:
@@ -2052,10 +2058,13 @@ async def chat_smart(payload: ChatRequest):
             menu_items = await _load_menu_details(sube_id)
             if menu_items:
                 sample = _pick_menu_samples(menu_items, 4)
-                venue = business_profile.get("sube_ad") if business_profile else None
+                isletme_ad = business_profile.get("isletme_ad") if business_profile else None
+                sube_ad = business_profile.get("sube_ad") if business_profile else None
                 reply = "Merhaba"
-                if venue:
-                    reply += f", {venue} şubemize hoş geldiniz"
+                if isletme_ad:
+                    reply += f", {isletme_ad}'ye hoş geldiniz"
+                elif sube_ad:
+                    reply += f", {sube_ad} şubemize hoş geldiniz"
                 else:
                     reply += "! Hoş geldiniz"
                 if sample and len(sample) > 0:
@@ -2084,7 +2093,7 @@ async def chat_smart(payload: ChatRequest):
                 detected_language=detected_lang,
             )
 
-            recipe_map_norm, recipe_detail_map = await _load_recipe_map(sube_id)
+        recipe_map_norm, recipe_detail_map = await _load_recipe_map(sube_id)
 
         attr_map, dairy_free_items, caffeine_free_items, gluten_free_items = _analyze_menu_attributes(menu_items, recipe_map_norm)
         for item in menu_items:
