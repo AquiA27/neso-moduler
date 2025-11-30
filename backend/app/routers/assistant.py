@@ -2854,6 +2854,7 @@ async def chat_smart(payload: ChatRequest):
                 else:
                     default_reply = f"Merhaba! Şu ürünler için seçenek belirtmediniz: {'; '.join(missing_vars_text)}. Lütfen tercihinizi belirtir misiniz?"
                 logging.info(f"[VARIATION] default_reply with product counts: {default_reply}")
+                force_default_reply = True  # Varyasyon sorusu için default_reply'yi zorunlu kıl
                 # LLM çağrısı yapılacak
             else:
                 # Sepet oluştur - varyasyon bilgisini de ekle
