@@ -1306,16 +1306,26 @@ async def regenerate_api_key(
         {"iid": tenant_id, "new_key": new_api_key}
     )
     
+    if not row:
+        raise HTTPException(status_code=500, detail="API key güncellenemedi")
+    
+    # Record objesi için dict'e çevir veya direkt erişim
+    row_dict = dict(row) if hasattr(row, 'keys') else row
+    key_name = row_dict.get("key_name") if isinstance(row_dict, dict) else (row_dict["key_name"] if "key_name" in row_dict else None)
+    rate_limit = row_dict.get("rate_limit_per_minute", 60) if isinstance(row_dict, dict) else (row_dict.get("rate_limit_per_minute") if "rate_limit_per_minute" in row_dict else 60)
+    last_used_at = row_dict.get("last_used_at") if isinstance(row_dict, dict) else (row_dict["last_used_at"] if "last_used_at" in row_dict else None)
+    created_at = row_dict["created_at"]
+    
     # Yeniden oluşturmada gerçek key'i döndür
     return {
-        "id": row["id"],
-        "isletme_id": row["isletme_id"],
-        "api_key": row["api_key"],  # Gerçek key (yeniden oluşturmada)
-        "key_name": row.get("key_name"),
-        "aktif": row["aktif"],
-        "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
-        "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
-        "last_used_at": row["last_used_at"].isoformat() if row.get("last_used_at") and hasattr(row["last_used_at"], "isoformat") else (str(row["last_used_at"]) if row.get("last_used_at") else None),
+        "id": row_dict["id"],
+        "isletme_id": row_dict["isletme_id"],
+        "api_key": row_dict["api_key"],  # Gerçek key (yeniden oluşturmada)
+        "key_name": key_name,
+        "aktif": row_dict["aktif"],
+        "rate_limit_per_minute": rate_limit if rate_limit is not None else 60,
+        "created_at": created_at.isoformat() if hasattr(created_at, "isoformat") else str(created_at),
+        "last_used_at": last_used_at.isoformat() if last_used_at and hasattr(last_used_at, "isoformat") else (str(last_used_at) if last_used_at else None),
         "is_new": True,  # Yeniden oluşturuldu
     }
 

@@ -3865,27 +3865,21 @@ async def chat_smart(payload: ChatRequest):
         raise
     except Exception as e:
         logging.error(f"[CHAT] Unhandled error in chat_smart: {e}", exc_info=True)
-        conversation_id_for_error = payload.conversation_id if hasattr(payload, 'conversation_id') and payload.conversation_id else uuid4().hex
-        reply = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
-        return await _build_chat_response(
-            reply=reply,
-            conversation_id=conversation_id_for_error,
-            detected_language="tr",
-            tenant_id=None,
-        )
-    except HTTPException:
-        raise
-    except Exception as e:
-        logging.error(f"[CHAT] Unhandled error in chat_smart: {e}", exc_info=True)
+        logging.error(f"[CHAT] Error type: {type(e).__name__}, Error args: {e.args}")
         # Hata durumunda basit bir mesaj döndür
         conversation_id_for_error = payload.conversation_id if hasattr(payload, 'conversation_id') and payload.conversation_id else uuid4().hex
-        reply = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
-        return await _build_chat_response(
-            reply=reply,
-            conversation_id=conversation_id_for_error,
-            detected_language="tr",
-            tenant_id=None,
-        )
+        try:
+            reply = "Üzgünüm, bir hata oluştu. Lütfen tekrar deneyin."
+            return await _build_chat_response(
+                reply=reply,
+                conversation_id=conversation_id_for_error,
+                detected_language="tr",
+                tenant_id=None,
+            )
+        except Exception as inner_e:
+            logging.error(f"[CHAT] Error building error response: {inner_e}", exc_info=True)
+            # Son çare: basit bir response döndür
+            raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # ---- Asistan Ayarları ----
