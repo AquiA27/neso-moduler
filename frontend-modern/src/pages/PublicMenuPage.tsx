@@ -182,7 +182,7 @@ export default function PublicMenuPage() {
                   <img
                     src={resolveImageUrl(customization.logo_url)}
                     alt={customization.app_name || 'Logo'}
-                    className="h-12 w-12 md:h-16 md:w-16 object-contain rounded-lg"
+                    className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-lg bg-white/5 border border-white/15"
                     onError={(e) => {
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
