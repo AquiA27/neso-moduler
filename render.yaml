@@ -8,8 +8,8 @@ services:
     env: python
     region: frankfurt  # Frankfurt (EU Central) - Türkiye için en iyi
     plan: starter  # veya free (test için), professional (production için)
-    buildCommand: pip install --upgrade pip --cache-dir /tmp/pip-cache && pip install --cache-dir /tmp/pip-cache -r backend/requirements.txt
-    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    buildCommand: pip install --upgrade pip --cache-dir /tmp/pip-cache && pip install --cache-dir /tmp/pip-cache -r backend/requirements.txt && cd backend && alembic upgrade head
+    startCommand: cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 2
     healthCheckPath: /ping
     envVars:
       # Database - Render PostgreSQL connection string
@@ -28,7 +28,11 @@ services:
       # CORS Origins (Vercel frontend URL'leri - deployment sonrası güncelleyin)
       - key: CORS_ORIGINS
         sync: false  # Manuel olarak Vercel URL'inizi ekleyin
-        value: https://your-frontend.vercel.app
+        value: https://your-frontend.vercel.app,https://www.yourdomain.com
+      
+      # Logging
+      - key: LOG_LEVEL
+        value: INFO
       
       # Rate Limiting
       - key: RATE_LIMIT_PER_MINUTE

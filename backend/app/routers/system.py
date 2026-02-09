@@ -34,13 +34,21 @@ async def health():
     
     # Redis check (optional)
     try:
-        if cache_service and hasattr(cache_service, 'redis') and cache_service.redis:
-            await cache_service.get("health_check_test")
-            checks["redis"] = "connected"
+        if cache_service.is_enabled():
+            test_key = "health_check_test"
+            await cache_service.set(test_key, {"test": True}, ttl=10)
+            result = await cache_service.get(test_key)
+            if result:
+                await cache_service.delete(test_key)
+                checks["redis"] = "connected"
+            else:
+                checks["redis"] = "disconnected"
         else:
-            checks["redis"] = "optional"
-    except Exception:
-        checks["redis"] = "optional"  # Redis is optional, don't fail if disconnected
+            checks["redis"] = "disabled"
+    except Exception as e:
+        checks["redis"] = "error"
+        checks["redis_error"] = str(e)
+        # Redis is optional, don't fail health check
     
     # Return 503 if unhealthy
     if checks["status"] == "unhealthy":

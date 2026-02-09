@@ -10,6 +10,7 @@ from .core.config import settings
 from .core.middleware import ErrorMiddleware, DefaultSubeMiddleware
 from .core.tenant_middleware import TenantStatusMiddleware, SubscriptionLimitMiddleware
 from .core.domain_middleware import DomainTenantMiddleware
+from .core.security_middleware import SecurityHeadersMiddleware
 from .core.startup_checks import validate_startup
 from .core.logging_config import setup_logging
 from .db.database import db
@@ -114,6 +115,9 @@ app.add_middleware(
 app.add_middleware(DomainTenantMiddleware)  # Domain'den tenant'ı tespit eder
 app.add_middleware(TenantStatusMiddleware)  # Tenant durumunu kontrol eder
 app.add_middleware(SubscriptionLimitMiddleware)  # Subscription limitlerini kontrol eder
+
+# ---- Security Headers (Production için) ----
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ---- Hata Yakalama Orta Katmanı ----
 app.add_middleware(ErrorMiddleware)

@@ -632,6 +632,36 @@ async def get_api_key_business(
                 detail="Business is inactive",
             )
         
+        # Rate limit kontrolü
+        api_key_id = api_key_row["id"]
+        rate_limit_per_minute = api_key_row.get("rate_limit_per_minute", 60)
+        
+        # Rate limiter servisini import et
+        from ..services.rate_limiter import rate_limiter
+        
+        allowed, retry_after = await rate_limiter.check_rate_limit(
+            api_key_id,
+            rate_limit_per_minute
+        )
+        
+        if not allowed:
+            logging.warning(
+                f"[API_KEY] Rate limit exceeded: api_key_id={api_key_id}, "
+                f"limit={rate_limit_per_minute}/min, retry_after={retry_after}s"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Rate limit exceeded: {rate_limit_per_minute} requests per minute",
+                headers={
+                    "X-RateLimit-Limit": str(rate_limit_per_minute),
+                    "X-RateLimit-Remaining": "0",
+                    "Retry-After": str(retry_after) if retry_after else "60",
+                } if retry_after else {
+                    "X-RateLimit-Limit": str(rate_limit_per_minute),
+                    "X-RateLimit-Remaining": "0",
+                },
+            )
+        
         # Son kullanım zamanını güncelle
         await db.execute(
             """
@@ -639,14 +669,14 @@ async def get_api_key_business(
             SET last_used_at = NOW()
             WHERE id = :id
             """,
-            {"id": api_key_row["id"]},
+            {"id": api_key_id},
         )
         
         return {
-            "api_key_id": api_key_row["id"],
+            "api_key_id": api_key_id,
             "isletme_id": api_key_row["isletme_id"],
             "isletme_adi": api_key_row["isletme_adi"],
-            "rate_limit_per_minute": api_key_row.get("rate_limit_per_minute", 60),
+            "rate_limit_per_minute": rate_limit_per_minute,
         }
         
     except HTTPException:

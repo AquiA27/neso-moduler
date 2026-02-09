@@ -62,6 +62,10 @@ class CacheService:
     def is_enabled(self) -> bool:
         """Cache aktif mi?"""
         return settings.REDIS_ENABLED and self._redis is not None
+    
+    def get_redis_client(self) -> Optional[Redis]:
+        """Redis client'ı döndür (rate limiting gibi özel kullanımlar için)"""
+        return self._redis if self.is_enabled() else None
 
     async def get(self, key: str) -> Optional[Any]:
         """Cache'den veri çek"""
