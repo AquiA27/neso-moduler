@@ -112,6 +112,7 @@ backend/backups/
 *.jpeg
 *.gif
 *.svg
+!frontend-modern/src/assets/*.svg
 *.mp3
 *.wav
 
