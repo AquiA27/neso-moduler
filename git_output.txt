@@ -1,0 +1,75 @@
+To https://github.com/AquiA27/neso-moduler.git
+   51710ea..07ed0d9  main -> main
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add/rm <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+	deleted:    DEPLOYMENT_CHECKLIST.md
+	deleted:    DEPLOYMENT_RECOMMENDATIONS.md
+	deleted:    RENDER_DEPLOYMENT.md
+	deleted:    ROI_HESAP_MAKINESI.md
+	deleted:    YATIRIMCI_SUNUMU.md
+	deleted:    YATIRIMCI_SUNUMU_PPT.md
+	modified:   backend/app/core/deps.py
+	modified:   backend/app/services/rate_limiter.py
+	deleted:    backend/test_embedding.py
+	deleted:    backend/test_fuzzy.py
+	deleted:    backend/test_performance.py
+	deleted:    backend/test_sentiment.py
+	deleted:    backend/tests/test_assistant_menu_attributes.py
+	deleted:    backend/tests/test_intent_detector.py
+	deleted:    backend/tests/test_saas_middleware.py
+	modified:   super-admin-panel/node_modules/.vite/deps/_metadata.json
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/axios.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/axios.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/chunk-DRWLMN53.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/chunk-DRWLMN53.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/chunk-G3PMV62Z.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/chunk-G3PMV62Z.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/chunk-PJEEZAML.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/chunk-PJEEZAML.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/lucide-react.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/lucide-react.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/package.json
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react-dom.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react-dom.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react-dom_client.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react-dom_client.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react-router-dom.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react-router-dom.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react_jsx-dev-runtime.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react_jsx-dev-runtime.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react_jsx-runtime.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/react_jsx-runtime.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/zustand.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/zustand.js.map
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/zustand_middleware.js
+	deleted:    super-admin-panel/node_modules/.vite/deps_temp_36887529/zustand_middleware.js.map
+	deleted:    test1_semantic.json
+	deleted:    test2_sentiment.json
+	deleted:    test3_fuzzy.json
+	deleted:    test3_fuzzy_retry.json
+	deleted:    test4_low_confidence.json
+	deleted:    test_manual.ps1
+	deleted:    test_menu_add.json
+	deleted:    test_request.json
+	deleted:    test_sql_direct.py
+	deleted:    test_tenant_list.py
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	backend/alembic/versions/2025_02_10_0000-add_additional_performance_indexes.py
+	backend_output2.txt
+	dump_logs.bat
+	git_deploy.bat
+	git_output.txt
+	run_test.ps1
+	run_test2.ps1
+	run_test3.ps1
+	start_neso.bat
+
+no changes added to commit (use "git add" and/or "git commit -a")

@@ -1,7 +1,7 @@
 # backend/app/core/deps.py
 from typing import Dict, Any, Mapping, Optional, Set
 
-from fastapi import Depends, HTTPException, status, Header, Query, Request
+from fastapi import Depends, HTTPException, status, Header, Query, Request, Response
 from fastapi.security import OAuth2PasswordBearer
 from starlette.requests import Request as StarletteRequest
 from jose import jwt, JWTError
@@ -574,6 +574,8 @@ async def get_sube_id(
 # API Key Authentication (Public API için)
 # ---------------------------
 async def get_api_key_business(
+    request: Request,
+    response: Response,
     api_key: str = Header(..., alias="X-API-Key", description="API Key for authentication"),
 ) -> Dict[str, Any]:
     """
@@ -581,7 +583,6 @@ async def get_api_key_business(
     Public API endpoint'leri için kullanılır.
     """
     import logging
-    import secrets
     
     # API key formatını kontrol et (neso_ prefix'i olmalı)
     if not api_key.startswith("neso_"):
@@ -639,28 +640,45 @@ async def get_api_key_business(
         # Rate limiter servisini import et
         from ..services.rate_limiter import rate_limiter
         
-        allowed, retry_after = await rate_limiter.check_rate_limit(
+        rate_result = await rate_limiter.check_rate_limit(
             api_key_id,
             rate_limit_per_minute
         )
         
-        if not allowed:
+        if not rate_result.allowed:
             logging.warning(
                 f"[API_KEY] Rate limit exceeded: api_key_id={api_key_id}, "
-                f"limit={rate_limit_per_minute}/min, retry_after={retry_after}s"
+                f"limit={rate_limit_per_minute}/min, retry_after={rate_result.retry_after}s"
             )
+            retry_after = rate_result.retry_after or 60
+            headers = {
+                "X-RateLimit-Limit": str(rate_limit_per_minute),
+                "X-RateLimit-Remaining": "0",
+                "Retry-After": str(retry_after),
+            }
+            if rate_result.reset_after:
+                headers["X-RateLimit-Reset"] = str(rate_result.reset_after)
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
                 detail=f"Rate limit exceeded: {rate_limit_per_minute} requests per minute",
-                headers={
-                    "X-RateLimit-Limit": str(rate_limit_per_minute),
-                    "X-RateLimit-Remaining": "0",
-                    "Retry-After": str(retry_after) if retry_after else "60",
-                } if retry_after else {
-                    "X-RateLimit-Limit": str(rate_limit_per_minute),
-                    "X-RateLimit-Remaining": "0",
-                },
+                headers=headers,
             )
+        
+        # Rate limit header'larını response'a ekle (limit devredeyse)
+        if rate_limit_per_minute > 0:
+            remaining = max(rate_result.remaining, 0)
+            response.headers["X-RateLimit-Limit"] = str(rate_limit_per_minute)
+            response.headers["X-RateLimit-Remaining"] = str(remaining)
+            if rate_result.reset_after:
+                response.headers["X-RateLimit-Reset"] = str(rate_result.reset_after)
+            
+            # Observability için request.state'e yaz (log / tracing için kullanılabilir)
+            if hasattr(request, "state"):
+                request.state.rate_limit = {
+                    "limit": rate_limit_per_minute,
+                    "remaining": remaining,
+                    "reset_after": rate_result.reset_after,
+                }
         
         # Son kullanım zamanını güncelle
         await db.execute(
@@ -677,6 +695,8 @@ async def get_api_key_business(
             "isletme_id": api_key_row["isletme_id"],
             "isletme_adi": api_key_row["isletme_adi"],
             "rate_limit_per_minute": rate_limit_per_minute,
+            "rate_limit_remaining": rate_result.remaining if rate_limit_per_minute > 0 else None,
+            "rate_limit_reset_after": rate_result.reset_after if rate_limit_per_minute > 0 else None,
         }
         
     except HTTPException:

@@ -1,9 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { superadminApi, subscriptionApi, paymentApi, customizationApi } from '../lib/api';
+import apiClient, { superadminApi, subscriptionApi, paymentApi, customizationApi } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
-import { 
-  Building2, CreditCard, Settings, Plus, Search, 
+import {
+  Building2, CreditCard, Settings, Plus, Search,
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
@@ -158,17 +158,17 @@ export default function SuperAdminPanel() {
     }
   };
 
-  const filteredTenants = tenants.filter(t => 
+  const filteredTenants = tenants.filter(t =>
     t.ad.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.vergi_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredSubscriptions = subscriptions.filter(s => 
+  const filteredSubscriptions = subscriptions.filter(s =>
     s.isletme_id.toString().includes(searchTerm) ||
     s.isletme_ad?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredPayments = payments.filter(p => 
+  const filteredPayments = payments.filter(p =>
     p.isletme_id.toString().includes(searchTerm) ||
     p.isletme_ad?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     p.fatura_no?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -198,11 +198,10 @@ export default function SuperAdminPanel() {
                 <button
                   key={id}
                   onClick={() => setActiveTab(id as any)}
-                  className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm ${
-                    activeTab === id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm ${activeTab === id
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <Icon className="w-5 h-5 mr-2" />
                   {label}
@@ -227,7 +226,7 @@ export default function SuperAdminPanel() {
 
           {!loading && activeTab === 'tenants' && (
             selectedTenantId ? (
-              <TenantDetailTab 
+              <TenantDetailTab
                 tenantDetail={tenantDetail}
                 onBack={() => {
                   setSelectedTenantId(null);
@@ -244,7 +243,7 @@ export default function SuperAdminPanel() {
                 }}
               />
             ) : (
-              <TenantsTab 
+              <TenantsTab
                 tenants={filteredTenants}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
@@ -267,7 +266,7 @@ export default function SuperAdminPanel() {
           )}
 
           {!loading && activeTab === 'subscriptions' && (
-            <SubscriptionsTab 
+            <SubscriptionsTab
               subscriptions={filteredSubscriptions}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
@@ -276,7 +275,7 @@ export default function SuperAdminPanel() {
           )}
 
           {!loading && activeTab === 'payments' && (
-            <PaymentsTab 
+            <PaymentsTab
               payments={filteredPayments}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
@@ -305,7 +304,7 @@ function DashboardTab({ stats }: { stats: DashboardStats }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
-      
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
@@ -405,17 +404,17 @@ function DashboardTab({ stats }: { stats: DashboardStats }) {
 }
 
 // Stat Card Component
-function StatCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
-  color 
-}: { 
-  title: string; 
-  value: number | string; 
-  subtitle?: string; 
-  icon: any; 
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  color
+}: {
+  title: string;
+  value: number | string;
+  subtitle?: string;
+  icon: any;
   color: string;
 }) {
   const colorClasses = {
@@ -445,14 +444,14 @@ function StatCard({
 }
 
 // Tenants Tab
-function TenantsTab({ 
-  tenants, 
-  searchTerm, 
+function TenantsTab({
+  tenants,
+  searchTerm,
   onSearchChange,
   onTenantClick
-}: { 
-  tenants: Tenant[]; 
-  searchTerm: string; 
+}: {
+  tenants: Tenant[];
+  searchTerm: string;
   onSearchChange: (value: string) => void;
   onTenantClick: (tenantId: number) => void;
 }) {
@@ -508,7 +507,7 @@ function TenantsTab({
                     </span>
                   )}
                 </div>
-                
+
                 <div className="space-y-2 mb-4">
                   {tenant.vergi_no && (
                     <div className="flex items-center text-sm text-gray-600">
@@ -707,11 +706,10 @@ function TenantDetailTab({
               </div>
               <div>
                 <p className="text-sm text-gray-600">Durum</p>
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                  subscription.status === 'active' ? 'bg-green-100 text-green-800' :
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${subscription.status === 'active' ? 'bg-green-100 text-green-800' :
                   subscription.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
+                    'bg-red-100 text-red-800'
+                  }`}>
                   {subscription.status}
                 </span>
               </div>
@@ -814,7 +812,7 @@ function TenantDetailTab({
           )}
         </div>
       </div>
-      
+
       {/* İşletme Silme */}
       <div className="bg-red-50 border border-red-200 rounded-lg p-6 mb-6">
         <h3 className="text-lg font-semibold text-red-900 mb-2 flex items-center">
@@ -976,12 +974,12 @@ function TenantDetailTab({
               <div>
                 <p className="text-sm text-gray-600">Tema</p>
                 <div className="flex items-center space-x-2">
-                  <div 
+                  <div
                     className="w-8 h-8 rounded border border-gray-300"
                     style={{ backgroundColor: customization.primary_color }}
                   />
                   {customization.secondary_color && (
-                    <div 
+                    <div
                       className="w-8 h-8 rounded border border-gray-300"
                       style={{ backgroundColor: customization.secondary_color }}
                     />
@@ -1000,14 +998,14 @@ function TenantDetailTab({
 }
 
 // Subscriptions Tab
-function SubscriptionsTab({ 
-  subscriptions, 
-  searchTerm, 
+function SubscriptionsTab({
+  subscriptions,
+  searchTerm,
   onSearchChange,
   onRefresh,
-}: { 
-  subscriptions: Subscription[]; 
-  searchTerm: string; 
+}: {
+  subscriptions: Subscription[];
+  searchTerm: string;
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
 }) {
@@ -1033,10 +1031,10 @@ function SubscriptionsTab({
           const baslangic = sub.baslangic_tarihi ? new Date(sub.baslangic_tarihi) : null;
           const bitis = sub.bitis_tarihi ? new Date(sub.bitis_tarihi) : null;
           const simdi = new Date();
-          
+
           let kullanimSuresi = '';
           let sonrakiYenileme = '';
-          
+
           if (baslangic) {
             const gunFarki = Math.floor((simdi.getTime() - baslangic.getTime()) / (1000 * 60 * 60 * 24));
             if (gunFarki < 30) {
@@ -1050,13 +1048,13 @@ function SubscriptionsTab({
               kullanimSuresi = ay > 0 ? `${yil} yıl ${ay} ay` : `${yil} yıl`;
             }
           }
-          
+
           if (sub.otomatik_yenileme && bitis) {
             sonrakiYenileme = new Date(bitis).toLocaleDateString('tr-TR');
           } else if (bitis) {
             sonrakiYenileme = new Date(bitis).toLocaleDateString('tr-TR');
           }
-          
+
           const handleStatusChange = async (newStatus: 'active' | 'suspended' | 'cancelled') => {
             let confirmMessage = '';
             if (newStatus === 'suspended') {
@@ -1093,11 +1091,10 @@ function SubscriptionsTab({
                     <p className="text-xs text-gray-500 mt-1">ID: {sub.isletme_id}</p>
                   )}
                 </div>
-                <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${
-                  sub.status === 'active' ? 'bg-green-100 text-green-800' :
+                <span className={`px-2 py-1 rounded text-xs font-medium whitespace-nowrap ${sub.status === 'active' ? 'bg-green-100 text-green-800' :
                   sub.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
-                  'bg-red-100 text-red-800'
-                }`}>
+                    'bg-red-100 text-red-800'
+                  }`}>
                   {sub.status === 'active' ? 'Aktif' : sub.status === 'suspended' ? 'Askıya Alındı' : 'İptal'}
                 </span>
               </div>
@@ -1169,13 +1166,13 @@ function SubscriptionsTab({
 }
 
 // Payments Tab
-function PaymentsTab({ 
-  payments, 
-  searchTerm, 
-  onSearchChange 
-}: { 
-  payments: Payment[]; 
-  searchTerm: string; 
+function PaymentsTab({
+  payments,
+  searchTerm,
+  onSearchChange
+}: {
+  payments: Payment[];
+  searchTerm: string;
   onSearchChange: (value: string) => void;
 }) {
   return (
@@ -1230,9 +1227,9 @@ function PaymentsTab({
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">₺{payment.tutar.toFixed(2)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 capitalize">
                     {payment.odeme_turu === 'odeme_sistemi' ? 'Ödeme Sistemi' :
-                     payment.odeme_turu === 'kredi_karti' ? 'Kredi Kartı' :
-                     payment.odeme_turu === 'havale' ? 'Havale' :
-                     payment.odeme_turu === 'nakit' ? 'Nakit' : payment.odeme_turu}
+                      payment.odeme_turu === 'kredi_karti' ? 'Kredi Kartı' :
+                        payment.odeme_turu === 'havale' ? 'Havale' :
+                          payment.odeme_turu === 'nakit' ? 'Nakit' : payment.odeme_turu}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     {payment.durum === 'completed' ? (
@@ -1321,7 +1318,7 @@ function ApiKeyManagementSection({ tenantId }: { tenantId: number; onRefresh?: (
       const endDate = new Date();
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - parseInt(usagePeriod));
-      
+
       const response = await (superadminApi.apiUsage as any)(
         tenantId,
         {
@@ -1495,9 +1492,8 @@ function ApiKeyManagementSection({ tenantId }: { tenantId: number; onRefresh?: (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Durum</label>
                 <div className="flex items-center space-x-2">
-                  <span className={`px-2 py-1 rounded text-xs font-medium ${
-                    apiKey.aktif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                  }`}>
+                  <span className={`px-2 py-1 rounded text-xs font-medium ${apiKey.aktif ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
                     {apiKey.aktif ? 'Aktif' : 'Pasif'}
                   </span>
                   <button
@@ -1675,22 +1671,22 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       '#e11d48': 'rose',
       '#f43f5e': 'rose',
     };
-    
+
     const normalizedPrimary = primary.toLowerCase();
     const themeKey = colorMap[normalizedPrimary];
-    
+
     if (themeKey) {
       return themeKey;
     }
-    
+
     // Eğer eşleşme yoksa, en yakın temayı bul
     for (const [key, theme] of Object.entries(themePresets)) {
-      if (theme.primary.toLowerCase() === normalizedPrimary || 
-          theme.secondary.toLowerCase() === secondary.toLowerCase()) {
+      if (theme.primary.toLowerCase() === normalizedPrimary ||
+        theme.secondary.toLowerCase() === secondary.toLowerCase()) {
         return key as keyof typeof themePresets;
       }
     }
-    
+
     return 'green'; // Varsayılan
   };
 
@@ -1782,7 +1778,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
           if (!key) return '';
           return key.length > 12 ? `${key.substring(0, 8)}...${key.substring(key.length - 4)}` : key;
         };
-        
+
         setFormData({
           domain: response.data.domain || '',
           app_name: response.data.app_name || '',
@@ -1843,21 +1839,21 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         email: formData.email || undefined,
         telefon: formData.telefon || undefined,
         adres: formData.adres || undefined,
-        openai_api_key: formData.openai_api_key && !formData.openai_api_key.includes('...') 
-          ? formData.openai_api_key 
+        openai_api_key: formData.openai_api_key && !formData.openai_api_key.includes('...')
+          ? formData.openai_api_key
           : undefined,
         openai_model: formData.openai_model || 'gpt-4o-mini',
         // Müşteri asistanı ayarları
-        customer_assistant_openai_api_key: formData.customer_assistant_openai_api_key && !formData.customer_assistant_openai_api_key.includes('...') 
-          ? formData.customer_assistant_openai_api_key 
+        customer_assistant_openai_api_key: formData.customer_assistant_openai_api_key && !formData.customer_assistant_openai_api_key.includes('...')
+          ? formData.customer_assistant_openai_api_key
           : undefined,
         customer_assistant_openai_model: formData.customer_assistant_openai_model || 'gpt-4o-mini',
         customer_assistant_tts_voice_id: formData.customer_assistant_tts_voice_id || undefined,
         customer_assistant_tts_speech_rate: formData.customer_assistant_tts_speech_rate || 1.0,
         customer_assistant_tts_provider: formData.customer_assistant_tts_provider || 'system',
         // İşletme asistanı ayarları
-        business_assistant_openai_api_key: formData.business_assistant_openai_api_key && !formData.business_assistant_openai_api_key.includes('...') 
-          ? formData.business_assistant_openai_api_key 
+        business_assistant_openai_api_key: formData.business_assistant_openai_api_key && !formData.business_assistant_openai_api_key.includes('...')
+          ? formData.business_assistant_openai_api_key
           : undefined,
         business_assistant_openai_model: formData.business_assistant_openai_model || 'gpt-4o-mini',
         business_assistant_tts_voice_id: formData.business_assistant_tts_voice_id || undefined,
@@ -1873,7 +1869,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         setSuccess('Özelleştirme oluşturuldu');
         setExists(true);
       }
-      
+
       // FormData'yı yeniden yükle
       const response = await customizationApi.get(selectedTenant);
       const primary = response.data.primary_color || themePresets.green.primary;
@@ -1883,7 +1879,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         if (!key) return '';
         return key.length > 12 ? `${key.substring(0, 8)}...${key.substring(key.length - 4)}` : key;
       };
-      
+
       setFormData({
         domain: response.data.domain || '',
         app_name: response.data.app_name || '',
@@ -1908,7 +1904,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         business_assistant_tts_speech_rate: typeof response.data.business_assistant_tts_speech_rate === 'number' ? response.data.business_assistant_tts_speech_rate : (parseFloat(String(response.data.business_assistant_tts_speech_rate || '1.0')) || 1.0),
         business_assistant_tts_provider: response.data.business_assistant_tts_provider || 'system',
       });
-      
+
       onRefresh();
     } catch (err: any) {
       setError(err.response?.data?.detail || err.message || 'Kaydetme sırasında hata oluştu');
@@ -2057,11 +2053,10 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                   {Object.entries(themePresets).map(([key, theme]) => (
                     <label
                       key={key}
-                      className={`border-2 rounded-lg p-3 cursor-pointer transition ${
-                        formData.theme === key
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
+                      className={`border-2 rounded-lg p-3 cursor-pointer transition ${formData.theme === key
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                        }`}
                     >
                       <input
                         type="radio"
@@ -2111,7 +2106,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                 placeholder="Rıhtım Cad. No: 12 Kadıköy / İstanbul"
               />
             </div>
-            
+
             {/* Genel OpenAI API Ayarları */}
             <div className="border-t pt-6 mt-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Genel OpenAI API Ayarları</h3>
@@ -2243,14 +2238,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
 
 // API Usage Tab
 function ApiUsageTab() {
-  const [stats, setStats] = useState<any[]>([]);
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [days, setDays] = useState(30);
   const [selectedTenant, setSelectedTenant] = useState<number | null>(null);
   const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [subTab, setSubTab] = useState<'overview' | 'endpoints' | 'errors'>('overview');
 
   useEffect(() => {
     loadTenants();
+  }, []);
+
+  useEffect(() => {
     loadStats();
   }, [days, selectedTenant]);
 
@@ -2266,47 +2265,37 @@ function ApiUsageTab() {
   const loadStats = async () => {
     setLoading(true);
     try {
-      if (selectedTenant) {
-        // Yeni tenant bazlı endpoint kullan
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
-        
-        const response = await (superadminApi.apiUsage as any)(
-          selectedTenant,
-          {
-            start_date: startDate.toISOString().split('T')[0],
-            end_date: endDate.toISOString().split('T')[0],
-          }
-        );
-        // Yeni endpoint tek bir obje döner, array'e çevir
-        setStats([response.data]);
-      } else {
-        // Tüm işletmeler için eski endpoint'i kullan (eğer backend'de varsa)
-        // Şimdilik boş array döndür
-        setStats([]);
-      }
+      const params = new URLSearchParams();
+      params.append('days', String(days));
+      if (selectedTenant) params.append('isletme_id', String(selectedTenant));
+      const response = await (apiClient as any).get(`/superadmin/api-usage?${params.toString()}`);
+      setData(response.data);
     } catch (error) {
       console.error('Error loading API usage stats:', error);
-      setStats([]);
+      setData(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const totalCost = stats.reduce((sum, stat) => sum + (parseFloat(stat.total_cost_usd) || 0), 0);
-  const totalTokens = stats.reduce((sum, stat) => sum + (parseInt(stat.total_tokens) || 0), 0);
-  const totalRequests = stats.reduce((sum, stat) => sum + (parseInt(stat.total_requests) || 0), 0);
+  const summary = data?.summary || {};
+  const perTenant = data?.per_tenant || [];
+  const dailyTrend = data?.daily_trend || [];
+  const endpointStats = data?.endpoint_stats || [];
+  const recentErrors = data?.recent_errors || [];
+
+  // Günlük trend için bar chart yükseklik hesaplama
+  const maxDailyRequests = Math.max(...dailyTrend.map((d: any) => d.total_requests || 0), 1);
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold text-gray-900">API Kullanım İstatistikleri</h2>
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h2 className="text-2xl font-bold text-gray-900">API Kullanım Takibi</h2>
+        <div className="flex items-center gap-3">
           <select
             value={selectedTenant || ''}
             onChange={(e) => setSelectedTenant(e.target.value ? parseInt(e.target.value) : null)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
           >
             <option value="">Tüm İşletmeler</option>
             {tenants.map((tenant) => (
@@ -2318,13 +2307,20 @@ function ApiUsageTab() {
           <select
             value={days}
             onChange={(e) => setDays(parseInt(e.target.value))}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
           >
             <option value={7}>Son 7 Gün</option>
             <option value={30}>Son 30 Gün</option>
             <option value={90}>Son 90 Gün</option>
             <option value={365}>Son 1 Yıl</option>
           </select>
+          <button
+            onClick={loadStats}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm flex items-center gap-1"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Yenile
+          </button>
         </div>
       </div>
 
@@ -2333,89 +2329,238 @@ function ApiUsageTab() {
           <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
           <p className="mt-2 text-gray-600">Yükleniyor...</p>
         </div>
+      ) : !data ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">API kullanım verisi yüklenemedi.</p>
+        </div>
       ) : (
         <>
           {/* Özet Kartlar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6 border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-blue-600">Toplam Maliyet</p>
-                  <p className="text-2xl font-bold text-blue-900 mt-1">${totalCost.toFixed(4)}</p>
-                </div>
-                <DollarSign className="w-8 h-8 text-blue-500" />
-              </div>
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl p-5 border border-blue-200">
+              <p className="text-xs font-semibold text-blue-600 uppercase tracking-wider">Toplam İstek</p>
+              <p className="text-2xl font-bold text-blue-900 mt-1">{(summary.total_requests || 0).toLocaleString()}</p>
             </div>
-            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-green-600">Toplam Token</p>
-                  <p className="text-2xl font-bold text-green-900 mt-1">{totalTokens.toLocaleString()}</p>
-                </div>
-                <Activity className="w-8 h-8 text-green-500" />
-              </div>
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-xl p-5 border border-green-200">
+              <p className="text-xs font-semibold text-green-600 uppercase tracking-wider">Toplam Token</p>
+              <p className="text-2xl font-bold text-green-900 mt-1">{(summary.total_tokens || 0).toLocaleString()}</p>
             </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg p-6 border border-purple-200">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-purple-600">Toplam İstek</p>
-                  <p className="text-2xl font-bold text-purple-900 mt-1">{totalRequests.toLocaleString()}</p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-purple-500" />
-              </div>
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-5 border border-purple-200">
+              <p className="text-xs font-semibold text-purple-600 uppercase tracking-wider">Maliyet (USD)</p>
+              <p className="text-2xl font-bold text-purple-900 mt-1">${(summary.total_cost_usd || 0).toFixed(4)}</p>
+            </div>
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100 rounded-xl p-5 border border-emerald-200">
+              <p className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">Başarılı</p>
+              <p className="text-2xl font-bold text-emerald-900 mt-1">{(summary.success_count || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-xl p-5 border border-red-200">
+              <p className="text-xs font-semibold text-red-600 uppercase tracking-wider">Hatalı</p>
+              <p className="text-2xl font-bold text-red-900 mt-1">{(summary.error_count || 0).toLocaleString()}</p>
             </div>
           </div>
 
-          {/* Detaylı Liste */}
-          {stats.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg">
-              <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <p className="text-gray-600">Bu dönemde API kullanım kaydı bulunamadı.</p>
+          {/* Alt Sekme Seçici */}
+          <div className="flex gap-2 border-b border-gray-200 pb-1">
+            {[
+              { id: 'overview', label: 'Genel Bakış' },
+              { id: 'endpoints', label: 'Endpoint Detayı' },
+              { id: 'errors', label: `Hatalar (${recentErrors.length})` },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setSubTab(tab.id as any)}
+                className={`px-4 py-2 text-sm font-medium rounded-t-lg transition ${subTab === tab.id
+                  ? 'bg-blue-50 text-blue-700 border-b-2 border-blue-600'
+                  : 'text-gray-500 hover:text-gray-700'
+                  }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {subTab === 'overview' && (
+            <>
+              {/* Günlük Trend */}
+              {dailyTrend.length > 0 && (
+                <div className="bg-white rounded-xl border border-gray-200 p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Günlük Trend</h3>
+                  <div className="flex items-end gap-1 h-40 overflow-x-auto pb-2">
+                    {[...dailyTrend].reverse().map((day: any, idx: number) => {
+                      const height = Math.max((day.total_requests / maxDailyRequests) * 100, 4);
+                      return (
+                        <div
+                          key={idx}
+                          className="group relative flex flex-col items-center min-w-[18px]"
+                        >
+                          <div
+                            className="w-4 bg-gradient-to-t from-blue-600 to-blue-400 rounded-t-sm transition-all hover:from-blue-700 hover:to-blue-500 cursor-pointer"
+                            style={{ height: `${height}%` }}
+                            title={`${day.date}: ${day.total_requests} istek, $${(day.total_cost_usd || 0).toFixed(4)}`}
+                          />
+                          {idx % Math.ceil(dailyTrend.length / 10) === 0 && (
+                            <span className="text-[9px] text-gray-400 mt-1 whitespace-nowrap rotate-[-45deg] origin-top-left">
+                              {day.date?.slice(5)}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* İşletme Bazında Kırılım */}
+              {perTenant.length > 0 ? (
+                <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+                  <div className="px-6 py-4 border-b border-gray-100">
+                    <h3 className="text-lg font-semibold text-gray-900">İşletme Bazında Kullanım</h3>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşletme</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">API Tipi</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Model</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İstek</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Token</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Maliyet</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ort. Süre</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Başarı/Hata</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {perTenant.map((row: any, idx: number) => (
+                          <tr key={idx} className="hover:bg-gray-50 transition">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{row.isletme_ad}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${row.api_type === 'openai' ? 'bg-green-100 text-green-800' :
+                                row.api_type === 'rest_api' ? 'bg-blue-100 text-blue-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                {row.api_type}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{row.model || '-'}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-900 font-medium">{row.total_requests.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{row.total_tokens.toLocaleString()}</td>
+                            <td className="px-4 py-3 text-sm text-right font-medium text-green-700">${row.total_cost_usd.toFixed(4)}</td>
+                            <td className="px-4 py-3 text-sm text-right text-gray-600">{row.avg_response_time_ms ? `${row.avg_response_time_ms}ms` : '-'}</td>
+                            <td className="px-4 py-3 text-sm text-right">
+                              <span className="text-green-600">{row.success_count}</span>
+                              {row.error_count > 0 && (
+                                <span className="text-red-600 ml-1">/ {row.error_count}</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-12 bg-gray-50 rounded-lg">
+                  <Activity className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600">Bu dönemde API kullanım kaydı bulunamadı.</p>
+                  <p className="text-sm text-gray-400 mt-1">İşletmeler API kullanmaya başladığında veriler burada görünecek.</p>
+                </div>
+              )}
+            </>
+          )}
+
+          {subTab === 'endpoints' && (
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900">Endpoint Bazında Kullanım</h3>
+              </div>
+              {endpointStats.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">Endpoint verisi bulunamadı.</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endpoint</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İstek</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Maliyet (TL)</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Maliyet (USD)</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Ort. Süre</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {endpointStats.map((row: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50 transition">
+                          <td className="px-4 py-3 text-sm font-mono text-gray-800">{row.endpoint}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${row.method === 'GET' ? 'bg-blue-100 text-blue-700' :
+                              row.method === 'POST' ? 'bg-green-100 text-green-700' :
+                                row.method === 'PATCH' ? 'bg-yellow-100 text-yellow-700' :
+                                  row.method === 'DELETE' ? 'bg-red-100 text-red-700' :
+                                    'bg-gray-100 text-gray-700'
+                              }`}>
+                              {row.method}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-right font-medium text-gray-900">{row.total_requests.toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-600">₺{row.total_cost_tl.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-green-700">${row.total_cost_usd.toFixed(4)}</td>
+                          <td className="px-4 py-3 text-sm text-right text-gray-600">{row.avg_response_time_ms ? `${row.avg_response_time_ms}ms` : '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          ) : (
-            <div className="bg-white rounded-lg shadow overflow-hidden">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İşletme</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Model</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (Prompt)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Token (Completion)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Toplam Token</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Maliyet (USD)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">İstek Sayısı</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ort. Yanıt Süresi</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {stats.map((stat, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {stat.isletme_ad || `İşletme #${stat.isletme_id}`}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{stat.model || '-'}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {parseInt(stat.total_prompt_tokens || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {parseInt(stat.total_completion_tokens || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {parseInt(stat.total_tokens || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        ${parseFloat(stat.total_cost_usd || 0).toFixed(4)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {parseInt(stat.total_requests || 0).toLocaleString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        {stat.avg_response_time_ms ? `${Math.round(stat.avg_response_time_ms)}ms` : '-'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          )}
+
+          {subTab === 'errors' && (
+            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
+              <div className="px-6 py-4 border-b border-gray-100">
+                <h3 className="text-lg font-semibold text-gray-900">Son Hatalar</h3>
+              </div>
+              {recentErrors.length === 0 ? (
+                <div className="text-center py-12 text-gray-500">
+                  <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-3" />
+                  <p>Bu dönemde hata kaydı yok. Harika! 🎉</p>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">İşletme</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Endpoint</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Durum Kodu</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Hata Mesajı</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tarih</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {recentErrors.map((err: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-red-50/30 transition">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{err.isletme_ad}</td>
+                          <td className="px-4 py-3 text-sm font-mono text-gray-700">{err.endpoint}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                              {err.status_code || 'N/A'}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-red-700 max-w-xs truncate" title={err.error_message}>
+                            {err.error_message || '-'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500 whitespace-nowrap">
+                            {err.created_at ? new Date(err.created_at).toLocaleString('tr-TR') : '-'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </>
@@ -2701,9 +2846,8 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
             {Object.entries(planPresets).map(([plan, details]) => (
               <label
                 key={plan}
-                className={`border rounded-xl p-4 cursor-pointer transition ${
-                  formData.plan_type === plan ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
-                }`}
+                className={`border rounded-xl p-4 cursor-pointer transition ${formData.plan_type === plan ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:border-blue-200'
+                  }`}
               >
                 <input
                   type="radio"
@@ -2764,11 +2908,10 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
                 {Object.entries(themePresets).map(([key, theme]) => (
                   <label
                     key={key}
-                    className={`border-2 rounded-lg p-3 cursor-pointer transition ${
-                      formData.theme === key
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                    className={`border-2 rounded-lg p-3 cursor-pointer transition ${formData.theme === key
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                      }`}
                   >
                     <input
                       type="radio"
@@ -2807,11 +2950,10 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
                 ].map((option) => (
                   <label
                     key={option.value}
-                    className={`border-2 rounded-lg p-3 cursor-pointer transition ${
-                      formData.odeme_turu === option.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
+                    className={`border-2 rounded-lg p-3 cursor-pointer transition ${formData.odeme_turu === option.value
+                      ? 'border-blue-500 bg-blue-50'
+                      : 'border-gray-200 hover:border-gray-300'
+                      }`}
                   >
                     <input
                       type="radio"
@@ -2830,7 +2972,7 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
               </div>
             </div>
           </div>
-          
+
           {/* OpenAI API Ayarları */}
           <div className="border-t pt-6 mt-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">OpenAI API Ayarları</h3>
@@ -2907,9 +3049,8 @@ function Field({
         min={min}
         max={max}
         step={step}
-        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 ${
-          error ? 'border-red-400 focus:ring-red-300' : 'border-gray-300'
-        }`}
+        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900 placeholder-gray-400 ${error ? 'border-red-400 focus:ring-red-300' : 'border-gray-300'
+          }`}
       />
       {error && <span className="text-xs text-red-500 mt-1">{error}</span>}
       {helpText && !error && <span className="text-xs text-gray-500 mt-1">{helpText}</span>}

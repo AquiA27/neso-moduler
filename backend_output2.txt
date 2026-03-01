@@ -1,0 +1,2 @@
+'\"cd c:\Users\alibu\NesoModuler\backend && call .venv\Scripts\activate.bat && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000\"' is not recognized as an internal or external command,
+operable program or batch file.

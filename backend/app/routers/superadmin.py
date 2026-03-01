@@ -731,27 +731,190 @@ async def get_api_usage_stats(
     api_type: Optional[str] = Query(None, description="API türü (örn: 'openai')"),
     _: Dict[str, Any] = Depends(get_current_user),
 ):
-    """API kullanım istatistiklerini getir"""
-    from ..services.api_usage_tracker import get_api_usage_stats as get_stats
-    
-    stats = await get_stats(
-        isletme_id=isletme_id,
-        days=days,
-        api_type=api_type,
+    """API kullanım istatistiklerini getir (tüm işletmeler veya tek işletme)"""
+    from datetime import timedelta
+    start_date = datetime.now() - timedelta(days=days)
+    params: Dict[str, Any] = {"start_date": start_date}
+    tenant_filter = ""
+    type_filter = ""
+
+    if isletme_id:
+        tenant_filter = " AND a.isletme_id = :isletme_id"
+        params["isletme_id"] = isletme_id
+
+    if api_type:
+        type_filter = " AND a.api_type = :api_type"
+        params["api_type"] = api_type
+
+    # 1) Genel özet istatistikler
+    summary_row = await db.fetch_one(
+        f"""
+        SELECT
+            COUNT(*)                            AS total_rows,
+            COALESCE(SUM(a.request_count), 0)   AS total_requests,
+            COALESCE(SUM(a.total_tokens), 0)    AS total_tokens,
+            COALESCE(SUM(a.prompt_tokens), 0)   AS total_prompt_tokens,
+            COALESCE(SUM(a.completion_tokens), 0) AS total_completion_tokens,
+            COALESCE(SUM(a.cost_usd), 0)        AS total_cost_usd,
+            COALESCE(SUM(a.cost_tl), 0)         AS total_cost_tl,
+            COALESCE(AVG(a.response_time_ms), 0) AS avg_response_time_ms,
+            COUNT(*) FILTER (WHERE a.status = 'success') AS success_count,
+            COUNT(*) FILTER (WHERE a.status = 'error')   AS error_count
+        FROM api_usage_logs a
+        WHERE a.created_at >= :start_date {tenant_filter} {type_filter}
+        """,
+        params,
     )
-    
-    # İşletme adlarını ekle
-    for stat in stats:
-        if stat.get("isletme_id"):
-            isletme_row = await db.fetch_one(
-                "SELECT ad FROM isletmeler WHERE id = :id",
-                {"id": stat["isletme_id"]}
-            )
-            if isletme_row:
-                isletme_dict = dict(isletme_row) if hasattr(isletme_row, 'keys') else isletme_row
-                stat["isletme_ad"] = isletme_dict.get("ad")
-    
-    return stats
+
+    # 2) İşletme bazında kırılım
+    tenant_rows = await db.fetch_all(
+        f"""
+        SELECT
+            a.isletme_id,
+            i.ad                                AS isletme_ad,
+            a.api_type,
+            a.model,
+            SUM(a.request_count)                AS total_requests,
+            SUM(a.total_tokens)                 AS total_tokens,
+            SUM(a.prompt_tokens)                AS total_prompt_tokens,
+            SUM(a.completion_tokens)            AS total_completion_tokens,
+            SUM(a.cost_usd)                     AS total_cost_usd,
+            SUM(a.cost_tl)                      AS total_cost_tl,
+            AVG(a.response_time_ms)             AS avg_response_time_ms,
+            COUNT(*) FILTER (WHERE a.status='success') AS success_count,
+            COUNT(*) FILTER (WHERE a.status='error')   AS error_count
+        FROM api_usage_logs a
+        LEFT JOIN isletmeler i ON i.id = a.isletme_id
+        WHERE a.created_at >= :start_date {tenant_filter} {type_filter}
+        GROUP BY a.isletme_id, i.ad, a.api_type, a.model
+        ORDER BY total_cost_usd DESC
+        """,
+        params,
+    )
+
+    # 3) Günlük trend (son N gün)
+    daily_rows = await db.fetch_all(
+        f"""
+        SELECT
+            DATE(a.created_at)                AS date,
+            COALESCE(SUM(a.request_count), 0) AS total_requests,
+            COALESCE(SUM(a.total_tokens), 0)  AS total_tokens,
+            COALESCE(SUM(a.cost_usd), 0)      AS total_cost_usd,
+            COALESCE(SUM(a.cost_tl), 0)       AS total_cost_tl
+        FROM api_usage_logs a
+        WHERE a.created_at >= :start_date {tenant_filter} {type_filter}
+        GROUP BY DATE(a.created_at)
+        ORDER BY date DESC
+        LIMIT 90
+        """,
+        params,
+    )
+
+    # 4) Endpoint bazında kırılım
+    endpoint_rows = await db.fetch_all(
+        f"""
+        SELECT
+            a.endpoint,
+            a.method,
+            COUNT(*)                            AS row_count,
+            COALESCE(SUM(a.request_count), 0)   AS total_requests,
+            COALESCE(SUM(a.cost_tl), 0)         AS total_cost_tl,
+            COALESCE(SUM(a.cost_usd), 0)        AS total_cost_usd,
+            COALESCE(AVG(a.response_time_ms), 0) AS avg_response_time_ms
+        FROM api_usage_logs a
+        WHERE a.created_at >= :start_date {tenant_filter} {type_filter}
+        GROUP BY a.endpoint, a.method
+        ORDER BY total_requests DESC
+        LIMIT 20
+        """,
+        params,
+    )
+
+    # 5) Son hatalar
+    error_rows = await db.fetch_all(
+        f"""
+        SELECT
+            a.isletme_id,
+            i.ad AS isletme_ad,
+            a.endpoint,
+            a.error_message,
+            a.status_code,
+            a.created_at
+        FROM api_usage_logs a
+        LEFT JOIN isletmeler i ON i.id = a.isletme_id
+        WHERE a.created_at >= :start_date
+          AND a.status = 'error'
+          {tenant_filter} {type_filter}
+        ORDER BY a.created_at DESC
+        LIMIT 10
+        """,
+        params,
+    )
+
+    return {
+        "summary": {
+            "total_rows": int(summary_row["total_rows"]) if summary_row else 0,
+            "total_requests": int(summary_row["total_requests"]) if summary_row else 0,
+            "total_tokens": int(summary_row["total_tokens"]) if summary_row else 0,
+            "total_prompt_tokens": int(summary_row["total_prompt_tokens"]) if summary_row else 0,
+            "total_completion_tokens": int(summary_row["total_completion_tokens"]) if summary_row else 0,
+            "total_cost_usd": float(summary_row["total_cost_usd"]) if summary_row else 0.0,
+            "total_cost_tl": float(summary_row["total_cost_tl"]) if summary_row else 0.0,
+            "avg_response_time_ms": float(summary_row["avg_response_time_ms"]) if summary_row else 0.0,
+            "success_count": int(summary_row["success_count"]) if summary_row else 0,
+            "error_count": int(summary_row["error_count"]) if summary_row else 0,
+        },
+        "per_tenant": [
+            {
+                "isletme_id": row["isletme_id"],
+                "isletme_ad": row["isletme_ad"] or f"İşletme #{row['isletme_id']}",
+                "api_type": row["api_type"],
+                "model": row["model"],
+                "total_requests": int(row["total_requests"] or 0),
+                "total_tokens": int(row["total_tokens"] or 0),
+                "total_prompt_tokens": int(row["total_prompt_tokens"] or 0),
+                "total_completion_tokens": int(row["total_completion_tokens"] or 0),
+                "total_cost_usd": float(row["total_cost_usd"] or 0),
+                "total_cost_tl": float(row["total_cost_tl"] or 0),
+                "avg_response_time_ms": round(float(row["avg_response_time_ms"] or 0), 1),
+                "success_count": int(row["success_count"] or 0),
+                "error_count": int(row["error_count"] or 0),
+            }
+            for row in tenant_rows
+        ],
+        "daily_trend": [
+            {
+                "date": row["date"].isoformat() if hasattr(row["date"], "isoformat") else str(row["date"]),
+                "total_requests": int(row["total_requests"] or 0),
+                "total_tokens": int(row["total_tokens"] or 0),
+                "total_cost_usd": float(row["total_cost_usd"] or 0),
+                "total_cost_tl": float(row["total_cost_tl"] or 0),
+            }
+            for row in daily_rows
+        ],
+        "endpoint_stats": [
+            {
+                "endpoint": row["endpoint"],
+                "method": row["method"],
+                "total_requests": int(row["total_requests"] or 0),
+                "total_cost_tl": float(row["total_cost_tl"] or 0),
+                "total_cost_usd": float(row["total_cost_usd"] or 0),
+                "avg_response_time_ms": round(float(row["avg_response_time_ms"] or 0), 1),
+            }
+            for row in endpoint_rows
+        ],
+        "recent_errors": [
+            {
+                "isletme_id": row["isletme_id"],
+                "isletme_ad": row["isletme_ad"] or f"İşletme #{row['isletme_id']}",
+                "endpoint": row["endpoint"],
+                "error_message": row["error_message"],
+                "status_code": row["status_code"],
+                "created_at": row["created_at"].isoformat() if hasattr(row["created_at"], "isoformat") else str(row["created_at"]),
+            }
+            for row in error_rows
+        ],
+    }
 
 
 # ---- Hızlı İşletme Kurulumu ----
