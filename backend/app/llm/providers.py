@@ -27,15 +27,51 @@ class RuleBasedProvider(LLMProvider):
             await asyncio.sleep(0.01)
 
     async def chat(self, messages: List[Dict[str, str]]) -> str:
-        # Simple rule-based responder for local/dev usage
+        # Improved rule-based responder when no OpenAI API key is available
         if not messages:
             return "Merhaba, size nasıl yardımcı olabilirim?"
-        last = messages[-1]["content"].lower()
-        if "süt" in last and "süz" in last:
+        last = messages[-1]["content"].lower().strip()
+        
+        # Greeting
+        greeting_words = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "günaydın"}
+        first_word = last.split()[0].strip(".,!?") if last else ""
+        if first_word in greeting_words:
+            return "Merhaba! Hoş geldiniz. Size menümüzden bir şeyler önerebilirim veya sipariş alabilrim. Ne istersiniz?"
+        
+        # Math / calculation
+        import re
+        math_match = re.search(r'(\d+)\s*[\+\-\*\/x]\s*(\d+)', last)
+        if math_match or any(kw in last for kw in ["kaç eder", "kaç yapar", "toplam", "artı", "eksi", "çarpı"]):
+            if math_match:
+                a, b = math_match.group(1), math_match.group(2)
+                op_char = re.search(r'[\+\-\*\/x]', last[math_match.start():math_match.end()]).group()
+                try:
+                    if op_char in ('+',):
+                        result = int(a) + int(b)
+                    elif op_char in ('-',):
+                        result = int(a) - int(b)
+                    elif op_char in ('*', 'x'):
+                        result = int(a) * int(b)
+                    elif op_char in ('/',):
+                        result = round(int(a) / int(b), 2) if int(b) != 0 else "tanımsız"
+                    else:
+                        result = "hesaplayamadım"
+                    return f"{a} {op_char} {b} = {result}. Başka bir şey sormak ister misiniz?"
+                except Exception:
+                    pass
+            return "Matematik sorunuza yanıt vermekte zorlanıyorum. Ama menümüzden sipariş almakta yardımcı olabilirim!"
+        
+        # Süt / dairy
+        if "süt" in last and ("süz" in last or "içermeyen" in last):
             return "Süt içermeyen seçenekler listesine bakıyorum; örnek: Americano ve Cola sütsüzdür."
         if "kafeinsiz" in last:
             return "Menüde kafeinsiz içecek olarak şu an için Cola'yı önerebilirim."
-        return "Elimdeki bilgilere göre yardımcı olmaya çalıştım. Daha fazla detay için ürün adı vererek sorabilirsiniz."
+        
+        # General question
+        if "?" in last or any(kw in last for kw in ["nedir", "nasıl", "ne var", "öneri", "tavsiye"]):
+            return "Sorunuzu yanıtlamaya çalışıyorum. Menümüzdeki ürünler hakkında soru sorabilir veya sipariş verebilirsiniz."
+        
+        return "Size menümüzden sipariş almak veya önerilerde bulunmak için buradayım. Ne istersiniz?"
 
 
 class OpenAIProvider(LLMProvider):
@@ -95,6 +131,7 @@ class OpenAIProvider(LLMProvider):
         import httpx
         import json
         import time
+        import logging
         from typing import Optional
 
         # Task-specific parameters
@@ -127,14 +164,27 @@ class OpenAIProvider(LLMProvider):
         start_time = time.time()
         usage_info = None
         
-        async with httpx.AsyncClient(timeout=60) as client:
-            resp = await client.post(
-                "https://api.openai.com/v1/chat/completions",
-                headers=headers,
-                content=json.dumps(payload),
-            )
-            resp.raise_for_status()
-            data = resp.json()
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(
+                    "https://api.openai.com/v1/chat/completions",
+                    headers=headers,
+                    content=json.dumps(payload),
+                )
+                resp.raise_for_status()
+                data = resp.json()
+        except httpx.HTTPStatusError as http_err:
+            logging.error(f"[OpenAI] HTTP error {http_err.response.status_code}: {http_err.response.text[:500]}")
+            return f"OpenAI API hatası ({http_err.response.status_code}). Lütfen API anahtarınızı kontrol edin.", None
+        except httpx.ConnectError as conn_err:
+            logging.error(f"[OpenAI] Connection error: {conn_err}")
+            return "OpenAI API'ye bağlanılamadı. İnternet bağlantınızı kontrol edin.", None
+        except httpx.TimeoutException:
+            logging.error("[OpenAI] Request timed out after 60s")
+            return "OpenAI API zaman aşımına uğradı. Lütfen tekrar deneyin.", None
+        except Exception as e:
+            logging.error(f"[OpenAI] Unexpected error: {e}", exc_info=True)
+            return f"Beklenmeyen bir hata oluştu: {str(e)[:100]}", None
         
         response_time_ms = int((time.time() - start_time) * 1000)
         
@@ -174,18 +224,18 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
     """
     Tenant-specific veya global API key ile LLM provider döndürür.
     
-    Args:
-        tenant_id: İşletme ID'si (opsiyonel). Varsa tenant-specific API key kullanılır.
-        assistant_type: Asistan tipi ('customer' veya 'business'). Varsa o asistan için özel ayarları kullanır.
-    
-    Returns:
-        LLMProvider: OpenAIProvider veya RuleBasedProvider
+    Öncelik sırası:
+    1. customer/business_assistant_openai_api_key (tenant-specific, asistan-specific)
+    2. openai_api_key (tenant-specific, genel)
+    3. settings.OPENAI_API_KEY (global/ortam değişkeni)
+    4. RuleBasedProvider (hiçbir key yoksa)
     """
     import logging
     from ..db.database import db
     
     api_key = None
     model = settings.OPENAI_MODEL or "gpt-4o-mini"
+    key_source = "none"
     
     # Önce tenant-specific API key'i kontrol et
     if tenant_id:
@@ -200,98 +250,119 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
                 api_key_col = "business_assistant_openai_api_key"
                 model_col = "business_assistant_openai_model"
             
-            # Kolonların varlığını kontrol et
-            column_check = await db.fetch_one(
-                """
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = 'tenant_customizations' 
-                AND column_name = :api_key_col
-                """,
-                {"api_key_col": api_key_col}
-            )
+            logging.info(f"[LLM_PROVIDER] Looking for key in column '{api_key_col}' for tenant_id={tenant_id}")
             
-            if column_check and api_key_col != "openai_api_key":
-                # Yeni kolonlar varsa kullan (asistan-specific)
-                try:
-                    customization = await db.fetch_one(
-                        f"""
-                        SELECT {api_key_col} as api_key, {model_col} as model
-                        FROM tenant_customizations
-                        WHERE isletme_id = :id AND {api_key_col} IS NOT NULL AND {api_key_col} != ''
-                        """,
-                        {"id": tenant_id}
-                    )
-                except Exception as col_err:
-                    logging.warning(f"[LLM_PROVIDER] Column {api_key_col} not found, falling back: {col_err}")
-                    customization = None
-            else:
-                # Yeni kolonlar yoksa genel kolonları kullan
-                customization = await db.fetch_one(
-                    """
-                    SELECT openai_api_key as api_key, openai_model as model
+            # Önce tüm key kolonlarını tek sorguda çek
+            try:
+                all_keys_query = """
+                    SELECT 
+                        openai_api_key,
+                        openai_model
                     FROM tenant_customizations
-                    WHERE isletme_id = :id AND openai_api_key IS NOT NULL AND openai_api_key != ''
-                    """,
-                    {"id": tenant_id}
-                )
+                    WHERE isletme_id = :id
+                """
+                base_row = await db.fetch_one(all_keys_query, {"id": tenant_id})
+                
+                if base_row:
+                    base_dict = dict(base_row) if hasattr(base_row, 'keys') else base_row
+                    logging.info(f"[LLM_PROVIDER] Found tenant_customizations row for tenant_id={tenant_id}, openai_api_key={'SET' if base_dict.get('openai_api_key') else 'EMPTY'}")
+                else:
+                    logging.warning(f"[LLM_PROVIDER] No tenant_customizations row found for tenant_id={tenant_id}")
+            except Exception as base_err:
+                logging.warning(f"[LLM_PROVIDER] Error checking base row: {base_err}")
+                base_row = None
             
-            if customization:
-                customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
-                tenant_api_key = customization_dict.get("api_key")
-                tenant_model = customization_dict.get("model")
-                if tenant_api_key and tenant_api_key.strip():
-                    api_key = tenant_api_key.strip()
-                    if tenant_model:
-                        model = tenant_model
-                    logging.info(f"[LLM_PROVIDER] Using tenant-specific API key for tenant_id={tenant_id}, assistant_type={assistant_type}, model={model}")
-                elif assistant_type and api_key_col != "openai_api_key":
-                    # Asistan-specific key yoksa genel key'i kullan
-                    fallback = await db.fetch_one(
+            # Asistan-specific kolonları kontrol et
+            if assistant_type and api_key_col != "openai_api_key":
+                try:
+                    # Kolon varlığını kontrol et
+                    column_check = await db.fetch_one(
                         """
-                        SELECT openai_api_key as api_key, openai_model as model
-                        FROM tenant_customizations
-                        WHERE isletme_id = :id AND openai_api_key IS NOT NULL AND openai_api_key != ''
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'tenant_customizations' 
+                        AND column_name = :api_key_col
                         """,
-                        {"id": tenant_id}
+                        {"api_key_col": api_key_col}
                     )
-                    if fallback:
-                        fallback_dict = dict(fallback) if hasattr(fallback, 'keys') else fallback
-                        fallback_key = fallback_dict.get("api_key")
-                        fallback_model = fallback_dict.get("model")
-                        if fallback_key and fallback_key.strip():
-                            api_key = fallback_key.strip()
-                            if fallback_model:
-                                model = fallback_model
-                            logging.info(f"[LLM_PROVIDER] Using fallback general API key for tenant_id={tenant_id}, assistant_type={assistant_type}, model={model}")
+                    
+                    if column_check:
+                        logging.info(f"[LLM_PROVIDER] Column '{api_key_col}' exists in DB")
+                        customization = await db.fetch_one(
+                            f"""
+                            SELECT {api_key_col} as api_key, {model_col} as model
+                            FROM tenant_customizations
+                            WHERE isletme_id = :id AND {api_key_col} IS NOT NULL AND {api_key_col} != ''
+                            """,
+                            {"id": tenant_id}
+                        )
+                        if customization:
+                            cust_dict = dict(customization) if hasattr(customization, 'keys') else customization
+                            tenant_key = cust_dict.get("api_key")
+                            tenant_model = cust_dict.get("model")
+                            if tenant_key and tenant_key.strip():
+                                api_key = tenant_key.strip()
+                                if tenant_model:
+                                    model = tenant_model
+                                key_source = f"tenant_{assistant_type}_specific"
+                                logging.info(f"[LLM_PROVIDER] ✅ Using {assistant_type}-specific API key for tenant_id={tenant_id}, model={model}, key=sk-...{api_key[-4:]}")
+                            else:
+                                logging.info(f"[LLM_PROVIDER] {assistant_type}-specific key exists but is empty/null for tenant_id={tenant_id}")
+                        else:
+                            logging.info(f"[LLM_PROVIDER] No {assistant_type}-specific key row found for tenant_id={tenant_id}")
+                    else:
+                        logging.warning(f"[LLM_PROVIDER] Column '{api_key_col}' does NOT exist in DB - schema migration may be needed")
+                except Exception as col_err:
+                    logging.warning(f"[LLM_PROVIDER] Error checking {api_key_col}: {col_err}")
+            
+            # Asistan-specific key bulunamadıysa, genel key'e bak
+            if not api_key and base_row:
+                base_dict = dict(base_row) if hasattr(base_row, 'keys') else base_row
+                general_key = base_dict.get("openai_api_key")
+                general_model = base_dict.get("openai_model")
+                if general_key and general_key.strip():
+                    api_key = general_key.strip()
+                    if general_model:
+                        model = general_model
+                    key_source = "tenant_general"
+                    logging.info(f"[LLM_PROVIDER] ✅ Using tenant general API key for tenant_id={tenant_id}, model={model}, key=sk-...{api_key[-4:]}")
+                else:
+                    logging.info(f"[LLM_PROVIDER] Tenant general openai_api_key is empty for tenant_id={tenant_id}")
+                    
         except Exception as e:
-            logging.warning(f"[LLM_PROVIDER] Failed to fetch tenant API key for tenant_id={tenant_id}, assistant_type={assistant_type}: {e}")
+            logging.error(f"[LLM_PROVIDER] ❌ Failed to fetch tenant API key for tenant_id={tenant_id}, assistant_type={assistant_type}: {e}", exc_info=True)
+    else:
+        logging.info(f"[LLM_PROVIDER] No tenant_id provided, skipping tenant-specific key lookup")
     
     # Tenant-specific key yoksa global key'i kontrol et
     if not api_key:
         api_key = settings.OPENAI_API_KEY
         if api_key:
             api_key = api_key.strip()
-            logging.info(f"[LLM_PROVIDER] Using global API key, assistant_type={assistant_type}, model={model}")
+            key_source = "global_env"
+            logging.info(f"[LLM_PROVIDER] ✅ Using global API key from env, model={model}, key=sk-...{api_key[-4:]}")
+        else:
+            logging.warning(f"[LLM_PROVIDER] ❌ No global OPENAI_API_KEY in environment")
     
     has_api_key = bool(api_key)
     is_llm_enabled = settings.ASSISTANT_ENABLE_LLM
     
-    logging.info(f"[LLM_PROVIDER] ASSISTANT_ENABLE_LLM={is_llm_enabled}, HAS_API_KEY={has_api_key}, tenant_id={tenant_id}")
+    logging.info(f"[LLM_PROVIDER] FINAL: ASSISTANT_ENABLE_LLM={is_llm_enabled}, HAS_API_KEY={has_api_key}, key_source={key_source}, tenant_id={tenant_id}, assistant_type={assistant_type}")
     
     if is_llm_enabled and has_api_key:
         try:
             provider = OpenAIProvider(api_key, model)
-            logging.info(f"[LLM_PROVIDER] Using OpenAI provider with model: {model}")
+            logging.info(f"[LLM_PROVIDER] ✅ OpenAI provider created with model: {model}")
             return provider
         except Exception as e:
-            logging.error(f"[LLM_PROVIDER] Failed to initialize OpenAI provider: {e}")
+            logging.error(f"[LLM_PROVIDER] ❌ Failed to initialize OpenAI provider: {e}")
             pass
     else:
         if not is_llm_enabled:
-            logging.warning("[LLM_PROVIDER] LLM disabled in settings")
+            logging.warning("[LLM_PROVIDER] ❌ LLM disabled in settings (ASSISTANT_ENABLE_LLM=False)")
         if not has_api_key:
-            logging.warning(f"[LLM_PROVIDER] OpenAI API key not found (tenant_id={tenant_id})")
+            logging.warning(f"[LLM_PROVIDER] ❌ No API key found from any source (tenant_id={tenant_id})")
     
-    logging.warning("[LLM_PROVIDER] Falling back to RuleBasedProvider")
+    logging.warning("[LLM_PROVIDER] ⚠️ Falling back to RuleBasedProvider - responses will be limited")
     return RuleBasedProvider()
+

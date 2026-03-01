@@ -71,6 +71,12 @@ services:
       # OpenAI (Opsiyonel)
       - key: OPENAI_API_KEY
         sync: false  # Manuel olarak ayarla (varsa)
+      
+      # LLM Assistant
+      - key: ASSISTANT_ENABLE_LLM
+        value: "true"
+      - key: ASSISTANT_ENABLE_TTS
+        value: "false"
 
 # Database service (Opsiyonel - eğer yeni database kurmak istiyorsan)
 # database:
