@@ -462,6 +462,18 @@ CREATE INDEX IF NOT EXISTS idx_backup_history_status ON backup_history (status);
 CREATE INDEX IF NOT EXISTS idx_backup_history_created ON backup_history (started_at);
 """
 
+CREATE_PLATFORM_SETTINGS = """
+CREATE TABLE IF NOT EXISTS platform_settings (
+    id BIGSERIAL PRIMARY KEY,
+    key TEXT NOT NULL UNIQUE,
+    value TEXT,
+    description TEXT,
+    is_secret BOOLEAN DEFAULT FALSE,
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_by TEXT
+);
+"""
+
 
 VIEWS_DIR = Path(__file__).resolve().parent / "views"
 AI_VIEW_FILES = [
@@ -621,6 +633,7 @@ async def create_tables(db: Database):
     await db.execute(CREATE_NOTIFICATION_HISTORY)
     await db.execute(CREATE_API_KEYS)
     await db.execute(CREATE_API_USAGE_LOGS)
+    await db.execute(CREATE_PLATFORM_SETTINGS)
     # API Usage Logs için eksik kolonları ekle
     for stmt in [s.strip() for s in ALTER_API_USAGE_LOGS_COMPAT.split(';') if s.strip()]:
         try:

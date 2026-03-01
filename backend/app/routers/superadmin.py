@@ -1555,3 +1555,181 @@ async def get_api_usage(
     
     return summary
 
+
+# ---- Platform Ayarları (Global) ----
+# Bu endpoint'ler veritabanındaki platform_settings tablosuyla çalışır.
+# Render env variable'larına gerek kalmadan, Super Admin panelinden
+# global API key'ler ve diğer platform ayarları yönetilebilir.
+
+class PlatformSettingIn(BaseModel):
+    key: str = Field(min_length=1, description="Ayar anahtarı")
+    value: Optional[str] = Field(None, description="Ayar değeri")
+    description: Optional[str] = Field(None, description="Açıklama")
+    is_secret: bool = Field(default=False, description="Gizli değer mi (API key gibi)")
+
+
+class PlatformSettingOut(BaseModel):
+    key: str
+    value: Optional[str] = None
+    description: Optional[str] = None
+    is_secret: bool = False
+    updated_at: Optional[str] = None
+    updated_by: Optional[str] = None
+
+
+@router.get("/platform-settings")
+async def get_platform_settings(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Tüm platform ayarlarını getir. Gizli değerler maskelenir."""
+    try:
+        # Tablonun var olup olmadığını kontrol et
+        table_check = await db.fetch_one("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_name = 'platform_settings'
+        """)
+        if not table_check:
+            return {"settings": [], "message": "Platform settings tablosu henüz oluşturulmamış"}
+        
+        rows = await db.fetch_all("""
+            SELECT key, value, description, is_secret, 
+                   updated_at::text, updated_by
+            FROM platform_settings
+            ORDER BY key
+        """)
+        
+        settings = []
+        for row in rows:
+            r = dict(row) if hasattr(row, 'keys') else row
+            item = {
+                "key": r.get("key"),
+                "description": r.get("description"),
+                "is_secret": r.get("is_secret", False),
+                "updated_at": r.get("updated_at"),
+                "updated_by": r.get("updated_by"),
+            }
+            # Gizli değerleri maskele
+            val = r.get("value")
+            if r.get("is_secret") and val:
+                if len(val) > 8:
+                    item["value"] = val[:4] + "..." + val[-4:]
+                else:
+                    item["value"] = "***"
+                item["has_value"] = True
+            else:
+                item["value"] = val
+                item["has_value"] = bool(val)
+            settings.append(item)
+        
+        return {"settings": settings}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Platform ayarları alınamadı: {str(e)}")
+
+
+@router.post("/platform-settings")
+async def upsert_platform_setting(
+    payload: PlatformSettingIn,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Platform ayarı ekle/güncelle."""
+    from datetime import datetime
+    try:
+        # Tablonun var olup olmadığını kontrol et
+        table_check = await db.fetch_one("""
+            SELECT table_name FROM information_schema.tables 
+            WHERE table_name = 'platform_settings'
+        """)
+        if not table_check:
+            # Tabloyu oluştur
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS platform_settings (
+                    id BIGSERIAL PRIMARY KEY,
+                    key TEXT NOT NULL UNIQUE,
+                    value TEXT,
+                    description TEXT,
+                    is_secret BOOLEAN DEFAULT FALSE,
+                    updated_at TIMESTAMPTZ DEFAULT NOW(),
+                    updated_by TEXT
+                )
+            """)
+        
+        username = current_user.get("username", "unknown")
+        
+        # Eğer maskelenmiş değer geldiyse (... içeriyorsa), güncelleme
+        if payload.value and "..." in payload.value and payload.is_secret:
+            # Maskelenmiş değer, güncelleme yapma (sadece description güncelle)
+            if payload.description:
+                await db.execute(
+                    """
+                    UPDATE platform_settings 
+                    SET description = :description, updated_at = :updated_at, updated_by = :updated_by
+                    WHERE key = :key
+                    """,
+                    {
+                        "key": payload.key,
+                        "description": payload.description,
+                        "updated_at": datetime.utcnow(),
+                        "updated_by": username,
+                    }
+                )
+            return {"message": "Ayar güncellendi (değer korundu)", "key": payload.key}
+        
+        # Upsert (INSERT or UPDATE)
+        await db.execute(
+            """
+            INSERT INTO platform_settings (key, value, description, is_secret, updated_at, updated_by)
+            VALUES (:key, :value, :description, :is_secret, :updated_at, :updated_by)
+            ON CONFLICT (key) DO UPDATE SET
+                value = :value,
+                description = COALESCE(:description, platform_settings.description),
+                is_secret = :is_secret,
+                updated_at = :updated_at,
+                updated_by = :updated_by
+            """,
+            {
+                "key": payload.key,
+                "value": payload.value,
+                "description": payload.description,
+                "is_secret": payload.is_secret,
+                "updated_at": datetime.utcnow(),
+                "updated_by": username,
+            }
+        )
+        
+        return {"message": f"Platform ayarı kaydedildi: {payload.key}", "key": payload.key}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Platform ayarı kaydedilemedi: {str(e)}")
+
+
+@router.delete("/platform-settings/{key}")
+async def delete_platform_setting(
+    key: str,
+    _: Dict[str, Any] = Depends(get_current_user),
+):
+    """Platform ayarını sil."""
+    try:
+        result = await db.execute(
+            "DELETE FROM platform_settings WHERE key = :key",
+            {"key": key}
+        )
+        return {"message": f"Platform ayarı silindi: {key}"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Platform ayarı silinemedi: {str(e)}")
+
+
+async def get_platform_setting_value(key: str) -> Optional[str]:
+    """
+    Platform ayarının değerini getir (internal helper).
+    Diğer modüller tarafından kullanılabilir.
+    """
+    try:
+        row = await db.fetch_one(
+            "SELECT value FROM platform_settings WHERE key = :key",
+            {"key": key}
+        )
+        if row:
+            r = dict(row) if hasattr(row, 'keys') else row
+            return r.get("value")
+    except Exception:
+        pass
+    return None
