@@ -8,39 +8,39 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
+
   const navigate = useNavigate();
   const { setUser, setTokens, setSubeId } = useAuthStore();
 
   const resolvePanel = (username: string, role: string): string => {
     const u = username.toLowerCase();
     const r = role.toLowerCase();
-    
+
     // Super admin sadece super admin panelini görebilir
     if (r === 'super_admin' || u === 'super') {
       return '/superadmin';
     }
-    
+
     // Mutfak kullanıcıları ve barista mutfak ekranını görebilir
     if (u === 'mutfak' || r === 'mutfak' || r === 'barista') {
       return '/mutfak';
     }
-    
+
     // Garson terminal kullanabilir
     if (r === 'garson') {
       return '/terminal';
     }
-    
+
     // Kasa/Operator yetkileri
     if (r === 'operator' || u === 'kasiyer') {
       return '/kasa';
     }
-    
+
     // Admin yetkileri (tenant admin)
     if (r === 'admin' || u === 'admin') {
       return '/dashboard';
     }
-    
+
     // Varsayılan olarak dashboard
     return '/dashboard';
   };
@@ -53,7 +53,7 @@ export default function LoginPage() {
     try {
       // Login
       const tokenData = await authApi.login(username, password);
-      
+
       if (!tokenData.access_token) {
         throw new Error('Token alınamadı');
       }
@@ -142,7 +142,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center text-sm text-white/60">
-          <p>Fistik Kafe (c) 2025</p>
+          <p>Neso Modüler &copy; 2026</p>
         </div>
       </div>
     </div>

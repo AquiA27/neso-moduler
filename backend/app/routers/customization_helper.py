@@ -32,7 +32,7 @@ async def check_assistant_columns() -> Dict[str, bool]:
         return {}
 
 
-async def get_select_fields(has_openai_columns: bool, has_assistant_columns: Dict[str, bool]) -> str:
+def get_select_fields(has_openai_columns: bool, has_assistant_columns: Dict[str, bool]) -> str:
     """Get SELECT fields for customization query."""
     base_fields = "id, isletme_id, domain, app_name, logo_url, primary_color, secondary_color, footer_text, email, telefon, adres"
     

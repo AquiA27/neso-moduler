@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { customizationApi, subscriptionApi } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
 import { Menu, Settings, LogOut, AlertTriangle, X } from 'lucide-react';
-import logo from '../assets/fistik-logo.svg';
+import logo from '../assets/neso-logo.svg';
 import TenantSwitcher from './TenantSwitcher';
 
 // Hex renk kodunu rgba'ya çevir
@@ -21,13 +21,13 @@ function Layout() {
   const [navOpen, setNavOpen] = useState(false);
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [showSubscriptionAlert, setShowSubscriptionAlert] = useState(true);
-  
+
   // Tenant customization'ı yükle (tenant_id veya subdomain'den)
   useEffect(() => {
     const loadCustomization = async () => {
       // Super admin tenant değiştirdiğinde selectedTenantId'yi kullan
       const effectiveTenantId = selectedTenantId || tenantId;
-      
+
       // Önce subdomain'den dene (domain-based routing)
       const subdomain = getCurrentSubdomain();
       if (subdomain) {
@@ -47,7 +47,7 @@ function Layout() {
           console.warn('Domain-based customization yüklenemedi:', error);
         }
       }
-      
+
       // Subdomain yoksa veya bulunamadıysa tenant_id'den yükle
       if (!effectiveTenantId) {
         // Super admin ise null bırak, normal kullanıcı için fallback
@@ -56,7 +56,7 @@ function Layout() {
         }
         return;
       }
-      
+
       try {
         const response = await customizationApi.get(effectiveTenantId);
         const customization = response.data;
@@ -71,13 +71,13 @@ function Layout() {
         // Hata durumunda null set etme, fallback kullanılsın
       }
     };
-    
+
     // Sadece user varsa yükle (login olduktan sonra)
     if (user) {
       loadCustomization();
     }
   }, [tenantId, selectedTenantId, user, setTenantCustomization]);
-  
+
   // Subscription durumunu kontrol et (super admin hariç)
   useEffect(() => {
     const checkSubscription = async () => {
@@ -85,7 +85,7 @@ function Layout() {
       if (user?.role === 'super_admin') {
         return;
       }
-      
+
       try {
         const response = await subscriptionApi.getMyStatus();
         setSubscriptionStatus(response.data);
@@ -96,12 +96,12 @@ function Layout() {
         }
       }
     };
-    
+
     if (user && tenantId) {
       checkSubscription();
     }
   }, [user, tenantId]);
-  
+
   // Logo ve app name'i belirle (memoize edilmiş)
   const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
   const displayName = useMemo(() => {
@@ -110,19 +110,19 @@ function Layout() {
     }
     return user?.role === 'super_admin' ? 'Neso Modüler' : 'Yönetim Paneli';
   }, [tenantCustomization?.app_name, user?.role]);
-  
+
   // Header arka plan rengini hesapla
   const headerBackground = useMemo(() => {
     if (tenantCustomization?.primary_color) {
       const primary = hexToRgba(tenantCustomization.primary_color, 0.9);
-      const secondary = tenantCustomization.secondary_color 
+      const secondary = tenantCustomization.secondary_color
         ? hexToRgba(tenantCustomization.secondary_color, 0.9)
         : primary;
       return `linear-gradient(to right, ${primary}, ${secondary})`;
     }
     return 'linear-gradient(to right, rgb(6 78 59 / 0.9), rgb(5 46 22 / 0.9))';
   }, [tenantCustomization?.primary_color, tenantCustomization?.secondary_color]);
-  
+
   const headerShadow = useMemo(() => {
     if (tenantCustomization?.primary_color) {
       const shadowColor = hexToRgba(tenantCustomization.primary_color, 0.25);
@@ -144,27 +144,27 @@ function Layout() {
     const u = username.toLowerCase();
     const r = role.toLowerCase();
     const panels: string[] = [];
-    
+
     // Mutfak kullanıcıları ve barista mutfak ekranını görebilir
     if (u === 'mutfak' || r === 'mutfak' || r === 'barista') {
       return ['mutfak']; // Sadece mutfak, başka hiçbir panele erişim yok
     }
-    
+
     // Garson terminal kullanabilir
     if (r === 'garson') {
       return ['terminal'];
     }
-    
+
     // Admin yetkileri
     if (r === 'super_admin' || r === 'admin' || u === 'admin' || u === 'super') {
       panels.push('admin');
     }
-    
+
     // Kasa/Operator yetkileri
     if (r === 'operator' || u === 'kasiyer') {
       panels.push('kasa');
     }
-    
+
     return panels.length > 0 ? panels : ['admin'];
   };
 
@@ -173,23 +173,23 @@ function Layout() {
   const showKasa = allowedPanels.includes('kasa');
   const showMutfak = allowedPanels.includes('mutfak');
   const showTerminal = allowedPanels.includes('terminal');
-  
+
   // Personeller sekmesi: super_admin ve admin görebilir
   const userRole = user?.role?.toLowerCase() || '';
   const username = user?.username?.toLowerCase() || '';
   const showPersoneller = user && (
-    userRole === 'super_admin' || 
+    userRole === 'super_admin' ||
     username === 'super' ||
     userRole === 'admin'
   );
-  
+
   // Debug için console.log (production'da kaldırılabilir)
   if (user && userRole === 'admin') {
     console.log('[Layout] Admin user detected:', { username, role: userRole, showPersoneller });
   }
-  
+
   const showSuperAdmin = user && (userRole === 'super_admin' || username === 'super');
-  
+
   // Super admin "Tüm İşletmeler" modundayken sadece Super Admin paneli gösterilmeli
   // Diğer veri sayfaları (raporlar, menü, stok, vb.) sadece tenant seçildiğinde gösterilmeli
   const isSuperAdminInAllTenantsMode = showSuperAdmin && selectedTenantId === null;
@@ -197,13 +197,11 @@ function Layout() {
 
   const getNavClass = (isActive: boolean, variant: 'desktop' | 'mobile') => {
     if (variant === 'mobile') {
-      return `flex items-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm transition-colors ${
-        isActive ? 'bg-white/15 text-white' : 'bg-white/5 text-white/80 hover:bg-white/10'
-      }`;
+      return `flex items-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm transition-colors ${isActive ? 'bg-white/15 text-white' : 'bg-white/5 text-white/80 hover:bg-white/10'
+        }`;
     }
-    return `px-4 py-2 rounded-lg transition-colors ${
-      isActive ? 'bg-white/15 text-white shadow-inner shadow-primary-900/30' : 'hover:bg-white/10 text-white/80'
-    }`;
+    return `px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/15 text-white shadow-inner shadow-primary-900/30' : 'hover:bg-white/10 text-white/80'
+      }`;
   };
 
   const renderLink = (to: string, label: string, variant: 'desktop' | 'mobile') => (
@@ -247,32 +245,32 @@ function Layout() {
   // Subscription uyarısı mesajı
   const subscriptionAlertMessage = useMemo(() => {
     if (!subscriptionStatus || !showSubscriptionAlert) return null;
-    
+
     const status = subscriptionStatus.status;
     const daysUntilExpiry = subscriptionStatus.days_until_expiry;
     const expiresSoon = subscriptionStatus.expires_soon;
-    
+
     if (status === 'suspended') {
       return {
         type: 'error',
         message: 'Aboneliğiniz askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.',
       };
     }
-    
+
     if (status === 'cancelled') {
       return {
         type: 'error',
         message: 'Aboneliğiniz sonlandırılmıştır. Lütfen yöneticinizle iletişime geçin.',
       };
     }
-    
+
     if (expiresSoon && daysUntilExpiry !== undefined) {
       return {
         type: 'warning',
         message: `Aboneliğiniz ${daysUntilExpiry} gün içinde sona erecek. Lütfen yöneticinizle iletişime geçin.`,
       };
     }
-    
+
     return null;
   }, [subscriptionStatus, showSubscriptionAlert]);
 
@@ -280,11 +278,10 @@ function Layout() {
     <div className="min-h-screen flex flex-col">
       {/* Subscription Uyarısı */}
       {subscriptionAlertMessage && (
-        <div className={`${
-          subscriptionAlertMessage.type === 'error' 
-            ? 'bg-red-600 text-white' 
+        <div className={`${subscriptionAlertMessage.type === 'error'
+            ? 'bg-red-600 text-white'
             : 'bg-yellow-500 text-white'
-        } px-4 py-3 flex items-center justify-between`}>
+          } px-4 py-3 flex items-center justify-between`}>
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-5 h-5" />
             <span>{subscriptionAlertMessage.message}</span>
@@ -297,9 +294,9 @@ function Layout() {
           </button>
         </div>
       )}
-      
+
       {/* Header */}
-      <header 
+      <header
         className="relative sticky top-0 z-50 border-b border-white/15 shadow-lg backdrop-blur-md"
         style={{
           background: headerBackground,
