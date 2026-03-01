@@ -5,10 +5,10 @@ const normalizeApiUrl = (url: string | undefined): string => {
   if (!url) {
     return 'http://localhost:8000';
   }
-  
+
   // Başındaki/sonundaki boşlukları temizle
   url = url.trim();
-  
+
   // Protokol yoksa veya yanlışsa düzelt
   if (!url.startsWith('http://') && !url.startsWith('https://')) {
     // Eğer 'ttps://' gibi bir hata varsa düzelt
@@ -19,10 +19,10 @@ const normalizeApiUrl = (url: string | undefined): string => {
       url = 'https://' + url;
     }
   }
-  
+
   // Sonundaki / işaretini kaldır
   url = url.replace(/\/$/, '');
-  
+
   return url;
 };
 
@@ -43,7 +43,7 @@ apiClient.interceptors.request.use(
     const subeId = Number(localStorage.getItem('neso.subeId') || sessionStorage.getItem('neso.subeId') || '1');
     const selectedTenantId = localStorage.getItem('neso.selectedTenantId');
     const userStr = localStorage.getItem('neso-auth-storage');
-    
+
     // Super admin mi kontrol et
     let isSuperAdmin = false;
     try {
@@ -59,14 +59,14 @@ apiClient.interceptors.request.use(
     } catch (e) {
       console.warn('Auth data parse error:', e);
     }
-    
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     if (subeId) {
       config.headers['X-Sube-Id'] = String(subeId);
     }
-    
+
     // Super admin için selectedTenantId'yi query parameter veya header olarak ekle
     if (isSuperAdmin && selectedTenantId) {
       // Query parameter olarak ekle
@@ -82,7 +82,7 @@ apiClient.interceptors.request.use(
     if (config.data instanceof FormData) {
       config.headers['Content-Type'] = 'multipart/form-data';
     }
-    
+
     return config;
   },
   (error) => {
@@ -134,7 +134,7 @@ apiClient.interceptors.response.use(
       isRefreshing = true;
 
       const refreshToken = localStorage.getItem('neso.refreshToken');
-      
+
       if (!refreshToken) {
         // Refresh token yok, logout yap
         isRefreshing = false;
@@ -167,7 +167,7 @@ apiClient.interceptors.response.use(
 
         // Orijinal isteği yeni token ile tekrar dene
         originalRequest.headers.Authorization = `Bearer ${access_token}`;
-        
+
         // Kuyruktaki istekleri işle
         processQueue(null, access_token);
         isRefreshing = false;
@@ -196,16 +196,16 @@ export const analyticsApi = {
     if (tarih) params.append('tarih', tarih);
     return apiClient.get(`/analytics/saatlik-yogunluk?${params.toString()}`);
   },
-  
+
   enCokTercihEdilenUrunler: async (limit: number = 10, period: 'gunluk' | 'haftalik' | 'aylik' | 'tumu' = 'tumu', tarih?: string) => {
-    const params = new URLSearchParams({ 
+    const params = new URLSearchParams({
       limit: String(limit),
-      period 
+      period
     });
     if (tarih) params.append('tarih', tarih);
     return apiClient.get(`/analytics/en-cok-tercih-edilen-urunler?${params.toString()}`);
   },
-  
+
   ozet: async (options?: { period?: 'gunluk' | 'haftalik' | 'aylik'; start?: string; end?: string; tarih?: string }) => {
     const params = new URLSearchParams();
     if (options?.period) params.append('period', options.period);
@@ -229,7 +229,7 @@ export const adminApi = {
     const queryString = searchParams.toString();
     return apiClient.get(`/admin/ozet${queryString ? `?${queryString}` : ''}`);
   },
-  
+
   trend: async (options?: { gunSay?: number; start?: string; end?: string }) => {
     const searchParams = new URLSearchParams();
     if (options?.start && options?.end) {
@@ -241,7 +241,7 @@ export const adminApi = {
     const queryString = searchParams.toString();
     return apiClient.get(`/admin/trend${queryString ? `?${queryString}` : ''}`);
   },
-  
+
   topUrunler: async (options?: { gunSay?: number; limit?: number; metrik?: 'adet' | 'ciro'; start?: string; end?: string }) => {
     const searchParams = new URLSearchParams();
     if (options?.start && options?.end) {
@@ -259,16 +259,16 @@ export const adminApi = {
     const queryString = searchParams.toString();
     return apiClient.get(`/admin/top-urunler${queryString ? `?${queryString}` : ''}`);
   },
-  
+
   personelAnaliz: async (gunSay: number = 30, limit: number = 20) => {
     return apiClient.get(`/admin/personel-analiz?gun_say=${gunSay}&limit=${limit}`);
   },
-  
+
   // Personeller
   personellerList: async () => {
     return apiClient.get('/admin/personeller');
   },
-  
+
   personelUpsert: async (data: { username: string; role: string; aktif: boolean; password?: string }) => {
     return apiClient.post('/admin/personeller/upsert', data);
   },
@@ -280,40 +280,40 @@ export const superadminApi = {
   tenantsList: async () => {
     return apiClient.get('/superadmin/tenants');
   },
-  
+
   tenantDetail: async (id: number) => {
     return apiClient.get(`/superadmin/tenants/${id}`);
   },
-  
+
   tenantCreate: async (data: { ad: string; vergi_no?: string; telefon?: string; aktif?: boolean }) => {
     return apiClient.post('/superadmin/tenants', data);
   },
-  
+
   tenantUpdate: async (id: number, data: { ad: string; vergi_no?: string; telefon?: string; aktif?: boolean }) => {
     return apiClient.patch(`/superadmin/tenants/${id}`, data);
   },
-  
+
   tenantDelete: async (id: number) => {
     return apiClient.delete(`/superadmin/tenants/${id}`);
   },
-  
+
   // API Keys
   apiKeyCreate: async (tenantId: number, data: { isletme_id: number; key_name?: string; rate_limit_per_minute?: number }) => {
     return apiClient.post(`/superadmin/tenants/${tenantId}/api-key`, data);
   },
-  
+
   apiKeyGet: async (tenantId: number) => {
     return apiClient.get(`/superadmin/tenants/${tenantId}/api-key`);
   },
-  
+
   apiKeyUpdate: async (tenantId: number, data: { aktif?: boolean; rate_limit_per_minute?: number; key_name?: string }) => {
     return apiClient.patch(`/superadmin/tenants/${tenantId}/api-key`, data);
   },
-  
+
   apiKeyRegenerate: async (tenantId: number) => {
     return apiClient.post(`/superadmin/tenants/${tenantId}/api-key/regenerate`);
   },
-  
+
   apiUsage: async (tenantId: number, options?: { start_date?: string; end_date?: string }) => {
     const params = new URLSearchParams();
     if (options?.start_date) params.append('start_date', options.start_date);
@@ -321,22 +321,22 @@ export const superadminApi = {
     const queryString = params.toString();
     return apiClient.get(`/superadmin/tenants/${tenantId}/api-usage${queryString ? `?${queryString}` : ''}`);
   },
-  
+
   // Users
   usersList: async (options?: { includePassive?: boolean }) => {
     const params = options?.includePassive ? { include_passive: true } : undefined;
     return apiClient.get('/superadmin/users', { params });
   },
-  
+
   userUpsert: async (data: { username: string; role: string; aktif: boolean; password?: string }) => {
     return apiClient.post('/superadmin/users/upsert', data);
   },
-  
+
   getUserPermissions: async (username: string) => {
     // Admin'ler için /admin/users/{username}/permissions endpoint'ini kullan
     return apiClient.get(`/admin/users/${username}/permissions`);
   },
-  
+
   updateUserPermissions: async (username: string, permissions: Record<string, boolean>) => {
     // Admin'ler için /admin/users/{username}/permissions endpoint'ini kullan
     return apiClient.put(`/admin/users/${username}/permissions`, {
@@ -344,16 +344,16 @@ export const superadminApi = {
       permissions,
     });
   },
-  
+
   getAvailablePermissions: async () => {
     // Admin'ler için /admin/permissions/available endpoint'ini kullan
     return apiClient.get('/admin/permissions/available');
   },
-  
+
   getRoleDefaultPermissions: async (role: string) => {
     return apiClient.get(`/superadmin/permissions/role-defaults/${role}`);
   },
-  
+
   // Quick Setup
   quickSetup: async (data: {
     isletme_ad: string;
@@ -375,10 +375,25 @@ export const superadminApi = {
   }) => {
     return apiClient.post('/superadmin/quick-setup', data);
   },
-  
+
   // Dashboard Stats
   dashboardStats: async () => {
     return apiClient.get('/superadmin/dashboard/stats');
+  },
+};
+
+// Platform Settings API (Super Admin only)
+export const platformSettingsApi = {
+  getAll: async () => {
+    return apiClient.get('/superadmin/platform-settings');
+  },
+
+  upsert: async (data: { key: string; value?: string; description?: string; is_secret?: boolean }) => {
+    return apiClient.post('/superadmin/platform-settings', data);
+  },
+
+  remove: async (key: string) => {
+    return apiClient.delete(`/superadmin/platform-settings/${key}`);
   },
 };
 
@@ -390,11 +405,11 @@ export const subscriptionApi = {
     if (params?.status) searchParams.append('status', params.status);
     return apiClient.get(`/subscription/list?${searchParams.toString()}`);
   },
-  
+
   get: async (isletme_id: number) => {
     return apiClient.get(`/subscription/${isletme_id}`);
   },
-  
+
   create: async (data: {
     isletme_id: number;
     plan_type: string;
@@ -411,19 +426,19 @@ export const subscriptionApi = {
   }) => {
     return apiClient.post('/subscription/create', data);
   },
-  
+
   update: async (isletme_id: number, data: any) => {
     return apiClient.patch(`/subscription/${isletme_id}`, data);
   },
-  
+
   updateStatus: async (isletme_id: number, status: string, bitis_tarihi?: string) => {
     return apiClient.patch(`/subscription/${isletme_id}/status`, { status, bitis_tarihi });
   },
-  
+
   getLimits: async (isletme_id: number) => {
     return apiClient.get(`/subscription/${isletme_id}/limits`);
   },
-  
+
   getMyStatus: async () => {
     return apiClient.get('/subscription/my/status');
   },
@@ -438,11 +453,11 @@ export const paymentApi = {
     if (params?.durum) searchParams.append('durum', params.durum);
     return apiClient.get(`/payment/list?${searchParams.toString()}`);
   },
-  
+
   get: async (payment_id: number) => {
     return apiClient.get(`/payment/${payment_id}`);
   },
-  
+
   create: async (data: {
     isletme_id: number;
     subscription_id?: number;
@@ -455,11 +470,11 @@ export const paymentApi = {
   }) => {
     return apiClient.post('/payment/create', data);
   },
-  
+
   updateStatus: async (payment_id: number, durum: string, odeme_tarihi?: string) => {
     return apiClient.patch(`/payment/${payment_id}/status`, { durum, odeme_tarihi });
   },
-  
+
   getSummary: async (isletme_id: number) => {
     return apiClient.get(`/payment/isletme/${isletme_id}/summary`);
   },
@@ -470,7 +485,7 @@ export const customizationApi = {
   get: async (isletme_id: number) => {
     return apiClient.get(`/customization/isletme/${isletme_id}`);
   },
-  
+
   create: async (data: {
     isletme_id: number;
     domain?: string;
@@ -486,15 +501,15 @@ export const customizationApi = {
   }) => {
     return apiClient.post('/customization/create', data);
   },
-  
+
   update: async (isletme_id: number, data: any) => {
     return apiClient.patch(`/customization/isletme/${isletme_id}`, data);
   },
-  
+
   getByDomain: async (domain: string) => {
     return publicApiClient.get(`/customization/domain/${domain}`);
   },
-  
+
   uploadLogo: async (isletme_id: number, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
@@ -514,20 +529,20 @@ export const authApi = {
     const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
-    
+
     const response = await axios.post(`${API_BASE_URL}/auth/token`, formData, {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     return response.data;
   },
-  
+
   refreshToken: async (refreshToken: string) => {
     const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
       refresh_token: refreshToken,
     });
     return response.data;
   },
-  
+
   me: async () => {
     const response = await apiClient.get('/auth/me');
     return response;
@@ -542,25 +557,25 @@ export const menuApi = {
     if (params?.varyasyonlar_dahil) searchParams.append('varyasyonlar_dahil', 'true');
     return apiClient.get(`/menu/liste?${searchParams.toString()}`);
   },
-  
+
   add: async (data: { ad: string; fiyat: number; kategori: string; aktif?: boolean; aciklama?: string }) => {
     return apiClient.post('/menu/ekle', data);
   },
-  
+
   update: async (id: number, data: Partial<{ ad: string; fiyat: number; kategori: string; aktif: boolean; aciklama: string }>) => {
     return apiClient.patch(`/menu/guncelle`, { id, ...data });
   },
-  
+
   uploadImage: async (id: number, file: File) => {
     const formData = new FormData();
     formData.append('file', file);
     return apiClient.post(`/menu/${id}/gorsel`, formData);
   },
-  
+
   deleteImage: async (id: number) => {
     return apiClient.delete(`/menu/${id}/gorsel`);
   },
-  
+
   delete: async (id: number) => {
     return apiClient.delete(`/menu/sil?id=${id}`);
   },
@@ -570,11 +585,11 @@ export const siparisApi = {
   add: async (data: { masa: string; sepet: Array<{ urun: string; adet: number; fiyat: number }>; tutar: number }) => {
     return apiClient.post('/siparis/ekle', data);
   },
-  
+
   list: async (limit?: number) => {
     return apiClient.get(`/siparis/liste${limit ? `?limit=${limit}` : ''}`);
   },
-  
+
   updateStatus: async (id: number, yeni_durum: string) => {
     return apiClient.patch(`/siparis/${id}/durum?yeni_durum=${encodeURIComponent(yeni_durum)}`);
   },
@@ -587,7 +602,7 @@ export const mutfakApi = {
     if (params?.durum) searchParams.append('durum', params.durum);
     return apiClient.get(`/mutfak/kuyruk?${searchParams.toString()}`);
   },
-  
+
   updateStatus: async (id: number, yeni_durum: string) => {
     return apiClient.patch(`/mutfak/durum/${id}?yeni_durum=${encodeURIComponent(yeni_durum)}`);
   },
@@ -601,11 +616,11 @@ export const kasaApi = {
   gunlukOzet: async () => {
     return apiClient.get('/kasa/ozet/gunluk');
   },
-  
+
   hesapDetay: async (masa: string) => {
     return apiClient.get(`/kasa/hesap/detay?masa=${encodeURIComponent(masa)}`);
   },
-  
+
   masalar: async (params?: { limit?: number; tumu?: boolean }) => {
     const searchParams = new URLSearchParams();
     if (params?.limit) searchParams.append('limit', String(params.limit));
@@ -613,11 +628,11 @@ export const kasaApi = {
     const queryString = searchParams.toString();
     return apiClient.get(`/kasa/masalar${queryString ? `?${queryString}` : ''}`);
   },
-  
+
   siparisler: async (limit?: number) => {
     return apiClient.get(`/kasa/siparisler${limit ? `?limit=${limit}` : ''}`);
   },
-  
+
   odemeEkle: async (data: { masa: string; tutar: number; yontem: string; iskonto_orani?: number }) => {
     return apiClient.post('/kasa/odeme/ekle', data);
   },
@@ -627,7 +642,7 @@ export const kasaApi = {
   itemIkram: async (data: { siparis_id: number; item_index: number }) => {
     return apiClient.post('/kasa/siparis/item/ikram', data);
   },
-  
+
   hesapKapat: async (masa: string) => {
     return apiClient.post(`/kasa/hesap/kapat?masa=${encodeURIComponent(masa)}`);
   },
@@ -638,7 +653,7 @@ export const adisyonApi = {
   olustur: async (masa: string) => {
     return apiClient.post('/adisyon/olustur', { masa });
   },
-  
+
   acik: async (limit?: number, durum?: string) => {
     const params = new URLSearchParams();
     if (limit) params.append('limit', String(limit));
@@ -646,19 +661,19 @@ export const adisyonApi = {
     const queryString = params.toString();
     return apiClient.get(`/adisyon/acik${queryString ? `?${queryString}` : ''}`);
   },
-  
+
   masaAdisyon: async (masa: string) => {
     return apiClient.get(`/adisyon/masa/${encodeURIComponent(masa)}`);
   },
-  
+
   detay: async (adisyonId: number) => {
     return apiClient.get(`/adisyon/${adisyonId}`);
   },
-  
+
   kapat: async (adisyonId: number) => {
     return apiClient.post(`/adisyon/${adisyonId}/kapat`);
   },
-  
+
   iskonto: async (adisyonId: number, iskonto_orani: number) => {
     return apiClient.patch(`/adisyon/${adisyonId}/iskonto?iskonto_orani=${iskonto_orani}`);
   },
@@ -674,19 +689,19 @@ export const stokApi = {
     if (params?.limit) searchParams.append('limit', String(params.limit));
     return apiClient.get(`/stok/liste?${searchParams.toString()}`);
   },
-  
+
   add: async (data: { ad: string; kategori: string; birim: string; mevcut: number; min: number; alis_fiyat: number }) => {
     return apiClient.post('/stok/ekle', data);
   },
-  
+
   update: async (originalAd: string, data: Partial<{ ad?: string; yeni_ad?: string; kategori: string; birim: string; mevcut: number; min: number; alis_fiyat: number }>) => {
     return apiClient.patch(`/stok/guncelle`, { ad: originalAd, ...data });
   },
-  
+
   delete: async (ad: string) => {
     return apiClient.delete(`/stok/sil?ad=${encodeURIComponent(ad)}`);
   },
-  
+
   alerts: async () => {
     return apiClient.get('/stok/uyarilar');
   },
@@ -699,11 +714,11 @@ export const receteApi = {
     if (params?.urun) searchParams.append('urun', params.urun);
     return apiClient.get(`/recete/liste?${searchParams.toString()}`);
   },
-  
+
   add: async (data: { urun: string; stok: string; miktar: number; birim: string }) => {
     return apiClient.post('/recete/ekle', data);
   },
-  
+
   delete: async (id: number) => {
     return apiClient.delete(`/recete/sil/${id}`);
   },
@@ -735,11 +750,11 @@ export const assistantApi = {
   parse: async (text: string) => {
     return apiClient.post('/assistant/parse', { text });
   },
-  
+
   createOrder: async (masa: string, text: string) => {
     return apiClient.post('/assistant/siparis', { masa, text });
   },
-  
+
   chat: async (data: { text: string; masa?: string; sube_id?: number; conversation_id?: string }) => {
     return apiClient.post('/assistant/chat', data);
   },
@@ -789,19 +804,19 @@ export const giderlerApi = {
     if (params?.kategori) searchParams.append('kategori', params.kategori);
     return apiClient.get(`/giderler/liste?${searchParams.toString()}`);
   },
-  
+
   add: async (data: { kategori: string; aciklama?: string; tutar: number; tarih: string; fatura_no?: string }) => {
     return apiClient.post('/giderler/ekle', data);
   },
-  
+
   update: async (data: { id: number; kategori?: string; aciklama?: string; tutar?: number; tarih?: string; fatura_no?: string }) => {
     return apiClient.patch('/giderler/guncelle', data);
   },
-  
+
   delete: async (id: number) => {
     return apiClient.delete(`/giderler/sil/${id}`);
   },
-  
+
   kategoriler: async () => {
     return apiClient.get('/giderler/kategoriler');
   },
@@ -812,15 +827,15 @@ export const masalarApi = {
   list: async () => {
     return apiClient.get('/masalar/liste');
   },
-  
+
   add: async (data: { masa_adi: string; kapasite?: number; pozisyon_x?: number; pozisyon_y?: number }) => {
     return apiClient.post('/masalar/ekle', data);
   },
-  
+
   update: async (data: { id: number; masa_adi?: string; durum?: string; kapasite?: number; pozisyon_x?: number; pozisyon_y?: number }) => {
     return apiClient.patch('/masalar/guncelle', data);
   },
-  
+
   delete: async (id: number) => {
     return apiClient.delete(`/masalar/sil/${id}`);
   },
@@ -831,15 +846,15 @@ export const menuVaryasyonlarApi = {
     const params = menuId ? `?menu_id=${menuId}` : '';
     return apiClient.get(`/menu-varyasyonlar/liste${params}`);
   },
-  
+
   add: async (data: { menu_id: number; ad: string; ek_fiyat?: number; sira?: number; aktif?: boolean }) => {
     return apiClient.post('/menu-varyasyonlar/ekle', data);
   },
-  
+
   update: async (data: { id: number; ad?: string; ek_fiyat?: number; sira?: number; aktif?: boolean }) => {
     return apiClient.patch('/menu-varyasyonlar/guncelle', data);
   },
-  
+
   delete: async (varyasyonId: number) => {
     return apiClient.delete(`/menu-varyasyonlar/sil/${varyasyonId}`);
   },

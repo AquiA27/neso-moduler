@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient, { superadminApi, subscriptionApi, paymentApi, customizationApi } from '../lib/api';
+import apiClient, { superadminApi, subscriptionApi, paymentApi, customizationApi, platformSettingsApi } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Building2, CreditCard, Settings, Plus, Search,
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
-  Trash2, Activity, Key, Copy, RefreshCw, Eye, EyeOff
+  Trash2, Activity, Key, Copy, RefreshCw, Eye, EyeOff, Globe, Save
 } from 'lucide-react';
 
 interface Tenant {
@@ -115,7 +115,7 @@ interface TenantDetail {
 }
 
 export default function SuperAdminPanel() {
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup' | 'api-usage'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup' | 'api-usage' | 'platform-settings'>('dashboard');
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -193,6 +193,7 @@ export default function SuperAdminPanel() {
                 { id: 'payments', label: 'Ödemeler', icon: CreditCard },
                 { id: 'customizations', label: 'Özelleştirmeler', icon: Settings },
                 { id: 'api-usage', label: 'API Kullanım', icon: Activity },
+                { id: 'platform-settings', label: 'Platform Ayarları', icon: Globe },
                 { id: 'quick-setup', label: 'Hızlı Kurulum', icon: Plus },
               ].map(({ id, label, icon: Icon }) => (
                 <button
@@ -288,6 +289,10 @@ export default function SuperAdminPanel() {
 
           {!loading && activeTab === 'api-usage' && (
             <ApiUsageTab />
+          )}
+
+          {!loading && activeTab === 'platform-settings' && (
+            <PlatformSettingsTab />
           )}
 
           {!loading && activeTab === 'quick-setup' && (
@@ -3058,5 +3063,294 @@ function Field({
   );
 }
 
+// Platform Settings Tab
+function PlatformSettingsTab() {
+  const [settings, setSettings] = useState<Array<{
+    key: string;
+    value?: string;
+    description?: string;
+    is_secret?: boolean;
+    has_value?: boolean;
+    updated_at?: string;
+    updated_by?: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [newKey, setNewKey] = useState('');
+  const [newValue, setNewValue] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newIsSecret, setNewIsSecret] = useState(true);
+  const [showValues, setShowValues] = useState<Record<string, boolean>>({});
+
+  // Predefined settings that should exist
+  const predefinedSettings = [
+    { key: 'openai_api_key', description: 'Global OpenAI API Anahtarı (tüm işletmeler için varsayılan)', is_secret: true },
+    { key: 'openai_model', description: 'Varsayılan OpenAI modeli', is_secret: false },
+  ];
+
+  const loadSettings = async () => {
+    try {
+      setLoading(true);
+      const response = await platformSettingsApi.getAll();
+      setSettings(response.data?.settings || []);
+    } catch (error) {
+      console.error('Platform settings load error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const handleSave = async (key: string, value: string, description?: string, is_secret?: boolean) => {
+    try {
+      setSaving(true);
+      await platformSettingsApi.upsert({ key, value, description, is_secret: is_secret ?? false });
+      await loadSettings();
+    } catch (error) {
+      console.error('Save error:', error);
+      alert('Ayar kaydedilemedi');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (key: string) => {
+    if (!confirm(`"${key}" ayarını silmek istediğinizden emin misiniz?`)) return;
+    try {
+      await platformSettingsApi.remove(key);
+      await loadSettings();
+    } catch (error) {
+      console.error('Delete error:', error);
+      alert('Ayar silinemedi');
+    }
+  };
+
+  const handleAddNew = async () => {
+    if (!newKey.trim()) return;
+    await handleSave(newKey.trim(), newValue, newDescription || undefined, newIsSecret);
+    setNewKey('');
+    setNewValue('');
+    setNewDescription('');
+    setNewIsSecret(true);
+  };
+
+  // Check which predefined settings are missing
+  const existingKeys = new Set(settings.map(s => s.key));
+  const missingPredefined = predefinedSettings.filter(ps => !existingKeys.has(ps.key));
+
+  if (loading) {
+    return (
+      <div className="text-center py-12">
+        <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-2 text-gray-600">Yükleniyor...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Platform Ayarları</h2>
+          <p className="text-gray-600 mt-1">Global API anahtarları ve platform yapılandırması</p>
+        </div>
+        <button
+          onClick={loadSettings}
+          className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-gray-700 transition-colors"
+        >
+          <RefreshCw className="w-4 h-4" />
+          Yenile
+        </button>
+      </div>
+
+      {/* Info Box */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
+          <div className="text-sm text-blue-800">
+            <p className="font-medium">API Anahtarı Öncelik Sırası</p>
+            <ol className="list-decimal ml-4 mt-1 space-y-0.5">
+              <li>İşletme-spesifik anahtar (Özelleştirmeler'den girilir)</li>
+              <li>Global anahtar (bu sayfadan girilir)</li>
+              <li>Ortam değişkeni (Render env variable)</li>
+            </ol>
+            <p className="mt-2">Her işletme için ayrı key almanıza gerek yok. Buraya bir tane girmeniz yeterli.</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Missing Predefined Settings */}
+      {missingPredefined.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+          <p className="text-sm font-medium text-yellow-800 mb-3">Eksik Ayarlar</p>
+          <div className="space-y-3">
+            {missingPredefined.map(ps => (
+              <div key={ps.key} className="flex items-center gap-3">
+                <span className="text-sm text-yellow-700 font-mono min-w-[180px]">{ps.key}</span>
+                <input
+                  type={ps.is_secret ? 'password' : 'text'}
+                  placeholder={ps.description}
+                  className="flex-1 px-3 py-1.5 border border-yellow-300 rounded-lg text-sm bg-white text-gray-900"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const input = e.target as HTMLInputElement;
+                      if (input.value.trim()) {
+                        handleSave(ps.key, input.value.trim(), ps.description, ps.is_secret);
+                        input.value = '';
+                      }
+                    }
+                  }}
+                />
+                <button
+                  onClick={(e) => {
+                    const container = (e.target as HTMLElement).closest('.flex');
+                    const input = container?.querySelector('input') as HTMLInputElement;
+                    if (input?.value.trim()) {
+                      handleSave(ps.key, input.value.trim(), ps.description, ps.is_secret);
+                      input.value = '';
+                    }
+                  }}
+                  disabled={saving}
+                  className="px-3 py-1.5 bg-yellow-500 text-white rounded-lg hover:bg-yellow-600 text-sm"
+                >
+                  <Save className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Existing Settings */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden mb-6">
+        <table className="w-full">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Anahtar</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Değer</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Açıklama</th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Son Güncelleme</th>
+              <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">İşlem</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-200">
+            {settings.length === 0 ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-gray-500">
+                  Henüz platform ayarı eklenmemiş
+                </td>
+              </tr>
+            ) : (
+              settings.map((setting) => (
+                <tr key={setting.key} className="hover:bg-gray-50">
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-sm text-gray-900">{setting.key}</span>
+                    {setting.is_secret && (
+                      <span className="ml-2 inline-flex px-1.5 py-0.5 rounded text-xs bg-red-100 text-red-700">gizli</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm text-gray-700 font-mono">
+                        {setting.is_secret && !showValues[setting.key]
+                          ? (setting.has_value ? '••••••••' : <span className="text-gray-400">boş</span>)
+                          : (setting.value || <span className="text-gray-400">boş</span>)
+                        }
+                      </span>
+                      {setting.is_secret && setting.has_value && (
+                        <button
+                          onClick={() => setShowValues(prev => ({ ...prev, [setting.key]: !prev[setting.key] }))}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          {showValues[setting.key] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 text-sm text-gray-500">{setting.description || '-'}</td>
+                  <td className="px-4 py-3 text-xs text-gray-400">
+                    {setting.updated_at ? new Date(setting.updated_at).toLocaleString('tr-TR') : '-'}
+                    {setting.updated_by && <span className="block text-gray-300">{setting.updated_by}</span>}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          const newVal = prompt(`"${setting.key}" için yeni değer girin:`, '');
+                          if (newVal !== null && newVal.trim()) {
+                            handleSave(setting.key, newVal.trim(), setting.description, setting.is_secret);
+                          }
+                        }}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        Düzenle
+                      </button>
+                      <button
+                        onClick={() => handleDelete(setting.key)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Add New Setting */}
+      <div className="border border-gray-200 rounded-lg p-4">
+        <h3 className="text-sm font-medium text-gray-700 mb-3">Yeni Ayar Ekle</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <input
+            type="text"
+            placeholder="Anahtar (örn: openai_api_key)"
+            value={newKey}
+            onChange={(e) => setNewKey(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+          />
+          <input
+            type="text"
+            placeholder="Değer"
+            value={newValue}
+            onChange={(e) => setNewValue(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+          />
+          <input
+            type="text"
+            placeholder="Açıklama (opsiyonel)"
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white text-gray-900"
+          />
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={newIsSecret}
+                onChange={(e) => setNewIsSecret(e.target.checked)}
+                className="rounded"
+              />
+              Gizli
+            </label>
+            <button
+              onClick={handleAddNew}
+              disabled={saving || !newKey.trim()}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 text-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Ekle
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 

@@ -216,22 +216,29 @@ export default function RaporlarPage() {
       loadDailySummary(dateRange.start, dateRange.end);
       loadDailyPayments();
     }
+  }, []);  // Initial load
+
+  useEffect(() => {
+    if (!appliedRange && dateRange.start && dateRange.end) {
+      loadDailySummary(dateRange.start, dateRange.end);
+      loadDailyPayments();
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dateRange.start, dateRange.end]);
 
   const loadTrendData = async () => {
     try {
-    let response;
-    if (appliedRange || (dateRange.start && dateRange.end)) {
-      const params: Record<string, string | number> = {};
-      buildRangeParams(params as Record<string, string>);
-      response = await adminApi.trend({
-        start: params.start_date as string,
-        end: params.end_date as string,
-      });
-    } else {
-      response = await adminApi.trend({ gunSay: trendDays });
-    }
+      let response;
+      if (appliedRange || (dateRange.start && dateRange.end)) {
+        const params: Record<string, string | number> = {};
+        buildRangeParams(params as Record<string, string>);
+        response = await adminApi.trend({
+          start: params.start_date as string,
+          end: params.end_date as string,
+        });
+      } else {
+        response = await adminApi.trend({ gunSay: trendDays });
+      }
       setTrendData(response.data || []);
     } catch (err) {
       console.error('Trend verileri yüklenemedi:', err);
@@ -474,11 +481,10 @@ export default function RaporlarPage() {
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition ${
-                activeTab === tab.id
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-t-lg transition ${activeTab === tab.id
                   ? 'bg-primary-600 text-white'
                   : 'bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
-              }`}
+                }`}
             >
               <Icon className="h-4 w-4" />
               <span className="hidden sm:inline">{tab.label}</span>
@@ -508,7 +514,7 @@ export default function RaporlarPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-white/70">Toplam Ciro</p>
-                    <p className="text-2xl font-bold">{dailySummary.ciro.toFixed(2)} ₺</p>
+                    <p className="text-2xl font-bold">{Number(dailySummary.ciro || 0).toFixed(2)} ₺</p>
                   </div>
                   <DollarSign className="h-6 w-6 text-green-400 sm:h-8 sm:w-8" />
                 </div>
@@ -518,7 +524,7 @@ export default function RaporlarPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-white/70">Ortalama Sipariş</p>
-                    <p className="text-2xl font-bold">{dailySummary.ortalama_siparis.toFixed(2)} ₺</p>
+                    <p className="text-2xl font-bold">{Number(dailySummary.ortalama_siparis || 0).toFixed(2)} ₺</p>
                   </div>
                   <TrendingUp className="h-6 w-6 text-blue-400 sm:h-8 sm:w-8" />
                 </div>
@@ -530,7 +536,7 @@ export default function RaporlarPage() {
                     <p className="text-sm text-white/70">Güncel Stok Değeri</p>
                     <p className="text-2xl font-bold">
                       ₺
-                      {dailySummary.stok_degeri.toLocaleString('tr-TR', {
+                      {Number(dailySummary.stok_degeri || 0).toLocaleString('tr-TR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
                       })}
@@ -765,7 +771,7 @@ export default function RaporlarPage() {
                         <td className="py-3 px-4 font-medium">{product.urun_adi}</td>
                         <td className="py-3 px-4 text-white/60">{product.kategori || '-'}</td>
                         <td className="py-3 px-4 text-right">{product.satis_adeti}</td>
-                        <td className="py-3 px-4 text-right font-semibold">{product.toplam_tutar.toFixed(2)} ₺</td>
+                        <td className="py-3 px-4 text-right font-semibold">{Number(product.toplam_tutar || 0).toFixed(2)} ₺</td>
                       </tr>
                     ))}
                   </tbody>
@@ -881,11 +887,10 @@ export default function RaporlarPage() {
                             ₺{product.profit.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-sm text-right">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                              product.profit_margin > 70 ? 'bg-green-500/20 text-green-400' :
-                              product.profit_margin > 50 ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-red-500/20 text-red-400'
-                            }`}>
+                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${product.profit_margin > 70 ? 'bg-green-500/20 text-green-400' :
+                                product.profit_margin > 50 ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-red-500/20 text-red-400'
+                              }`}>
                               {product.profit_margin.toFixed(1)}%
                             </span>
                           </td>
@@ -896,6 +901,11 @@ export default function RaporlarPage() {
                 </div>
               </div>
             </>
+          )}
+          {!profitability.loading && !profitability.error && !profitability.data && (
+            <div className="card flex items-center justify-center py-12">
+              <p className="text-white/50">Karlılık verisi bulunamadı. Tarih aralığı seçip 'Uygula' butonuna basın.</p>
+            </div>
           )}
         </div>
       )}
@@ -988,11 +998,10 @@ export default function RaporlarPage() {
                             ₺{person.avg_order_value?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-sm text-right">
-                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                              person.performance_score > 80 ? 'bg-green-500/20 text-green-400' :
-                              person.performance_score > 60 ? 'bg-yellow-500/20 text-yellow-400' :
-                              'bg-orange-500/20 text-orange-400'
-                            }`}>
+                            <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${person.performance_score > 80 ? 'bg-green-500/20 text-green-400' :
+                                person.performance_score > 60 ? 'bg-yellow-500/20 text-yellow-400' :
+                                  'bg-orange-500/20 text-orange-400'
+                              }`}>
                               {person.performance_score?.toFixed(0) || 0}%
                             </span>
                           </td>
@@ -1033,6 +1042,11 @@ export default function RaporlarPage() {
                 </div>
               )}
             </>
+          )}
+          {!personnel.loading && !personnel.error && !personnel.data && (
+            <div className="card flex items-center justify-center py-12">
+              <p className="text-white/50">Personel verisi bulunamadı. Tarih aralığı seçip 'Uygula' butonuna basın.</p>
+            </div>
           )}
         </div>
       )}
@@ -1176,6 +1190,11 @@ export default function RaporlarPage() {
               )}
             </>
           )}
+          {!customer.loading && !customer.error && !customer.data && (
+            <div className="card flex items-center justify-center py-12">
+              <p className="text-white/50">Müşteri davranış verisi bulunamadı. Tarih aralığı seçip 'Uygula' butonuna basın.</p>
+            </div>
+          )}
         </div>
       )}
 
@@ -1311,6 +1330,11 @@ export default function RaporlarPage() {
                 </div>
               )}
             </>
+          )}
+          {!category.loading && !category.error && !category.data && (
+            <div className="card flex items-center justify-center py-12">
+              <p className="text-white/50">Kategori verisi bulunamadı. Tarih aralığı seçip 'Uygula' butonuna basın.</p>
+            </div>
           )}
         </div>
       )}
@@ -1498,11 +1522,10 @@ export default function RaporlarPage() {
                               ₺{slot.avg_order_value?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="px-4 py-3 text-sm text-right">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                                slot.order_count > timeAnalysis.data.avg_orders_per_hour ?
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${slot.order_count > timeAnalysis.data.avg_orders_per_hour ?
                                   'bg-green-500/20 text-green-400' :
                                   'bg-slate-500/20 text-slate-400'
-                              }`}>
+                                }`}>
                                 {slot.order_count > timeAnalysis.data.avg_orders_per_hour ? 'Yoğun' : 'Normal'}
                               </span>
                             </td>
@@ -1514,6 +1537,11 @@ export default function RaporlarPage() {
                 </div>
               )}
             </>
+          )}
+          {!timeAnalysis.loading && !timeAnalysis.error && !timeAnalysis.data && (
+            <div className="card flex items-center justify-center py-12">
+              <p className="text-white/50">Zaman analizi verisi bulunamadı. Tarih aralığı seçip 'Uygula' butonuna basın.</p>
+            </div>
           )}
         </div>
       )}
