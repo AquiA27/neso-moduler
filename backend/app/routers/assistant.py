@@ -3866,19 +3866,13 @@ async def chat_smart(payload: ChatRequest):
                 # API kullanımını logla (tenant_id varsa)
                 if usage_info and tenant_id:
                     from ..services.api_usage_tracker import log_api_usage
-                    customization_row = await db.fetch_one(
-                        "SELECT openai_model FROM tenant_customizations WHERE isletme_id = :id",
-                        {"id": tenant_id}
-                    )
-                    model = "gpt-4o-mini"
-                    if customization_row:
-                        customization_dict = dict(customization_row) if hasattr(customization_row, 'keys') else customization_row
-                        model = customization_dict.get("openai_model") or "gpt-4o-mini"
+                    # Model bilgisini provider'dan al (get_llm_provider zaten doğru modeli seçti)
+                    actual_model = getattr(provider, 'model', 'gpt-4o-mini')
                 
                     await log_api_usage(
                         isletme_id=tenant_id,
                         api_type="openai",
-                        model=model,
+                        model=actual_model,
                         endpoint="/v1/chat/completions",
                         prompt_tokens=usage_info.get("prompt_tokens", 0),
                         completion_tokens=usage_info.get("completion_tokens", 0),
