@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { superadminApi, subscriptionApi, paymentApi, customizationApi } from '../lib/api';
-import { 
-  Building2, CreditCard, Settings, Plus, Search, Edit, Trash2, 
+import {
+  Building2, CreditCard, Settings, Plus, Search, Edit, Trash2,
   BarChart3, Users, TrendingUp, AlertCircle, CheckCircle, XCircle,
   Calendar, DollarSign, Package, Globe, LogOut
 } from 'lucide-react';
@@ -105,16 +105,16 @@ export default function DashboardPage() {
     navigate('/login');
   };
 
-  const filteredTenants = tenants.filter(t => 
+  const filteredTenants = tenants.filter(t =>
     t.ad.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.vergi_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const filteredSubscriptions = subscriptions.filter(s => 
+  const filteredSubscriptions = subscriptions.filter(s =>
     s.isletme_id.toString().includes(searchTerm)
   );
 
-  const filteredPayments = payments.filter(p => 
+  const filteredPayments = payments.filter(p =>
     p.isletme_id.toString().includes(searchTerm) ||
     p.fatura_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -155,11 +155,10 @@ export default function DashboardPage() {
                 <button
                   key={id}
                   onClick={() => setActiveTab(id as any)}
-                  className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm ${
-                    activeTab === id
+                  className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm ${activeTab === id
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                    }`}
                 >
                   <Icon className="w-5 h-5 mr-2" />
                   {label}
@@ -183,7 +182,7 @@ export default function DashboardPage() {
           )}
 
           {!loading && activeTab === 'tenants' && (
-            <TenantsTab 
+            <TenantsTab
               tenants={filteredTenants}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
@@ -192,7 +191,7 @@ export default function DashboardPage() {
           )}
 
           {!loading && activeTab === 'subscriptions' && (
-            <SubscriptionsTab 
+            <SubscriptionsTab
               subscriptions={filteredSubscriptions}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
@@ -201,7 +200,7 @@ export default function DashboardPage() {
           )}
 
           {!loading && activeTab === 'payments' && (
-            <PaymentsTab 
+            <PaymentsTab
               payments={filteredPayments}
               searchTerm={searchTerm}
               onSearchChange={setSearchTerm}
@@ -227,7 +226,7 @@ function DashboardTab({ stats }: { stats: DashboardStats }) {
   return (
     <div>
       <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
-      
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard
@@ -304,17 +303,17 @@ function DashboardTab({ stats }: { stats: DashboardStats }) {
 }
 
 // Stat Card Component
-function StatCard({ 
-  title, 
-  value, 
-  subtitle, 
-  icon: Icon, 
-  color 
-}: { 
-  title: string; 
-  value: number; 
-  subtitle?: string; 
-  icon: any; 
+function StatCard({
+  title,
+  value,
+  subtitle,
+  icon: Icon,
+  color
+}: {
+  title: string;
+  value: number;
+  subtitle?: string;
+  icon: any;
   color: string;
 }) {
   const colorClasses = {
@@ -341,17 +340,30 @@ function StatCard({
 }
 
 // Tenants Tab
-function TenantsTab({ 
-  tenants, 
-  searchTerm, 
-  onSearchChange, 
-  onRefresh 
-}: { 
-  tenants: Tenant[]; 
-  searchTerm: string; 
+function TenantsTab({
+  tenants,
+  searchTerm,
+  onSearchChange,
+  onRefresh
+}: {
+  tenants: Tenant[];
+  searchTerm: string;
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
 }) {
+  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Bu işletmeyi (ve tüm verilerini) silmek istediğinize emin misiniz?')) {
+      try {
+        await superadminApi.tenantDelete(id);
+        onRefresh();
+      } catch (err: any) {
+        alert('Silme hatası: ' + err.message);
+      }
+    }
+  };
+
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
@@ -401,10 +413,10 @@ function TenantsTab({
                   )}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <button className="text-blue-600 hover:text-blue-900 mr-4">
+                  <button onClick={() => setEditingTenant(tenant)} className="text-blue-600 hover:text-blue-900 mr-4">
                     <Edit className="w-4 h-4" />
                   </button>
-                  <button className="text-red-600 hover:text-red-900">
+                  <button onClick={() => handleDelete(tenant.id)} className="text-red-600 hover:text-red-900">
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </td>
@@ -413,19 +425,93 @@ function TenantsTab({
           </tbody>
         </table>
       </div>
+
+      {/* Editing Modal */}
+      {editingTenant && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 max-w-md w-full">
+            <h3 className="text-lg font-bold mb-4">İşletme Düzenle</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">İşletme Adı</label>
+                <input
+                  type="text"
+                  value={editingTenant.ad}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, ad: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Vergi No</label>
+                <input
+                  type="text"
+                  value={editingTenant.vergi_no || ''}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, vergi_no: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Telefon</label>
+                <input
+                  type="text"
+                  value={editingTenant.telefon || ''}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, telefon: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+              <div className="flex items-center mt-2">
+                <input
+                  type="checkbox"
+                  checked={editingTenant.aktif}
+                  onChange={(e) => setEditingTenant({ ...editingTenant, aktif: e.target.checked })}
+                  className="mr-2"
+                />
+                <label className="text-sm font-medium text-gray-700">Aktif Mi?</label>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => setEditingTenant(null)}
+                className="px-4 py-2 border rounded-lg text-gray-600 hover:bg-gray-50"
+              >
+                İptal
+              </button>
+              <button
+                onClick={async () => {
+                  try {
+                    await superadminApi.tenantUpdate(editingTenant.id, {
+                      ad: editingTenant.ad,
+                      vergi_no: editingTenant.vergi_no,
+                      telefon: editingTenant.telefon,
+                      aktif: editingTenant.aktif
+                    });
+                    setEditingTenant(null);
+                    onRefresh();
+                  } catch (err: any) {
+                    alert('Hata: ' + err.message);
+                  }
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Kaydet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // Subscriptions Tab
-function SubscriptionsTab({ 
-  subscriptions, 
-  searchTerm, 
-  onSearchChange, 
-  onRefresh 
-}: { 
-  subscriptions: Subscription[]; 
-  searchTerm: string; 
+function SubscriptionsTab({
+  subscriptions,
+  searchTerm,
+  onSearchChange,
+  onRefresh
+}: {
+  subscriptions: Subscription[];
+  searchTerm: string;
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
 }) {
@@ -450,11 +536,10 @@ function SubscriptionsTab({
           <div key={sub.id} className="border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">İşletme #{sub.isletme_id}</h3>
-              <span className={`px-2 py-1 rounded text-xs font-medium ${
-                sub.status === 'active' ? 'bg-green-100 text-green-800' :
-                sub.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-red-100 text-red-800'
-              }`}>
+              <span className={`px-2 py-1 rounded text-xs font-medium ${sub.status === 'active' ? 'bg-green-100 text-green-800' :
+                  sub.status === 'suspended' ? 'bg-yellow-100 text-yellow-800' :
+                    'bg-red-100 text-red-800'
+                }`}>
                 {sub.status}
               </span>
             </div>
@@ -484,14 +569,14 @@ function SubscriptionsTab({
 }
 
 // Payments Tab
-function PaymentsTab({ 
-  payments, 
-  searchTerm, 
-  onSearchChange, 
-  onRefresh 
-}: { 
-  payments: Payment[]; 
-  searchTerm: string; 
+function PaymentsTab({
+  payments,
+  searchTerm,
+  onSearchChange,
+  onRefresh
+}: {
+  payments: Payment[];
+  searchTerm: string;
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
 }) {
@@ -559,10 +644,137 @@ function PaymentsTab({
 
 // Customizations Tab
 function CustomizationsTab({ onRefresh }: { onRefresh: () => void }) {
+  const [tenants, setTenants] = useState<Tenant[]>([]);
+  const [selectedTenant, setSelectedTenant] = useState<number | ''>('');
+  const [customization, setCustomization] = useState<Customization | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    // load tenants
+    superadminApi.tenantsList().then((res: any) => setTenants(res.data)).catch(console.error);
+  }, []);
+
+  useEffect(() => {
+    if (selectedTenant) {
+      setLoading(true);
+      customizationApi.get(Number(selectedTenant))
+        .then((res: any) => setCustomization(res.data))
+        .catch(() => setCustomization({ id: 0, isletme_id: Number(selectedTenant), domain: '', app_name: '', logo_url: '', primary_color: '#3b82f6', secondary_color: '#1e40af' }))
+        .finally(() => setLoading(false));
+    } else {
+      setCustomization(null);
+    }
+  }, [selectedTenant]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customization) return;
+    try {
+      if (customization.id) {
+        await customizationApi.update(customization.isletme_id, customization);
+      } else {
+        await customizationApi.create(customization);
+      }
+      alert('Temel yapılandırmalar başarıyla kaydedildi!');
+      onRefresh();
+    } catch (err: any) {
+      alert('Hata: ' + err.message);
+    }
+  };
+
   return (
     <div>
-      <h2 className="text-2xl font-bold mb-6">Özelleştirmeler</h2>
-      <p className="text-gray-600">Özelleştirme yönetimi yakında eklenecek...</p>
+      <h2 className="text-2xl font-bold mb-6">Özelleştirmeler (White-Label)</h2>
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Hangi İşletmeyi Özelleştirmek İstiyorsunuz?</label>
+        <select
+          className="w-full max-w-md px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          value={selectedTenant}
+          onChange={e => setSelectedTenant(Number(e.target.value) || '')}
+        >
+          <option value="">-- İşletme Seçin --</option>
+          {tenants.map(t => <option key={t.id} value={t.id}>{t.ad} (ID: {t.id})</option>)}
+        </select>
+      </div>
+
+      {loading && <div className="text-gray-500">Yükleniyor...</div>}
+
+      {!loading && customization && (
+        <form onSubmit={handleSave} className="bg-gray-50 p-6 rounded-lg space-y-6 max-w-2xl border">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Domain / Subdomain</label>
+              <input
+                type="text"
+                value={customization.domain || ''}
+                placeholder="ornek.neso.com"
+                onChange={(e) => setCustomization({ ...customization, domain: e.target.value })}
+                className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Uygulama Sistem Adı</label>
+              <input
+                type="text"
+                value={customization.app_name || ''}
+                onChange={(e) => setCustomization({ ...customization, app_name: e.target.value })}
+                className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700">Logo URL</label>
+              <input
+                type="url"
+                value={customization.logo_url || ''}
+                onChange={(e) => setCustomization({ ...customization, logo_url: e.target.value })}
+                className="mt-1 w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Ana Renk (Primary Color)</label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={customization.primary_color || '#3b82f6'}
+                  onChange={(e) => setCustomization({ ...customization, primary_color: e.target.value })}
+                  className="mt-1 w-12 h-10 border rounded-lg cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={customization.primary_color || '#3b82f6'}
+                  onChange={(e) => setCustomization({ ...customization, primary_color: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">İkincil Renk (Secondary Color)</label>
+              <div className="flex gap-2">
+                <input
+                  type="color"
+                  value={customization.secondary_color || '#1e40af'}
+                  onChange={(e) => setCustomization({ ...customization, secondary_color: e.target.value })}
+                  className="mt-1 w-12 h-10 border rounded-lg cursor-pointer"
+                />
+                <input
+                  type="text"
+                  value={customization.secondary_color || '#1e40af'}
+                  onChange={(e) => setCustomization({ ...customization, secondary_color: e.target.value })}
+                  className="mt-1 w-full px-4 py-2 border rounded-lg"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end pt-4">
+            <button
+              type="submit"
+              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              Özelleştirmeyi Kaydet
+            </button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
