@@ -87,6 +87,7 @@ from .routers.onboarding import router as onboarding_router # /onboarding/*
 from .routers.backup import router as backup_router  # /system/backup/*
 from .routers.analytics_advanced import router as analytics_advanced_router  # /analytics/advanced/*
 from .routers.cache import router as cache_router  # /cache/*
+from .routers.seed_demo import router as seed_demo_router  # /seed/* (geçici)
 
 from pathlib import Path
 
@@ -248,6 +249,7 @@ app.include_router(audit_router)       # /audit/*
 app.include_router(backup_router)      # /system/backup/*
 app.include_router(analytics_advanced_router)  # /analytics/advanced/*
 app.include_router(cache_router)       # /cache/*
+app.include_router(seed_demo_router)   # /seed/* (DEMO - sonra kaldırılacak)
 
 # ---- Observability & Varsayılan Şube ----
 app.add_middleware(RequestIdAndRateLimitMiddleware)
