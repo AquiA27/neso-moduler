@@ -39,6 +39,12 @@ class Settings(BaseSettings):
     REQUEST_LOG_ENABLED: bool = True
     ADD_REQUEST_ID_HEADER: bool = True
 
+    # ---------- Sentry Error Tracking ----------
+    SENTRY_DSN: Optional[str] = None
+    SENTRY_ENVIRONMENT: str = "production"
+    SENTRY_TRACES_SAMPLE_RATE: float = 1.0
+    SENTRY_PROFILES_SAMPLE_RATE: float = 1.0
+
     # ---------- Pydantic Settings v2 ----------
     model_config = SettingsConfigDict(
         env_file=".env",

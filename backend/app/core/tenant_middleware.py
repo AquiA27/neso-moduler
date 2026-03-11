@@ -121,11 +121,9 @@ class TenantStatusMiddleware(BaseHTTPMiddleware):
             # Kullanıcı bilgilerini al
             user_row = await db.fetch_one(
                 """
-                SELECT u.id, u.username, u.role, s.isletme_id
-                FROM users u
-                LEFT JOIN user_sube_izinleri usi ON usi.username = u.username
-                LEFT JOIN subeler s ON s.id = usi.sube_id
-                WHERE u.username = :username
+                SELECT id, username, role, tenant_id as isletme_id
+                FROM users
+                WHERE username = :username
                 LIMIT 1
                 """,
                 {"username": username},
@@ -364,11 +362,9 @@ class SubscriptionLimitMiddleware(BaseHTTPMiddleware):
             # Kullanıcı ve tenant bilgilerini al
             user_row = await db.fetch_one(
                 """
-                SELECT u.id, u.username, u.role, s.isletme_id
-                FROM users u
-                LEFT JOIN user_sube_izinleri usi ON usi.username = u.username
-                LEFT JOIN subeler s ON s.id = usi.sube_id
-                WHERE u.username = :username
+                SELECT id, username, role, tenant_id as isletme_id
+                FROM users
+                WHERE username = :username
                 LIMIT 1
                 """,
                 {"username": username},
@@ -430,11 +426,9 @@ class SubscriptionLimitMiddleware(BaseHTTPMiddleware):
                 max_limit = sub_row["max_kullanicilar"]
                 current = await db.fetch_one(
                     """
-                    SELECT COUNT(DISTINCT u.id) as count
-                    FROM users u
-                    LEFT JOIN user_sube_izinleri usi ON usi.username = u.username
-                    LEFT JOIN subeler s ON s.id = usi.sube_id
-                    WHERE s.isletme_id = :id AND u.aktif = TRUE
+                    SELECT COUNT(id) as count
+                    FROM users
+                    WHERE tenant_id = :id AND aktif = TRUE
                     """,
                     {"id": isletme_id},
                 )

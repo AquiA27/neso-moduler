@@ -22,6 +22,31 @@ setup_logging(
     json_logs=settings.ENV == "prod"
 )
 logger = logging.getLogger(__name__)
+
+# Initialize Sentry
+if settings.SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.starlette import StarletteIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    
+    sentry_sdk.init(
+        dsn=settings.SENTRY_DSN,
+        environment=settings.SENTRY_ENVIRONMENT,
+        # Set traces_sample_rate to 1.0 to capture 100%
+        # of transactions for performance monitoring.
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+        # Set profiles_sample_rate to 1.0 to profile 100%
+        # of sampled transactions.
+        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+        integrations=[
+            FastApiIntegration(),
+            StarletteIntegration(),
+            SqlalchemyIntegration(),
+        ],
+    )
+    logger.info(f"Sentry initialized in environment: {settings.SENTRY_ENVIRONMENT}")
+
 logger.info(f"[STARTUP] Application starting in {settings.ENV} mode")
 
 # Routers
@@ -58,6 +83,7 @@ from .routers.subscription import router as subscription_router  # /subscription
 from .routers.payment import router as payment_router  # /payment/*
 from .routers.customization import router as customization_router  # /customization/*
 from .routers.audit import router as audit_router  # /audit/*
+from .routers.onboarding import router as onboarding_router # /onboarding/*
 from .routers.backup import router as backup_router  # /system/backup/*
 from .routers.analytics_advanced import router as analytics_advanced_router  # /analytics/advanced/*
 from .routers.cache import router as cache_router  # /cache/*
@@ -216,6 +242,7 @@ app.include_router(menu_varyasyonlar_router)  # /menu-varyasyonlar/*
 app.include_router(adisyon_router)     # /adisyon/*
 app.include_router(subscription_router)  # /subscription/*
 app.include_router(payment_router)     # /payment/*
+app.include_router(onboarding_router)  # /onboarding/*
 app.include_router(customization_router)  # /customization/*
 app.include_router(audit_router)       # /audit/*
 app.include_router(backup_router)      # /system/backup/*

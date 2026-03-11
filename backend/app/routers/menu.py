@@ -672,6 +672,32 @@ async def menu_yukle_csv(
     )
     mevcut_map = {normalize_name(r["ad"]): r["ad"] for r in mevcut_rows}
 
+    # ------- KOTA KONTROLÜ (CSV Bulk Insert için) -------
+    tenant_info = await db.fetch_one(
+        "SELECT isletme_id FROM subeler WHERE id = :sid", {"sid": sube_id}
+    )
+    if tenant_info:
+        isletme_id = tenant_info["isletme_id"]
+        sub = await db.fetch_one(
+            "SELECT max_menu_items FROM subscriptions WHERE isletme_id = :id", {"id": isletme_id}
+        )
+        if sub:
+            max_limit = sub["max_menu_items"]
+            current_count_row = await db.fetch_one(
+                "SELECT COUNT(*) as count FROM menu m JOIN subeler s ON m.sube_id = s.id WHERE s.isletme_id = :id AND m.aktif = TRUE", 
+                {"id": isletme_id}
+            )
+            count_val = current_count_row["count"] if current_count_row else 0
+            
+            # Yeni eklenecek benzersiz ürünleri hesapla
+            new_additions = [it for it in items if normalize_name(it["ad"]) not in mevcut_map]
+            
+            if count_val + len(new_additions) > max_limit:
+                raise HTTPException(
+                    status_code=403, 
+                    detail=f"Menü item limiti aşıldı. En fazla {max_limit} ürün izniniz var (Mevcut: {count_val}, Yeni denenen: {len(new_additions)})."
+                )
+
     insert_count = 0
     update_count = 0
 

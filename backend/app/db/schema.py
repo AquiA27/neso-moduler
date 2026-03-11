@@ -474,6 +474,20 @@ CREATE TABLE IF NOT EXISTS platform_settings (
 );
 """
 
+CREATE_USER_AGREEMENTS = """
+CREATE TABLE IF NOT EXISTS user_agreements (
+    id BIGSERIAL PRIMARY KEY,
+    user_id BIGINT REFERENCES users(id) ON DELETE CASCADE,
+    isletme_id BIGINT REFERENCES isletmeler(id) ON DELETE CASCADE,
+    agreement_type TEXT NOT NULL, -- 'kvkk', 'terms', 'cookie_policy'
+    version TEXT, -- '1.0'
+    accepted BOOLEAN NOT NULL DEFAULT FALSE,
+    ip_address TEXT,
+    user_agent TEXT,
+    accepted_at TIMESTAMPTZ DEFAULT NOW()
+);
+"""
+
 
 VIEWS_DIR = Path(__file__).resolve().parent / "views"
 AI_VIEW_FILES = [
@@ -634,6 +648,7 @@ async def create_tables(db: Database):
     await db.execute(CREATE_API_KEYS)
     await db.execute(CREATE_API_USAGE_LOGS)
     await db.execute(CREATE_PLATFORM_SETTINGS)
+    await db.execute(CREATE_USER_AGREEMENTS)
     # API Usage Logs için eksik kolonları ekle
     for stmt in [s.strip() for s in ALTER_API_USAGE_LOGS_COMPAT.split(';') if s.strip()]:
         try:
