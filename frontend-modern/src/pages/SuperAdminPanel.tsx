@@ -7,8 +7,19 @@ import {
   BarChart3, Users, AlertCircle, CheckCircle,
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
-  Trash2, Activity, Key, Copy, RefreshCw, Eye, EyeOff, Globe, Save
+  Trash2, Activity, Key, Copy, RefreshCw, Eye, EyeOff, Globe, Save,
+  LogOut, Bell, ChevronRight, ArrowUpRight, TrendingUp
 } from 'lucide-react';
+
+function BoxIcon(props: any) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+      <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+      <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+      <line x1="12" y1="22.08" x2="12" y2="12"></line>
+    </svg>
+  );
+}
 
 interface Tenant {
   id: number;
@@ -116,6 +127,7 @@ interface TenantDetail {
 
 export default function SuperAdminPanel() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup' | 'api-usage' | 'platform-settings'>('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -174,131 +186,200 @@ export default function SuperAdminPanel() {
     p.fatura_no?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const navItems = [
+    { id: 'dashboard', label: 'Genel Bakış', icon: BarChart3 },
+    { id: 'tenants', label: 'İşletmeler', icon: Building2 },
+    { id: 'subscriptions', label: 'Abonelikler', icon: Package },
+    { id: 'payments', label: 'Finans', icon: CreditCard },
+    { id: 'customizations', label: 'Uygulama Ayarları', icon: Settings },
+    { id: 'api-usage', label: 'API Kullanım', icon: Activity },
+    { id: 'platform-settings', label: 'Platform Ayarları', icon: Globe },
+    { id: 'quick-setup', label: 'Hızlı Kurulum', icon: Plus },
+  ];
+
+  const handleLogout = () => {
+    // Basic logout handling similar to what we did
+    window.location.href = '/login';
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">Super Admin Paneli</h1>
-          <p className="text-gray-600 mt-1">İşletme, abonelik ve ödeme yönetimi</p>
-        </div>
-
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow mb-6">
-          <div className="border-b border-gray-200">
-            <nav className="flex -mb-px">
-              {[
-                { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-                { id: 'tenants', label: 'İşletmeler', icon: Building2 },
-                { id: 'subscriptions', label: 'Abonelikler', icon: Package },
-                { id: 'payments', label: 'Ödemeler', icon: CreditCard },
-                { id: 'customizations', label: 'Özelleştirmeler', icon: Settings },
-                { id: 'api-usage', label: 'API Kullanım', icon: Activity },
-                { id: 'platform-settings', label: 'Platform Ayarları', icon: Globe },
-                { id: 'quick-setup', label: 'Hızlı Kurulum', icon: Plus },
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setActiveTab(id as any)}
-                  className={`flex items-center px-6 py-4 border-b-2 font-medium text-sm ${activeTab === id
-                    ? 'border-blue-500 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                >
-                  <Icon className="w-5 h-5 mr-2" />
-                  {label}
-                </button>
-              ))}
-            </nav>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="bg-white rounded-lg shadow p-6">
-          {loading && (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <p className="mt-2 text-gray-600">Yükleniyor...</p>
+    <div className="flex h-screen bg-[#F8FAFC] font-sans overflow-hidden">
+      
+      {/* Sidebar */}
+      <aside className={`bg-[#0B3B24] text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+        <div className="h-20 flex items-center justify-between px-6 border-b border-white/10">
+          {isSidebarOpen ? (
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center">
+                <BoxIcon className="w-5 h-5 text-white" />
+              </div>
+              <span className="font-bold text-lg tracking-wide">Neso<span className="text-emerald-400">Admin</span></span>
+            </div>
+          ) : (
+            <div className="w-8 h-8 mx-auto rounded-lg bg-emerald-500 flex items-center justify-center">
+              <BoxIcon className="w-5 h-5 text-white" />
             </div>
           )}
+        </div>
 
-          {!loading && activeTab === 'dashboard' && stats && (
-            <DashboardTab stats={stats} />
-          )}
+        <div className="flex-1 py-6 px-4 space-y-2 overflow-y-auto">
+          {navItems.map(({ id, label, icon: Icon }) => {
+            const isActive = activeTab === id;
+            return (
+              <button
+                key={id}
+                onClick={() => setActiveTab(id as any)}
+                className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 group ${
+                  isActive 
+                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-900/20' 
+                    : 'text-white/60 hover:bg-white/5 hover:text-white'
+                }`}
+                title={!isSidebarOpen ? label : ''}
+              >
+                <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-white' : 'text-white/60 group-hover:text-white'}`} />
+                {isSidebarOpen && <span className="font-medium text-sm whitespace-nowrap">{label}</span>}
+              </button>
+            )
+          })}
+        </div>
 
-          {!loading && activeTab === 'tenants' && (
-            selectedTenantId ? (
-              <TenantDetailTab
-                tenantDetail={tenantDetail}
-                onBack={() => {
-                  setSelectedTenantId(null);
-                  setTenantDetail(null);
-                }}
-                onRefresh={async () => {
-                  try {
-                    const response = await superadminApi.tenantDetail(selectedTenantId);
-                    setTenantDetail(response.data);
-                  } catch (error) {
-                    console.error('Error loading tenant detail:', error);
-                    alert('Tenant detayı yüklenirken hata oluştu');
-                  }
-                }}
-              />
-            ) : (
-              <TenantsTab
-                tenants={filteredTenants}
+        <div className="p-4 border-t border-white/10">
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-red-300 hover:bg-red-500/10 transition-colors ${
+              !isSidebarOpen && 'justify-center'
+            }`}
+            title={!isSidebarOpen ? 'Çıkış Yap' : ''}
+          >
+            <LogOut className="w-5 h-5" />
+            {isSidebarOpen && <span className="font-medium text-sm">Çıkış Yap</span>}
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Layout */}
+      <div className="flex-1 flex flex-col min-w-0">
+        
+        {/* Header */}
+        <header className="h-20 bg-white border-b border-gray-100 flex items-center justify-between px-8 shadow-sm z-10 flex-shrink-0">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+              className="p-2 -ml-2 rounded-lg text-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            >
+              <MenuIcon className="w-5 h-5" />
+            </button>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">
+              {navItems.find(i => i.id === activeTab)?.label || 'Super Admin'}
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-6">
+            <button className="relative p-2 text-gray-400 hover:bg-gray-50 rounded-full transition-colors">
+              <Bell className="w-5 h-5" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></span>
+            </button>
+            <div className="h-8 w-px bg-gray-200"></div>
+            <div className="flex items-center gap-3 cursor-pointer group">
+              <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-700 font-bold border-2 border-white shadow-sm">
+                A
+              </div>
+              <div className="hidden md:block text-sm">
+                <p className="font-semibold text-gray-700 group-hover:text-emerald-600 transition-colors">Yönetici</p>
+                <p className="text-xs text-gray-400">Süper Admin</p>
+              </div>
+            </div>
+          </div>
+        </header>
+
+        {/* Dynamic Content */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-[#F8FAFC]">
+          <div className="max-w-7xl mx-auto">
+            {loading && (
+              <div className="h-64 flex items-center justify-center">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+              </div>
+            )}
+
+            {!loading && activeTab === 'dashboard' && stats && (
+              <DashboardTab stats={stats} />
+            )}
+
+            {!loading && activeTab === 'tenants' && (
+              selectedTenantId ? (
+                <TenantDetailTab
+                  tenantDetail={tenantDetail}
+                  onBack={() => {
+                    setSelectedTenantId(null);
+                    setTenantDetail(null);
+                  }}
+                  onRefresh={async () => {
+                    try {
+                      const response = await superadminApi.tenantDetail(selectedTenantId);
+                      setTenantDetail(response.data);
+                    } catch (error) {
+                      console.error('Error loading tenant detail:', error);
+                      alert('Tenant detayı yüklenirken hata oluştu');
+                    }
+                  }}
+                />
+              ) : (
+                <TenantsTab
+                  tenants={filteredTenants}
+                  searchTerm={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  onTenantClick={async (tenantId: number) => {
+                    setSelectedTenantId(tenantId);
+                    setLoading(true);
+                    try {
+                      const response = await superadminApi.tenantDetail(tenantId);
+                      setTenantDetail(response.data);
+                    } catch (error) {
+                      console.error('Error loading tenant detail:', error);
+                      alert('Tenant detayı yüklenirken hata oluştu');
+                      setSelectedTenantId(null);
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}
+                />
+              )
+            )}
+
+            {!loading && activeTab === 'subscriptions' && (
+              <SubscriptionsTab
+                subscriptions={filteredSubscriptions}
                 searchTerm={searchTerm}
                 onSearchChange={setSearchTerm}
-                onTenantClick={async (tenantId: number) => {
-                  setSelectedTenantId(tenantId);
-                  setLoading(true);
-                  try {
-                    const response = await superadminApi.tenantDetail(tenantId);
-                    setTenantDetail(response.data);
-                  } catch (error) {
-                    console.error('Error loading tenant detail:', error);
-                    alert('Tenant detayı yüklenirken hata oluştu');
-                    setSelectedTenantId(null);
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
+                onRefresh={loadData}
               />
-            )
-          )}
+            )}
 
-          {!loading && activeTab === 'subscriptions' && (
-            <SubscriptionsTab
-              subscriptions={filteredSubscriptions}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-              onRefresh={loadData}
-            />
-          )}
+            {!loading && activeTab === 'payments' && (
+              <PaymentsTab
+                payments={filteredPayments}
+                searchTerm={searchTerm}
+                onSearchChange={setSearchTerm}
+              />
+            )}
 
-          {!loading && activeTab === 'payments' && (
-            <PaymentsTab
-              payments={filteredPayments}
-              searchTerm={searchTerm}
-              onSearchChange={setSearchTerm}
-            />
-          )}
+            {!loading && activeTab === 'customizations' && (
+              <CustomizationsTab tenants={tenants} onRefresh={loadData} />
+            )}
 
-          {!loading && activeTab === 'customizations' && (
-            <CustomizationsTab tenants={tenants} onRefresh={loadData} />
-          )}
+            {!loading && activeTab === 'api-usage' && (
+              <ApiUsageTab />
+            )}
 
-          {!loading && activeTab === 'api-usage' && (
-            <ApiUsageTab />
-          )}
+            {!loading && activeTab === 'platform-settings' && (
+              <PlatformSettingsTab />
+            )}
 
-          {!loading && activeTab === 'platform-settings' && (
-            <PlatformSettingsTab />
-          )}
-
-          {!loading && activeTab === 'quick-setup' && (
-            <QuickSetupTab onComplete={loadData} />
-          )}
-        </div>
+            {!loading && activeTab === 'quick-setup' && (
+              <QuickSetupTab onComplete={loadData} />
+            )}
+          </div>
+        </main>
       </div>
     </div>
   );
@@ -307,142 +388,88 @@ export default function SuperAdminPanel() {
 // Dashboard Tab
 function DashboardTab({ stats }: { stats: DashboardStats }) {
   return (
-    <div>
-      <h2 className="text-2xl font-bold mb-6">Dashboard</h2>
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <StatCard
-          title="Toplam İşletme"
-          value={stats.isletmeler.total}
-          subtitle={`${stats.isletmeler.active} aktif`}
-          icon={Building2}
-          color="blue"
-        />
-        <StatCard
-          title="Aktif İşletme"
-          value={stats.isletmeler.active}
-          subtitle={`${stats.isletmeler.passive} pasif`}
-          icon={Building2}
-          color="green"
-        />
-        <StatCard
-          title="Toplam Şube"
-          value={stats.subeler.total}
-          icon={Building2}
-          color="purple"
-        />
-        <StatCard
-          title="Pasif İşletme"
-          value={stats.isletmeler.passive}
-          icon={AlertCircle}
-          color="red"
-        />
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      
+      {/* Top Banner / Welcome */}
+      <div className="bg-gradient-to-r from-[#0B3B24] to-emerald-800 rounded-2xl p-8 text-white shadow-lg overflow-hidden relative">
+        <div className="relative z-10 w-full md:w-2/3">
+          <h2 className="text-3xl font-bold mb-2">Sisteme Hoş Geldiniz 🎉</h2>
+          <p className="text-emerald-50/80 leading-relaxed max-w-lg">
+            Platformunuzun tüm verilerini, aktif abonelikleri ve gelir özetlerini buradan canlı olarak takip edebilirsiniz.
+          </p>
+        </div>
+        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12 transform origin-bottom border-l border-white/10 hidden md:block"></div>
       </div>
 
-      {/* Second Row Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <StatCard
-          title="Toplam Kullanıcı"
-          value={stats.kullanicilar.total}
-          icon={Users}
-          color="indigo"
-        />
-        <StatCard
-          title="Arıza ve Servis Talepleri"
-          value={stats.ariza_servis_talepleri}
-          icon={AlertCircle}
-          color="orange"
-        />
-        <StatCard
-          title="Aktif Abonelik"
-          value={stats.abonelikler.active}
-          icon={Package}
-          color="teal"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard title="Toplam İşletme" value={stats.isletmeler.total} subtitle={`${stats.isletmeler.active} aktif`} icon={Building2} bg="bg-blue-50" color="text-blue-600" />
+        <StatCard title="Kayıtlı Şube" value={stats.subeler.total} icon={Activity} bg="bg-emerald-50" color="text-emerald-600" />
+        <StatCard title="Kullanıcı Ort." value={stats.kullanicilar.total} icon={Users} bg="bg-indigo-50" color="text-indigo-600" />
+        <StatCard title="Aktif Abonelik" value={stats.abonelikler.active} icon={Package} bg="bg-orange-50" color="text-orange-500" />
       </div>
 
-      {/* Financial Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg p-6">
-          <div className="flex items-center justify-between">
+      {/* Financials & Plans */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex items-center justify-between group">
             <div>
-              <p className="text-blue-600 font-medium">Bu Ay Gelir</p>
-              <p className="text-3xl font-bold text-blue-900 mt-2">
-                ₺{stats.finansal.this_month_revenue.toFixed(2)}
-              </p>
+              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Aylık Tahmini Gelir</p>
+              <h3 className="text-3xl font-bold text-gray-900 group-hover:text-emerald-600 transition-colors">
+                ₺{stats.finansal.this_month_revenue.toLocaleString('tr-TR')}
+              </h3>
             </div>
-            <DollarSign className="w-12 h-12 text-blue-600" />
+            <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center">
+              <DollarSign className="w-8 h-8 text-emerald-500" />
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 flex items-center justify-between group">
+            <div>
+              <p className="text-sm font-medium text-gray-400 uppercase tracking-wider mb-2">Bekleyen Tahsilat</p>
+              <h3 className="text-3xl font-bold text-gray-900 group-hover:text-rose-600 transition-colors">
+                ₺{stats.finansal.pending_payments.total.toLocaleString('tr-TR')}
+              </h3>
+              <p className="text-sm text-gray-500 mt-2">{stats.finansal.pending_payments.count} adet açık ödeme</p>
+            </div>
+            <div className="w-16 h-16 rounded-full bg-rose-50 flex items-center justify-center">
+              <TrendingUp className="w-8 h-8 text-rose-500" />
+            </div>
           </div>
         </div>
 
-        <div className="bg-gradient-to-br from-orange-50 to-orange-100 rounded-lg p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-orange-600 font-medium">Bekleyen Ödemeler</p>
-              <p className="text-3xl font-bold text-orange-900 mt-2">
-                ₺{stats.finansal.pending_payments.total.toFixed(2)}
-              </p>
-              <p className="text-sm text-orange-700 mt-1">
-                {stats.finansal.pending_payments.count} adet
-              </p>
-            </div>
-            <AlertCircle className="w-12 h-12 text-orange-600" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-bold text-gray-800">Plan Dağılımı</h3>
+            <ArrowUpRight className="w-4 h-4 text-gray-400" />
           </div>
-        </div>
-      </div>
-
-      {/* Plan Distribution */}
-      <div className="bg-gray-50 rounded-lg p-6">
-        <h3 className="text-lg font-semibold mb-4">Plan Dağılımı</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {stats.abonelikler.plan_distribution.map((plan) => (
-            <div key={plan.plan_type} className="bg-white rounded-lg p-4 shadow">
-              <p className="text-sm text-gray-600 capitalize">{plan.plan_type}</p>
-              <p className="text-2xl font-bold text-gray-900 mt-1">{plan.count}</p>
-            </div>
-          ))}
+          <div className="space-y-4">
+            {stats.abonelikler.plan_distribution.map((plan, idx) => (
+              <div key={idx} className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors">
+                <div className="flex items-center gap-3">
+                  <span className={`w-3 h-3 rounded-full ${idx === 0 ? 'bg-emerald-500' : idx === 1 ? 'bg-blue-500' : 'bg-purple-500'}`}></span>
+                  <span className="text-sm font-medium text-gray-700 capitalize">{plan.plan_type} Plan</span>
+                </div>
+                <span className="font-bold text-gray-900 bg-white px-3 py-1 rounded-full shadow-sm border border-gray-100">{plan.count}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// Stat Card Component
-function StatCard({
-  title,
-  value,
-  subtitle,
-  icon: Icon,
-  color
-}: {
-  title: string;
-  value: number | string;
-  subtitle?: string;
-  icon: any;
-  color: string;
-}) {
-  const colorClasses = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-green-100 text-green-600',
-    purple: 'bg-purple-100 text-purple-600',
-    orange: 'bg-orange-100 text-orange-600',
-    red: 'bg-red-100 text-red-600',
-    indigo: 'bg-indigo-100 text-indigo-600',
-    teal: 'bg-teal-100 text-teal-600',
-  };
-
+function StatCard({ title, value, subtitle, icon: Icon, bg, color }: any) {
   return (
-    <div className="bg-white rounded-lg shadow p-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-sm text-gray-600">{title}</p>
-          <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
-          {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
-        </div>
-        <div className={`${colorClasses[color as keyof typeof colorClasses]} p-3 rounded-full`}>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col group hover:shadow-md transition-all">
+      <div className="flex justify-between items-start mb-4">
+        <div className={`p-3 rounded-xl ${bg} ${color}`}>
           <Icon className="w-6 h-6" />
         </div>
+        {subtitle && <span className="text-xs font-medium px-2 py-1 bg-gray-50 text-gray-500 rounded-full border border-gray-100">{subtitle}</span>}
+      </div>
+      <div>
+        <h4 className="text-3xl font-bold text-gray-900">{value}</h4>
+        <p className="text-sm font-medium text-gray-500 mt-1">{title}</p>
       </div>
     </div>
   );
