@@ -153,6 +153,8 @@ async def main():
         "DATABASE_URL",
         "postgresql://neso_prod_user:zi1U5obfDlZXB142XElIQGM0DVDhTBJq@dpg-d4cu6r3uibrs73852mo0-a.frankfurt-postgres.render.com:5432/neso_prod"
     )
+    # asyncpg'nin kabul edebilmesi için SQLAlchemy formatındaki (+asyncpg) takısını temizliyoruz:
+    conn_str = conn_str.replace("postgresql+asyncpg://", "postgresql://")
     
     print("=" * 60)
     print("🚀 NESO MODÜLER - Demo Veri Seed Script")
