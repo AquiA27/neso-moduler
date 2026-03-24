@@ -24,15 +24,15 @@ os.environ.setdefault("DATABASE_URL", "postgresql+asyncpg://neso:neso123@localho
 import asyncpg
 
 # ===== KONFİGÜRASYON =====
-DEMO_ISLETME_ADI = "Fıstık Cafe & Bistro"
+DEMO_ISLETME_ADI = "Ateş Kafe"
 DEMO_SUBE_ADI = "Merkez Şube"
-DEMO_ADMIN_USER = "demo_admin"
-DEMO_ADMIN_PASS = "DemoAdmin123!"  # Güçlü şifre (production policy)
-DEMO_OPERATOR_USER = "kasiyer1"
+DEMO_ADMIN_USER = "ates_admin"
+DEMO_ADMIN_PASS = "AtesAdmin123!"  # Güçlü şifre (production policy)
+DEMO_OPERATOR_USER = "ates_kasiyer"
 DEMO_OPERATOR_PASS = "Kasiyer123!"
-DEMO_MUTFAK_USER = "mutfak1"
+DEMO_MUTFAK_USER = "ates_mutfak"
 DEMO_MUTFAK_PASS = "Mutfak1234!"
-DEMO_GARSON_USER = "garson1"
+DEMO_GARSON_USER = "ates_garson"
 DEMO_GARSON_PASS = "Garson12345!"
 
 # ===== MENÜ VERİSİ =====
@@ -96,6 +96,34 @@ STOK_ITEMS = [
     {"ad": "Bardak (Karton)", "kategori": "Sarf Malzeme", "birim": "adet", "mevcut": 200, "min": 50, "alis_fiyat": 3.5},
 ]
 
+# ===== REÇETE VERİSİ =====
+RECETE_ITEMS = [
+    {"urun": "Türk Kahvesi", "stok": "Kahve Çekirdeği (Arabica)", "miktar": 0.015, "birim": "kg"},
+    {"urun": "Türk Kahvesi", "stok": "Şeker", "miktar": 0.005, "birim": "kg"},
+    {"urun": "Espresso", "stok": "Kahve Çekirdeği (Arabica)", "miktar": 0.018, "birim": "kg"},
+    {"urun": "Americano", "stok": "Kahve Çekirdeği (Arabica)", "miktar": 0.018, "birim": "kg"},
+    {"urun": "Latte", "stok": "Kahve Çekirdeği (Arabica)", "miktar": 0.018, "birim": "kg"},
+    {"urun": "Latte", "stok": "Süt (Günlük)", "miktar": 0.200, "birim": "litre"},
+    {"urun": "Cappuccino", "stok": "Kahve Çekirdeği (Arabica)", "miktar": 0.018, "birim": "kg"},
+    {"urun": "Cappuccino", "stok": "Süt (Günlük)", "miktar": 0.150, "birim": "litre"},
+    {"urun": "Mocha", "stok": "Kahve Çekirdeği (Arabica)", "miktar": 0.018, "birim": "kg"},
+    {"urun": "Mocha", "stok": "Süt (Günlük)", "miktar": 0.150, "birim": "litre"},
+    {"urun": "Mocha", "stok": "Çikolata Sosu", "miktar": 0.030, "birim": "litre"},
+    {"urun": "Çay (Çaydanlık)", "stok": "Çay (Rize Turist)", "miktar": 0.050, "birim": "kg"},
+    {"urun": "Sahanda Yumurta", "stok": "Yumurta", "miktar": 3, "birim": "adet"},
+    {"urun": "Sahanda Yumurta", "stok": "Tereyağı", "miktar": 0.030, "birim": "kg"},
+    {"urun": "Menemen", "stok": "Yumurta", "miktar": 2, "birim": "adet"},
+    {"urun": "Menemen", "stok": "Domates", "miktar": 0.200, "birim": "kg"},
+    {"urun": "Menemen", "stok": "Biber", "miktar": 0.050, "birim": "kg"},
+    {"urun": "Tavuk Sote", "stok": "Tavuk Göğüs", "miktar": 0.250, "birim": "kg"},
+    {"urun": "Tavuk Sote", "stok": "Biber", "miktar": 0.050, "birim": "kg"},
+    {"urun": "Tavuk Sote", "stok": "Domates", "miktar": 0.100, "birim": "kg"},
+    {"urun": "Köfte Izgara", "stok": "Kıyma (Dana)", "miktar": 0.200, "birim": "kg"},
+    {"urun": "Smoothie (Mango)", "stok": "Mango (Dondurulmuş)", "miktar": 0.150, "birim": "kg"},
+    {"urun": "Limonata", "stok": "Limon", "miktar": 0.200, "birim": "kg"},
+    {"urun": "Limonata", "stok": "Şeker", "miktar": 0.050, "birim": "kg"}
+]
+
 # ===== GİDER VERİSİ =====
 GIDER_ITEMS = [
     {"kategori": "Kira", "aciklama": "Mart 2026 kira ödemesi", "tutar": 15000, "gun_offset": -5},
@@ -123,7 +151,7 @@ async def main():
     # Internal URL'de "-a" son eki var, External'da yok
     conn_str = os.getenv(
         "SEED_DATABASE_URL",
-        "postgresql://neso_prod_user:zi1U5obfDlZXB142XElIQGM0DVDhTBJq@dpg-d4cu6r3uibrs73852mo0-a.frankfurt-postgres.render.com:5432/neso_prod"
+        "postgresql://neso_prod_user:zi1U5obfDlZXB142XElIQGM0DVDhTBJq@dpg-d4cu6r3uibrs73852mo0.frankfurt-postgres.render.com:5432/neso_prod"
     )
     
     print("=" * 60)
@@ -299,7 +327,25 @@ async def main():
         print(f"   ✅ {len(STOK_ITEMS)} stok kalemi eklendi")
 
         # ============================================
-        # 7. GEÇMİŞ SİPARİŞLER OLUŞTUR (Son 14 gün)
+        # 6.5. REÇETE KALEMLERİ OLUŞTUR
+        # ============================================
+        print("📜 6.5/8 - Reçeteler oluşturuluyor...")
+        
+        for recete in RECETE_ITEMS:
+            existing_recete = await conn.fetchrow(
+                "SELECT id FROM receteler WHERE sube_id = $1 AND urun = $2 AND stok = $3",
+                sube_id, recete["urun"], recete["stok"]
+            )
+            if not existing_recete:
+                await conn.execute(
+                    """INSERT INTO receteler (sube_id, urun, stok, miktar, birim) 
+                       VALUES ($1, $2, $3, $4, $5)""",
+                    sube_id, recete["urun"], recete["stok"], recete["miktar"], recete["birim"]
+                )
+        print(f"   ✅ {len(RECETE_ITEMS)} reçete tanımı eklendi")
+
+        # ============================================
+        # 7. GEÇMİŞ SİPARİŞLER OLUŞTUR (Son 20 gün)
         # ============================================
         print("📋 7/8 - Geçmiş siparişler ve ödemeler oluşturuluyor...")
         
@@ -307,8 +353,8 @@ async def main():
         siparis_count = 0
         odeme_count = 0
         
-        # Son 14 gün için sipariş oluştur
-        for day_offset in range(14, 0, -1):
+        # Son 20 gün için sipariş oluştur
+        for day_offset in range(20, 0, -1):
             gun = now - timedelta(days=day_offset)
             
             # Gün bazında sipariş sayısı (hafta sonu daha yoğun)
@@ -378,7 +424,7 @@ async def main():
             )
             siparis_count += 1
         
-        print(f"   ✅ {siparis_count} sipariş oluşturuldu (14 gün + bugün aktif)")
+        print(f"   ✅ {siparis_count} sipariş oluşturuldu (20 gün + bugün aktif)")
         print(f"   ✅ {odeme_count} ödeme kaydı oluşturuldu")
 
         # ============================================
@@ -437,13 +483,13 @@ async def main():
         print(f"   Menü     : {len(MENU_ITEMS)} ürün + varyasyonlar")
         print(f"   Masalar  : {len(MASA_ADLARI)} masa")
         print(f"   Stok     : {len(STOK_ITEMS)} kalem")
-        print(f"   Siparişler: {siparis_count} (son 14 gün)")
+        print(f"   Siparişler: {siparis_count} (son 20 gün)")
         print(f"   Ödemeler : {odeme_count} kayıt")
         print(f"   Giderler : {len(GIDER_ITEMS)} kayıt")
         print()
         print("🔑 TANITIM İÇİN:")
         print(f"   1. '{DEMO_ADMIN_USER}' ile giriş yapın")
-        print(f"   2. Dashboard'da son 14 günlük verileri görün")
+        print(f"   2. Dashboard'da son 20 günlük verileri görün")
         print(f"   3. Menü, Kasa, Mutfak, Raporlar sayfalarını gezin")
         print(f"   4. AI Asistana 'Bugün en çok ne sattık?' diye sorun")
         print()
