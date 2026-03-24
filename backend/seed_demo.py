@@ -148,10 +148,10 @@ MASA_ADLARI = [
 
 async def main():
     # Database URL - Render PostgreSQL (External - dışarıdan erişim)
-    # Internal URL'de "-a" son eki var, External'da yok
+    # Render ortamında otomatik tanımlı DATABASE_URL'i kullanır, yoksa dahili ağa (-a) düşer.
     conn_str = os.getenv(
-        "SEED_DATABASE_URL",
-        "postgresql://neso_prod_user:zi1U5obfDlZXB142XElIQGM0DVDhTBJq@dpg-d4cu6r3uibrs73852mo0.frankfurt-postgres.render.com:5432/neso_prod"
+        "DATABASE_URL",
+        "postgresql://neso_prod_user:zi1U5obfDlZXB142XElIQGM0DVDhTBJq@dpg-d4cu6r3uibrs73852mo0-a.frankfurt-postgres.render.com:5432/neso_prod"
     )
     
     print("=" * 60)
@@ -161,11 +161,20 @@ async def main():
     print()
 
     import ssl as _ssl
+    import traceback
     ssl_ctx = _ssl.create_default_context()
     ssl_ctx.check_hostname = False
     ssl_ctx.verify_mode = _ssl.CERT_NONE
     
-    conn = await asyncpg.connect(conn_str, ssl=ssl_ctx, timeout=30)
+    try:
+        # Önce SSL ile bağlanmayı dener (Dış ağlar ve bazı internal ağlar)
+        conn = await asyncpg.connect(conn_str, ssl=ssl_ctx, timeout=30)
+        print("   ✅ Veritabanına SSL (Güvenli) bağlantı kuruldu.")
+    except Exception as e:
+        print(f"   ⚠️ SSL ile bağlantı koptu ({type(e).__name__}), iç ağ (SSL'siz) bağlantısına dönülüyor...")
+        # İç ağlar (VPC) genelde SSL kabul etmez ve aniden bağlantıyı keser.
+        conn = await asyncpg.connect(conn_str, ssl=False, timeout=30)
+        print("   ✅ Veritabanına İç Ağdan (SSL'siz) bağlantı kuruldu.")
     
     try:
         # ============================================
