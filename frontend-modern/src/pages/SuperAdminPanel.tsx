@@ -390,17 +390,6 @@ function DashboardTab({ stats }: { stats: DashboardStats }) {
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
       
-      {/* Top Banner / Welcome */}
-      <div className="bg-gradient-to-r from-[#0B3B24] to-emerald-800 rounded-2xl p-8 text-white shadow-lg overflow-hidden relative">
-        <div className="relative z-10 w-full md:w-2/3">
-          <h2 className="text-3xl font-bold mb-2">Sisteme Hoş Geldiniz 🎉</h2>
-          <p className="text-emerald-50/80 leading-relaxed max-w-lg">
-            Platformunuzun tüm verilerini, aktif abonelikleri ve gelir özetlerini buradan canlı olarak takip edebilirsiniz.
-          </p>
-        </div>
-        <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-white/5 skew-x-12 transform origin-bottom border-l border-white/10 hidden md:block"></div>
-      </div>
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard title="Toplam İşletme" value={stats.isletmeler.total} subtitle={`${stats.isletmeler.active} aktif`} icon={Building2} bg="bg-blue-50" color="text-blue-600" />
         <StatCard title="Kayıtlı Şube" value={stats.subeler.total} icon={Activity} bg="bg-emerald-50" color="text-emerald-600" />
