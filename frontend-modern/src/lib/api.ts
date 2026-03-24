@@ -793,6 +793,9 @@ export const biAssistantApi = {
   query: async (data: { text: string; sube_id?: number }) => {
     return apiClient.post('/bi-assistant/query', data);
   },
+  morningBrief: async (sube_id?: number) => {
+    return apiClient.get(sube_id ? `/bi-assistant/morning-brief?sube_id=${sube_id}` : '/bi-assistant/morning-brief');
+  },
 };
 
 // Giderler API

@@ -1457,3 +1457,69 @@ async def bi_query(
 
     return BIQueryResponse(reply=reply_text, data=response_data, suggestions=suggestions)
 
+
+@router.get("/morning-brief", response_model=BIQueryResponse, dependencies=[Depends(require_roles({"admin", "super_admin"}))])
+async def get_morning_brief(
+    sube_id: Optional[int] = Query(None, description="Opsiyonel şube ID (Super Admin için)"),
+    user: Dict[str, Any] = Depends(get_current_user),
+    user_sube_id: int = Depends(get_sube_id),
+):
+    """
+    Proaktif Sabah Özeti: Dünün satışlarını, kritik stokları ve bugünün önerilerini getirir.
+    """
+    try:
+        target_sube_id = sube_id if (sube_id and user.get("role") == "super_admin") else user_sube_id
+        
+        # 1. Verileri topla (Dün)
+        yesterday_revenue = await get_revenue_data(target_sube_id, days=1)
+        critical_stocks = await get_inventory_status(target_sube_id)
+        
+        # 2. LLM Prompt'u hazırla
+        tenant_id = user.get("switched_tenant_id") or user.get("tenant_id")
+        if not tenant_id and target_sube_id:
+            sube_row = await db.fetch_one("SELECT isletme_id FROM subeler WHERE id = :id", {"id": target_sube_id})
+            if sube_row:
+                tenant_id = dict(sube_row).get("isletme_id")
+
+        provider = await get_llm_provider(tenant_id=tenant_id, assistant_type="business")
+        
+        prompt = f"""Sen Neso'nun proaktif işletme zekası asistanısın. Yönetici şu an sisteme giriş yaptı ve senden bir 'Sabah Özeti' (Morning Brief) bekliyor.
+Lütfen aşağıdaki verileri kullanarak enerjik, motive edici ve yöneticiyi yönlendirici kısa bir özet metni hazırla.
+
+# Veriler:
+- Dünkü Ciro: {yesterday_revenue.get('total_revenue', 0):.2f} TL
+- Dünkü Sipariş Sayısı: {yesterday_revenue.get('total_orders', 0)}
+- Kritik Stok Uyarıları: {len(critical_stocks)} ürün kritik seviyede. {', '.join([s['ad'] for s in critical_stocks[:3]])} {'ve diğerleri' if len(critical_stocks) > 3 else ''}
+
+Yanıtını şu formatta yapılandır:
+1. Günaydın mesajı ve dünün kısa değerlendirmesi (Örn: "Dün harika bir gündü, X TL ciro yaptık...")
+2. Dikkat etmesi gerekenler (Örn: "Stokta azalan XY ürünleri için sipariş vermeyi unutmayın.")
+3. Bugün için kısa bir strateji/öneri.
+
+(Maksimum 4-5 cümle kullan, emoji ekle.)"""
+
+        llm_reply = ""
+        if hasattr(provider, 'chat'):
+            import inspect
+            sig = inspect.signature(provider.chat)
+            if 'task_type' in sig.parameters:
+                result = await provider.chat([{"role": "user", "content": prompt}], task_type="bi_analysis")
+            else:
+                result = await provider.chat([{"role": "user", "content": prompt}])
+                
+            if isinstance(result, tuple):
+                llm_reply, _ = result
+            else:
+                llm_reply = result
+
+        if not llm_reply or not llm_reply.strip():
+            llm_reply = f"🌅 Günaydın! Dün {yesterday_revenue.get('total_orders', 0)} siparişten toplam {yesterday_revenue.get('total_revenue', 0):.2f} ₺ ciro elde ettik. Tüm ekibin eline sağlık!\n\n🛒 {'Stoklarınız gayet iyi durumda!' if not critical_stocks else f'Dikkat: {len(critical_stocks)} ürününüz kritik stok seviyesinde. Tedarikçilerle iletişime geçmenizi öneririm.'}\n\nBugün için harika bir gün diliyorum!"
+            
+        return BIQueryResponse(
+            reply=llm_reply,
+            data={"yesterday_revenue": yesterday_revenue, "critical_stocks": len(critical_stocks)}
+        )
+    except Exception as e:
+        logging.error(f"Morning brief error: {e}", exc_info=True)
+        return BIQueryResponse(reply="Günaydın! Sabah özetinizi şu an getiremiyorum, ancak işlerinizde kolaylıklar dilerim.")
+

@@ -152,9 +152,13 @@ export function useCache<T>(
       const result = await fetcher();
       setData(result);
       setToCache(key, result, storage, ttl);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-      console.error('Fetch error:', err);
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail
+        || (typeof err?.response?.data === 'string' ? err.response.data : null)
+        || err?.message
+        || 'Unknown error';
+      setError(new Error(errorMsg));
+      console.error(`[useCache] Fetch error for key ${key}:`, err?.response?.data || err);
     } finally {
       setLoading(false);
     }

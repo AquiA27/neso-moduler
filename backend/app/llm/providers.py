@@ -336,15 +336,42 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
     
     # Tenant-specific key yoksa global key'i kontrol et
     if not api_key:
-        # 1) Önce ortam değişkeninden
-        api_key = settings.OPENAI_API_KEY
-        if api_key:
-            api_key = api_key.strip()
-            key_source = "global_env"
-            logging.info(f"[LLM_PROVIDER] ✅ Using global API key from env, model={model}, key=sk-...{api_key[-4:]}")
-        else:
-            # 2) Ortam değişkeni yoksa, platform_settings tablosundan
-            try:
+        api_key_col = "openai_api_key"
+        model_col = "openai_model"
+        if assistant_type == "customer":
+            api_key_col = "customer_assistant_openai_api_key"
+            model_col = "customer_assistant_openai_model"
+        elif assistant_type == "business":
+            api_key_col = "business_assistant_openai_api_key"
+            model_col = "business_assistant_openai_model"
+
+        # 1) Önce platform_settings tablosundan (Kullanıcı arayüzünden girilenler önceliklidir)
+        try:
+            # Asistan-spesifik kontrol et
+            if assistant_type and api_key_col != "openai_api_key":
+                ps_row = await db.fetch_one(
+                    "SELECT value FROM platform_settings WHERE key = :key", {"key": api_key_col}
+                )
+                if ps_row:
+                    ps_dict = dict(ps_row) if hasattr(ps_row, 'keys') else ps_row
+                    ps_key = ps_dict.get("value")
+                    if ps_key and ps_key.strip():
+                        api_key = ps_key.strip()
+                        key_source = "platform_settings_db_specific"
+                        
+                        # Asistan-spesifik model
+                        ps_model_row = await db.fetch_one(
+                            "SELECT value FROM platform_settings WHERE key = :key", {"key": model_col}
+                        )
+                        if ps_model_row:
+                            ps_model_dict = dict(ps_model_row) if hasattr(ps_model_row, 'keys') else ps_model_row
+                            if ps_model_dict.get("value") and ps_model_dict.get("value").strip():
+                                model = ps_model_dict.get("value").strip()
+                        
+                        logging.info(f"[LLM_PROVIDER] ✅ Using global {assistant_type}-specific API key from platform_settings DB, model={model}, key=sk-...{api_key[-4:]}")
+            
+            # Asistan-spesifik yoksa, genel platform_settings anahtarını kKontrol et
+            if not api_key:
                 ps_row = await db.fetch_one(
                     "SELECT value FROM platform_settings WHERE key = 'openai_api_key'",
                 )
@@ -354,26 +381,30 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
                     if ps_key and ps_key.strip():
                         api_key = ps_key.strip()
                         key_source = "platform_settings_db"
-                        logging.info(f"[LLM_PROVIDER] ✅ Using global API key from platform_settings DB, model={model}, key=sk-...{api_key[-4:]}")
-                
-                # Model de platform_settings'den alınabilir
-                if not api_key:
-                    pass  # Key bulunamadı
-                else:
-                    ps_model_row = await db.fetch_one(
-                        "SELECT value FROM platform_settings WHERE key = 'openai_model'",
-                    )
-                    if ps_model_row:
-                        ps_model_dict = dict(ps_model_row) if hasattr(ps_model_row, 'keys') else ps_model_row
-                        ps_model = ps_model_dict.get("value")
-                        if ps_model and ps_model.strip():
-                            model = ps_model.strip()
-                            logging.info(f"[LLM_PROVIDER] Using model from platform_settings: {model}")
-            except Exception as ps_err:
-                logging.warning(f"[LLM_PROVIDER] platform_settings lookup failed (table may not exist): {ps_err}")
-            
-            if not api_key:
-                logging.warning(f"[LLM_PROVIDER] ❌ No global OPENAI_API_KEY in env or platform_settings")
+                        
+                        # Model de platform_settings'den alınabilir
+                        ps_model_row = await db.fetch_one(
+                            "SELECT value FROM platform_settings WHERE key = 'openai_model'",
+                        )
+                        if ps_model_row:
+                            ps_model_dict = dict(ps_model_row) if hasattr(ps_model_row, 'keys') else ps_model_row
+                            if ps_model_dict.get("value") and ps_model_dict.get("value").strip():
+                                model = ps_model_dict.get("value").strip()
+                        
+                        logging.info(f"[LLM_PROVIDER] ✅ Using global general API key from platform_settings DB, model={model}, key=sk-...{api_key[-4:]}")
+
+        except Exception as ps_err:
+            logging.warning(f"[LLM_PROVIDER] platform_settings lookup failed (table may not exist): {ps_err}")
+
+        # 2) Hala platform_settings içinde bulamadıysa, .env ortam değişkenini kontrol et
+        if not api_key:
+            api_key_env = settings.OPENAI_API_KEY
+            if api_key_env and api_key_env.strip():
+                api_key = api_key_env.strip()
+                key_source = "global_env"
+                logging.info(f"[LLM_PROVIDER] ✅ Using global API key from env, model={model}, key=sk-...{api_key[-4:]}")
+            else:
+                logging.warning(f"[LLM_PROVIDER] ❌ No global OPENAI_API_KEY in platform_settings or env")
     
     has_api_key = bool(api_key)
     is_llm_enabled = settings.ASSISTANT_ENABLE_LLM

@@ -1,2 +1,0 @@
-To https://github.com/AquiA27/neso-moduler.git
-   18037d8..3db9b6e  main -> main

@@ -189,12 +189,43 @@ class PromptBuilder:
 3. UYGULANABILIR öneriler sunmak
 4. KISA ve ÖZ cevaplar vermek (maksimum 6 cümle)
 
+EK GÖREV (ZENGİN ARAYÜZ & GRAFİKLER):
+Eğer kullanıcının sorusu bir trendi, karşılaştırmayı veya oran dağılımını analiz etmeyi gerektiriyorsa, yanıtının en sonuna MUTLAKA görselleştirme için bir JSON bloğu ekle. 
+JSON bloğu kesinkes ```json ve ``` etiketleri arasında olmalıdır. JSON içindeki data dizisi en az 2 öğe içermelidir.
+
+JSON FORMAT ÖRNEKLERİ:
+1) Zaman/Trend veya Karşılaştırma Grafiği (Bar/Line):
+```json
+{
+  "chartType": "bar", 
+  "title": "Günlük Ciro Trendi",
+  "data": [
+    {"name": "01 Mar", "value": 1500},
+    {"name": "02 Mar", "value": 2100}
+  ],
+  "color": "#eab308"
+}
+```
+(Not: chartType "bar" veya "line" olabilir. color için genellikle #eab308 (neso gold) veya #3b82f6 gibi hex kodları kullan)
+
+2) Oran/Dağılım Grafiği (Pie):
+```json
+{
+  "chartType": "pie",
+  "title": "Gider Dağılımı",
+  "data": [
+    {"name": "Personel", "value": 8500},
+    {"name": "Malzeme", "value": 4200}
+  ]
+}
+```
+
 KURALLAR:
-- Sadece verilen verileri kullan
-- Rakamları doğru hesapla
-- Tahminde bulunma, bilmiyorsan "veri yok" de
+- Sadece verilen verileri kullan ve JSON'a sadece gerçek verileri ekle
+- Rakamları doğru hesapla, tahminde bulunma
 - Türkçe karakter kullan
-- Profesyonel ama samimi ol"""
+- Profesyonel ama samimi ol
+- Grafikleri ancak veri buna uygunsa (trendler, listeler, oranlar) çiz"""
 
         # Intent'e özel context
         context = PromptBuilder._build_context_for_intent(intent, relevant_data, time_period)
