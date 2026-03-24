@@ -8,7 +8,7 @@ import {
   DollarSign, Package, ArrowLeft, Phone, Calendar,
   ExternalLink, UserCog, Menu as MenuIcon, FileText,
   Trash2, Activity, Key, Copy, RefreshCw, Eye, EyeOff, Globe, Save,
-  LogOut, Bell, ChevronRight, ArrowUpRight, TrendingUp
+  LogOut, Bell, ArrowUpRight, TrendingUp
 } from 'lucide-react';
 
 function BoxIcon(props: any) {
