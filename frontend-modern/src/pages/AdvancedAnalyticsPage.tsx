@@ -59,6 +59,7 @@ interface PersonnelPerformance {
 
 export default function AdvancedAnalyticsPage() {
   const token = useAuthStore((state) => state.accessToken);
+  const selectedTenantId = useAuthStore((state) => state.selectedTenantId);
   const [activeTab, setActiveTab] = useState<'profitability' | 'personnel' | 'customer' | 'category' | 'time'>('profitability');
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
 
@@ -69,9 +70,12 @@ export default function AdvancedAnalyticsPage() {
     if (dateRange.end) params.append('end_date', dateRange.end);
 
     return performanceUtils.measure('fetch_profitability', async () => {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (selectedTenantId) headers['X-Tenant-Id'] = String(selectedTenantId);
+
       const response = await fetch(
         `${API_BASE_URL}/analytics/advanced/product-profitability?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch profitability data');
       return response.json();
@@ -84,9 +88,12 @@ export default function AdvancedAnalyticsPage() {
     if (dateRange.end) params.append('end_date', dateRange.end);
 
     return performanceUtils.measure('fetch_personnel', async () => {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (selectedTenantId) headers['X-Tenant-Id'] = String(selectedTenantId);
+
       const response = await fetch(
         `${API_BASE_URL}/analytics/advanced/personnel-performance?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch personnel data');
       return response.json();
@@ -99,9 +106,12 @@ export default function AdvancedAnalyticsPage() {
     if (dateRange.end) params.append('end_date', dateRange.end);
 
     return performanceUtils.measure('fetch_customer', async () => {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (selectedTenantId) headers['X-Tenant-Id'] = String(selectedTenantId);
+
       const response = await fetch(
         `${API_BASE_URL}/analytics/advanced/customer-behavior?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch customer data');
       return response.json();
@@ -114,9 +124,12 @@ export default function AdvancedAnalyticsPage() {
     if (dateRange.end) params.append('end_date', dateRange.end);
 
     return performanceUtils.measure('fetch_category', async () => {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (selectedTenantId) headers['X-Tenant-Id'] = String(selectedTenantId);
+
       const response = await fetch(
         `${API_BASE_URL}/analytics/advanced/category-analysis?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch category data');
       return response.json();
@@ -129,9 +142,12 @@ export default function AdvancedAnalyticsPage() {
     if (dateRange.end) params.append('end_date', dateRange.end);
 
     return performanceUtils.measure('fetch_time', async () => {
+      const headers: Record<string, string> = { Authorization: `Bearer ${token}` };
+      if (selectedTenantId) headers['X-Tenant-Id'] = String(selectedTenantId);
+
       const response = await fetch(
         `${API_BASE_URL}/analytics/advanced/time-based-analysis?${params}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers }
       );
       if (!response.ok) throw new Error('Failed to fetch time data');
       return response.json();

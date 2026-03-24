@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { analyticsApi, adminApi, kasaApi, stokApi } from '../lib/api';
-import axios from 'axios';
+import apiClient, { analyticsApi, adminApi, kasaApi, stokApi } from '../lib/api';
 import { useCache } from '../hooks/useCache';
 import { performanceUtils } from '../hooks/usePerformance';
 import {
@@ -33,7 +32,6 @@ import {
   BarChart3,
 } from 'lucide-react';
 
-// ... (keep all existing interfaces)
 interface TrendData {
   gun: string;
   siparis_adedi: number;
@@ -70,23 +68,6 @@ interface DailyPaymentSummary {
 }
 
 const COLORS = ['#06b6d4', '#22c55e', '#14b8a6', '#0ea5e9', '#10b981', '#a855f7'];
-
-const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
-
-// Create axios instance with automatic token handling
-const apiClient = axios.create({
-  baseURL: API_BASE_URL,
-  headers: { 'Content-Type': 'application/json' },
-});
-
-// Add token interceptor
-apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('neso.accessToken') || sessionStorage.getItem('neso.token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
 
 export default function RaporlarPage() {
   const [activeTab, setActiveTab] = useState<'general' | 'profitability' | 'personnel' | 'customer' | 'category' | 'time'>('general');
