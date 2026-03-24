@@ -364,15 +364,12 @@ async def main():
                 siparis_sayisi = random.randint(12, 25)
             
             for _ in range(siparis_sayisi):
-                # Rastgele saat (08:00 - 23:00 arası)
                 saat = random.randint(8, 22)
                 dakika = random.randint(0, 59)
                 siparis_zamani = gun.replace(hour=saat, minute=dakika, second=random.randint(0, 59))
-                
-                # Rastgele masa
+                kapanis_zamani = siparis_zamani + timedelta(minutes=random.randint(15, 60))
                 masa = random.choice(MASA_ADLARI)
                 
-                # Rastgele sepet (1-4 ürün)
                 urun_sayisi = random.randint(1, 4)
                 secilen_urunler = random.sample(MENU_ITEMS, min(urun_sayisi, len(MENU_ITEMS)))
                 
@@ -380,27 +377,31 @@ async def main():
                 toplam = 0
                 for urun in secilen_urunler:
                     adet = random.randint(1, 3)
-                    sepet.append({
-                        "urun": urun["ad"],
-                        "adet": adet,
-                        "fiyat": urun["fiyat"]
-                    })
+                    sepet.append({"urun": urun["ad"], "adet": adet, "fiyat": urun["fiyat"]})
                     toplam += urun["fiyat"] * adet
                 
-                # Sipariş ekle (tamamlanmış)
+                # Kapalı Adisyon Oluştur
+                row = await conn.fetchrow(
+                    """INSERT INTO adisyons (sube_id, masa, acilis_zamani, kapanis_zamani, durum, toplam_tutar, odeme_toplam, bakiye, created_at) 
+                       VALUES ($1, $2, $3, $4, 'kapali', $5, $5, 0, $3) RETURNING id""",
+                    sube_id, masa, siparis_zamani, kapanis_zamani, toplam
+                )
+                adisyon_id = row["id"]
+
+                # Sipariş ekle (tamamlanmış ve adisyon_id ile)
                 await conn.execute(
-                    """INSERT INTO siparisler (sube_id, masa, sepet, durum, tutar, created_at) 
-                       VALUES ($1, $2, $3, 'tamamlandi', $4, $5)""",
-                    sube_id, masa, json.dumps(sepet), toplam, siparis_zamani
+                    """INSERT INTO siparisler (sube_id, masa, adisyon_id, sepet, durum, tutar, created_at) 
+                       VALUES ($1, $2, $3, $4, 'odendi', $5, $6)""",
+                    sube_id, masa, adisyon_id, json.dumps(sepet), toplam, siparis_zamani
                 )
                 siparis_count += 1
                 
                 # Ödeme ekle
-                yontem = random.choice(["nakit", "kredi_karti", "kredi_karti", "kredi_karti"])  # %75 kart
+                yontem = random.choice(["nakit", "kredi_karti", "kredi_karti", "kredi_karti"])
                 await conn.execute(
-                    """INSERT INTO odemeler (sube_id, masa, tutar, yontem, created_at) 
-                       VALUES ($1, $2, $3, $4, $5)""",
-                    sube_id, masa, toplam, yontem, siparis_zamani + timedelta(minutes=random.randint(15, 60))
+                    """INSERT INTO odemeler (sube_id, masa, adisyon_id, tutar, yontem, created_at) 
+                       VALUES ($1, $2, $3, $4, $5, $6)""",
+                    sube_id, masa, adisyon_id, toplam, yontem, kapanis_zamani
                 )
                 odeme_count += 1
         
@@ -416,11 +417,21 @@ async def main():
                 sepet.append({"urun": urun["ad"], "adet": adet, "fiyat": urun["fiyat"]})
                 toplam += urun["fiyat"] * adet
             
+            siparis_zamani = now - timedelta(minutes=random.randint(5, 30))
+            
+            # Açık Adisyon Oluştur
+            row = await conn.fetchrow(
+                """INSERT INTO adisyons (sube_id, masa, acilis_zamani, durum, toplam_tutar, odeme_toplam, bakiye, created_at) 
+                   VALUES ($1, $2, $3, 'acik', $4, 0, $4, $3) RETURNING id""",
+                sube_id, masa, siparis_zamani, toplam
+            )
+            adisyon_id = row["id"]
+
             durum = random.choice(["yeni", "hazirlaniyor"])
             await conn.execute(
-                """INSERT INTO siparisler (sube_id, masa, sepet, durum, tutar, created_at) 
-                   VALUES ($1, $2, $3, $4, $5, $6)""",
-                sube_id, masa, json.dumps(sepet), durum, toplam, now - timedelta(minutes=random.randint(5, 30))
+                """INSERT INTO siparisler (sube_id, masa, adisyon_id, sepet, durum, tutar, created_at) 
+                   VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                sube_id, masa, adisyon_id, json.dumps(sepet), durum, toplam, siparis_zamani
             )
             siparis_count += 1
         
