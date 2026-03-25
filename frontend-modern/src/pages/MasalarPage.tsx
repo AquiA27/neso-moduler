@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { masalarApi } from '../lib/api';
-import { Plus, Edit, Trash2, QrCode, LayoutGrid, List, GripHorizontal, Check } from 'lucide-react';
+import { Plus, Edit, Trash2, LayoutGrid, List, GripHorizontal, Check } from 'lucide-react';
 
 interface MasaItem {
   id: number;
@@ -52,8 +52,8 @@ export default function MasalarPage() {
       const promises = masaItems.map((masa) =>
         masalarApi.update({
           id: masa.id,
-          pozisyon_x: masa.pozisyon_x,
-          pozisyon_y: masa.pozisyon_y,
+          pozisyon_x: masa.pozisyon_x === null ? undefined : masa.pozisyon_x,
+          pozisyon_y: masa.pozisyon_y === null ? undefined : masa.pozisyon_y,
           durum: masa.durum,
         })
       );
