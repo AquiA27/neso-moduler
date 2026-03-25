@@ -25,15 +25,14 @@ class PublicCreateIn(BaseModel):
 def _extract_candidates(text: str) -> list:
     import re
     t = text.casefold()
-    t = re.sub(r"[,.;
-]", " ", t)
+    t = re.sub(r"[,.;\n]", " ", t)
     NUMBER_WORDS = {
         "bir": 1, "iki": 2, "üç": 3, "uc": 3, "dört": 4, "dort": 4,
         "beş": 5, "bes": 5, "altı": 6, "alti": 6, "yedi": 7, "sekiz": 8,
         "dokuz": 9, "on": 10
     }
     for word, number in NUMBER_WORDS.items():
-        t = re.sub(r"" + word + r"", str(number), t)
+        t = re.sub(r"\b" + word + r"\b", str(number), t)
     tokens = t.split()
     skip_words = {
         "tane", "adet", "ve", "de", "da", "ile", 
