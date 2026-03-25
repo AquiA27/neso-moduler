@@ -119,8 +119,15 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             detail="Account is deactivated"
         )
 
-    # Verify password
-    if not verify_password(form_data.password, user_dict.get("sifre_hash", "")):
+    # Verify password - guard against NULL sifre_hash (password-less accounts)
+    pw_hash = user_dict.get("sifre_hash")
+    if not pw_hash:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not verify_password(form_data.password, pw_hash):
         if cache_service.is_enabled():
             attempts = await cache_service.get(attempts_key) or 0
             attempts += 1

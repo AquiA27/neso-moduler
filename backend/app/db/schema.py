@@ -652,13 +652,15 @@ async def create_tables(db: Database):
         mfa_exists = await db.fetch_one("""
             SELECT column_name 
             FROM information_schema.columns 
-            WHERE table_name = 'users' AND column_name = 'mfa_enabled'
+            WHERE table_schema = 'public' AND table_name = 'users' AND column_name = 'mfa_enabled'
         """)
         
         if not mfa_exists:
-            await db.execute("ALTER TABLE users ADD COLUMN mfa_secret TEXT;")
-            await db.execute("ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE;")
+            # ADD IF NOT EXISTS ile güvenceye al
+            await db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_secret TEXT;")
+            await db.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS mfa_enabled BOOLEAN DEFAULT FALSE;")
             logging.info("Migration [SUCCESS]: Added mfa_secret and mfa_enabled to users table.")
+
     except Exception as e:
         logging.error(f"Migration error for MFA columns: {e}", exc_info=True)
         
