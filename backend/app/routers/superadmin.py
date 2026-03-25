@@ -1130,7 +1130,10 @@ async def quick_setup(
             )
         
         # 7. API Key oluştur (işletme için otomatik API key)
+        from ..core.security import encrypt_string
         api_key = _generate_api_key()
+        encrypted_key = encrypt_string(api_key)
+        
         api_key_row = await db.fetch_one(
             """
             INSERT INTO api_keys (isletme_id, api_key, key_name, aktif, rate_limit_per_minute)
@@ -1139,7 +1142,7 @@ async def quick_setup(
             """,
             {
                 "iid": isletme_id,
-                "api_key": api_key,
+                "api_key": encrypted_key,
                 "key_name": f"{payload.isletme_ad} - API Key",
                 "rate_limit": 60,  # Varsayılan rate limit
             }
@@ -1151,7 +1154,7 @@ async def quick_setup(
         "sube_id": sube_id,
         "subscription_id": subscription["id"],
         "admin_username": payload.admin_username,
-        "api_key": api_key_row["api_key"],  # İlk kurulumda API key'i döndür
+        "api_key": api_key,  # İlk kurulumda API key'i (düz metin olarak) bir kerelik döndür
         "message": "İşletme başarıyla kuruldu",
     }
 
@@ -1312,6 +1315,7 @@ async def create_api_key(
     if payload.isletme_id != tenant_id:
         raise HTTPException(status_code=400, detail="İşletme ID eşleşmiyor")
     
+    from ..core.security import encrypt_string, decrypt_string
     # Mevcut API key var mı kontrol et
     existing = await db.fetch_one(
         "SELECT * FROM api_keys WHERE isletme_id = :iid",
@@ -1319,11 +1323,12 @@ async def create_api_key(
     )
     
     if existing:
+        decrypted_key = decrypt_string(existing["api_key"]) or existing["api_key"]
         # Mevcut API key'i döndür (maskelenmiş)
         return {
             "id": existing["id"],
             "isletme_id": existing["isletme_id"],
-            "api_key": _mask_api_key(existing["api_key"]),
+            "api_key": _mask_api_key(decrypted_key),
             "key_name": existing.get("key_name"),
             "aktif": existing["aktif"],
             "rate_limit_per_minute": existing.get("rate_limit_per_minute", 60),
@@ -1334,6 +1339,7 @@ async def create_api_key(
     
     # Yeni API key oluştur
     api_key = _generate_api_key()
+    encrypted_key = encrypt_string(api_key)
     
     try:
         row = await db.fetch_one(
@@ -1344,7 +1350,7 @@ async def create_api_key(
             """,
             {
                 "iid": tenant_id,
-                "api_key": api_key,
+                "api_key": encrypted_key,
                 "key_name": payload.key_name,
                 "rate_limit": payload.rate_limit_per_minute,
             }
@@ -1352,11 +1358,11 @@ async def create_api_key(
         
         logging.info(f"[API_KEY] Created API key for tenant_id={tenant_id}")
         
-        # İlk oluşturmada gerçek key'i döndür
+        # İlk oluşturmada gerçek key'i döndür (plain text)
         return {
             "id": row["id"],
             "isletme_id": row["isletme_id"],
-            "api_key": row["api_key"],  # Gerçek key (ilk seferde)
+            "api_key": api_key,  # Gerçek key (ilk seferde)
             "key_name": row.get("key_name"),
             "aktif": row["aktif"],
             "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
@@ -1384,6 +1390,9 @@ async def get_api_key(
     if not row:
         raise HTTPException(status_code=404, detail="API key bulunamadı")
     
+    from ..core.security import decrypt_string
+    decrypted_key = decrypt_string(row["api_key"]) or row["api_key"]
+    
     # Record objesi için doğrudan erişim
     key_name = row["key_name"] if "key_name" in row and row["key_name"] is not None else None
     rate_limit = row["rate_limit_per_minute"] if "rate_limit_per_minute" in row and row["rate_limit_per_minute"] is not None else 60
@@ -1392,7 +1401,7 @@ async def get_api_key(
     return {
         "id": row["id"],
         "isletme_id": row["isletme_id"],
-        "api_key": _mask_api_key(row["api_key"]),
+        "api_key": _mask_api_key(decrypted_key),
         "key_name": key_name,
         "aktif": row["aktif"],
         "rate_limit_per_minute": rate_limit,
@@ -1446,10 +1455,13 @@ async def update_api_key(
     
     row = await db.fetch_one(update_sql, params)
     
+    from ..core.security import decrypt_string
+    decrypted_key = decrypt_string(row["api_key"]) or row["api_key"]
+    
     return {
         "id": row["id"],
         "isletme_id": row["isletme_id"],
-        "api_key": _mask_api_key(row["api_key"]),
+        "api_key": _mask_api_key(decrypted_key),
         "key_name": row.get("key_name"),
         "aktif": row["aktif"],
         "rate_limit_per_minute": row.get("rate_limit_per_minute", 60),
@@ -1474,7 +1486,9 @@ async def regenerate_api_key(
         raise HTTPException(status_code=404, detail="API key bulunamadı")
     
     # Yeni API key oluştur
+    from ..core.security import encrypt_string
     new_api_key = _generate_api_key()
+    encrypted_new_key = encrypt_string(new_api_key)
     
     row = await db.fetch_one(
         """
@@ -1483,7 +1497,7 @@ async def regenerate_api_key(
         WHERE isletme_id = :iid
         RETURNING id, isletme_id, api_key, key_name, aktif, rate_limit_per_minute, created_at, last_used_at
         """,
-        {"iid": tenant_id, "new_key": new_api_key}
+        {"iid": tenant_id, "new_key": encrypted_new_key}
     )
     
     if not row:
@@ -1496,11 +1510,11 @@ async def regenerate_api_key(
     last_used_at = row_dict.get("last_used_at") if isinstance(row_dict, dict) else (row_dict["last_used_at"] if "last_used_at" in row_dict else None)
     created_at = row_dict["created_at"]
     
-    # Yeniden oluşturmada gerçek key'i döndür
+    # Yeniden oluşturmada gerçek key'i (plain text) döndür
     return {
         "id": row_dict["id"],
         "isletme_id": row_dict["isletme_id"],
-        "api_key": row_dict["api_key"],  # Gerçek key (yeniden oluşturmada)
+        "api_key": new_api_key,  # Gerçek key (yeniden oluşturmada)
         "key_name": key_name,
         "aktif": row_dict["aktif"],
         "rate_limit_per_minute": rate_limit if rate_limit is not None else 60,

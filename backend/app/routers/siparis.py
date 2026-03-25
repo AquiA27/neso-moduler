@@ -290,15 +290,31 @@ async def siparis_get(
 async def siparis_durum_guncelle(
     id: int,
     yeni_durum: Literal["yeni", "hazirlaniyor", "hazir", "iptal", "odendi"],
-    _: Mapping[str, Any] = Depends(get_current_user),
+    current_user: Mapping[str, Any] = Depends(get_current_user),
     sube_id: int = Depends(get_sube_id),
 ):
     owner = await db.fetch_one(
-        "SELECT id FROM siparisler WHERE id = :id AND sube_id = :sid",
+        "SELECT id, durum, masa, tutar FROM siparisler WHERE id = :id AND sube_id = :sid",
         {"id": id, "sid": sube_id},
     )
     if not owner:
         raise HTTPException(status_code=404, detail="Sipariş bulunamadı veya bu şubeye ait değil")
+
+    # 3. Gelişmiş Denetim / Audit Logları Entegrasyonu
+    # Sipariş "iptal" durumuna çekilirse, bu kritik bir işlemdir ve kalıcı olarak kayıt altına alınmalıdır.
+    from ..services.audit import audit_service
+    if yeni_durum == "iptal" and owner["durum"] != "iptal":
+        await audit_service.log_action(
+            action="siparis.iptal",
+            user_id=current_user.get("id"),
+            username=current_user.get("username"),
+            sube_id=sube_id,
+            entity_type="siparis",
+            entity_id=id,
+            old_values={"durum": owner["durum"], "masa": owner["masa"], "tutar": float(owner.get("tutar", 0))},
+            new_values={"durum": "iptal"},
+            success=True
+        )
 
     await db.execute(
         "UPDATE siparisler SET durum = :durum WHERE id = :id",

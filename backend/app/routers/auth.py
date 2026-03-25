@@ -12,8 +12,9 @@ from ..core.security import (
     decode_token,
     verify_token_type,
 )
-from ..core.deps import get_current_user, get_current_user_and_role
+from ..core.deps import get_current_user, get_current_user_and_role, oauth2_scheme
 from ..db.database import db
+from ..services.cache import cache_service
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -48,6 +49,13 @@ class UserResponse(BaseModel):
     role: str
     aktif: bool
 
+class MFAVerifyRequest(BaseModel):
+    temp_token: str = Field(..., description="Temporary token received after password verification")
+    code: str = Field(..., description="6-digit MFA code")
+
+class MFAEnableRequest(BaseModel):
+    code: str = Field(..., description="6-digit MFA code to confirm setup")
+
 
 # ========== Authentication Endpoints ==========
 
@@ -56,14 +64,38 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     """
     Login with username and password.
     Returns access token and refresh token.
+    Includes brute-force protection and account lockout.
     """
+    username = form_data.username
+    lockout_key = f"lockout:{username}"
+    attempts_key = f"login_attempts:{username}"
+
+    # 1. Lockout Check
+    if cache_service.is_enabled():
+        is_locked = await cache_service.exists(lockout_key)
+        if is_locked:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Account temporarily locked due to multiple failed login attempts. Please try again in 15 minutes."
+            )
+
     # Fetch user from database (tenant_id dahil)
     user = await db.fetch_one(
-        "SELECT id, username, sifre_hash, role, tenant_id, aktif FROM users WHERE username = :u",
-        {"u": form_data.username}
+        "SELECT id, username, sifre_hash, role, tenant_id, aktif, mfa_enabled FROM users WHERE username = :u",
+        {"u": username}
     )
 
     if not user:
+        # Invalid username - Increment attempt to prevent username enumeration timing attacks easily
+        if cache_service.is_enabled():
+            attempts = await cache_service.get(attempts_key) or 0
+            attempts += 1
+            if attempts >= 5:
+                await cache_service.set(lockout_key, "1", 900)
+                await cache_service.delete(attempts_key)
+            else:
+                await cache_service.set(attempts_key, attempts, 3600)
+
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
@@ -82,10 +114,46 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
 
     # Verify password
     if not verify_password(form_data.password, user_dict.get("sifre_hash", "")):
+        if cache_service.is_enabled():
+            attempts = await cache_service.get(attempts_key) or 0
+            attempts += 1
+            if attempts >= 5:
+                # Lock for 15 minutes (900 seconds)
+                await cache_service.set(lockout_key, "1", 900)
+                await cache_service.delete(attempts_key)
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Account locked for 15 minutes due to too many failed attempts."
+                )
+            else:
+                # Remember attempt for 1 hour
+                await cache_service.set(attempts_key, attempts, 3600)
+                
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid username or password",
             headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    # Successful login - Reset attempts
+    if cache_service.is_enabled():
+        await cache_service.delete(attempts_key)
+
+    # Check if MFA is enabled
+    mfa_enabled = user_dict.get("mfa_enabled", False)
+    # Require MFA if enabled OR if super admin (and force setup if missing)
+    # Actually, we will just honor the DB column here.
+    if mfa_enabled:
+        temp_token_data = {"sub": user_dict.get("username"), "type": "mfa_temp"}
+        temp_token = create_access_token(temp_token_data, expires_minutes=5)
+        # We return a specific 403 response so frontend knows to show MFA input
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "message": "MFA code required",
+                "mfa_required": True,
+                "temp_token": temp_token
+            }
         )
 
     # Create tokens (tenant_id dahil)
@@ -309,3 +377,111 @@ async def me(info: Dict[str, Any] = Depends(get_current_user_and_role)):
 async def pong(current_user: Dict[str, Any] = Depends(get_current_user)):
     """Test endpoint to verify authentication"""
     return {"message": f"secure pong, {current_user['username']}"}
+
+
+@router.post("/logout")
+async def logout(token: str = Depends(oauth2_scheme)):
+    """
+    Logout the user by adding their access token to the Redis deny list.
+    """
+    from ..services.cache import cache_service
+    import time
+    
+    if cache_service.is_enabled():
+        try:
+            payload = decode_token(token)
+            exp = payload.get("exp")
+            if exp:
+                ttl = int(exp - time.time())
+                if ttl > 0:
+                    await cache_service.set(f"denylist:{token}", "1", ttl)
+        except Exception:
+            pass # Token invalid or already expired
+            
+    return {"message": "Successfully logged out"}
+
+
+# ========== MFA Endpoints ==========
+
+@router.post("/token/mfa", response_model=TokenOut)
+async def verify_mfa_login(request: MFAVerifyRequest):
+    """
+    Verify MFA code and return real access/refresh tokens.
+    """
+    import pyotp
+    payload = decode_token(request.temp_token)
+    if payload.get("type") != "mfa_temp":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token type")
+    username = payload.get("sub")
+
+    user = await db.fetch_one(
+        "SELECT username, role, tenant_id, mfa_secret, aktif FROM users WHERE username = :u", 
+        {"u": username}
+    )
+    if not user or not user["aktif"]:
+        raise HTTPException(status_code=401, detail="User not found or inactive")
+        
+    if not user["mfa_secret"]:
+        raise HTTPException(status_code=400, detail="MFA is not configured for this user")
+
+    totp = pyotp.TOTP(user["mfa_secret"])
+    if not totp.verify(request.code):
+        raise HTTPException(status_code=401, detail="Invalid MFA code")
+
+    token_data = {
+        "sub": user["username"],
+        "role": user["role"],
+        "tenant_id": user["tenant_id"],
+    }
+    access_token = create_access_token(token_data)
+    refresh_token = create_refresh_token({"sub": user["username"]})
+
+    return TokenOut(access_token=access_token, refresh_token=refresh_token)
+
+
+@router.post("/mfa/setup")
+async def mfa_setup(current_user: Dict[str, Any] = Depends(get_current_user_and_role)):
+    """
+    Generate a new MFA secret and provisioning URI. 
+    User is required to verify it before it gets enabled.
+    """
+    import pyotp
+    secret = pyotp.random_base32()
+    
+    # Store the secret but do NOT enable MFA yet
+    await db.execute(
+        "UPDATE users SET mfa_secret = :s, mfa_enabled = FALSE WHERE username = :u",
+        {"s": secret, "u": current_user["username"]}
+    )
+    
+    uri = pyotp.totp.TOTP(secret).provisioning_uri(
+        name=current_user["username"], 
+        issuer_name="Neso Moduler"
+    )
+    
+    return {"secret": secret, "uri": uri}
+
+
+@router.post("/mfa/enable")
+async def mfa_enable(request: MFAEnableRequest, current_user: Dict[str, Any] = Depends(get_current_user_and_role)):
+    """
+    Confirm the generated MFA secret with a valid code to enable MFA permanently.
+    """
+    import pyotp
+    user = await db.fetch_one(
+        "SELECT mfa_secret FROM users WHERE username = :u", 
+        {"u": current_user["username"]}
+    )
+    if not user or not user["mfa_secret"]:
+        raise HTTPException(status_code=400, detail="MFA setup has not been initiated")
+        
+    totp = pyotp.TOTP(user["mfa_secret"])
+    if not totp.verify(request.code):
+        raise HTTPException(status_code=401, detail="Invalid MFA code. Cannot enable.")
+        
+    await db.execute(
+        "UPDATE users SET mfa_enabled = TRUE WHERE username = :u", 
+        {"u": current_user["username"]}
+    )
+    return {"message": "MFA clearly verified and enabled successfully"}
+

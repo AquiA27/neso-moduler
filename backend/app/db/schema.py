@@ -488,6 +488,48 @@ CREATE TABLE IF NOT EXISTS user_agreements (
 );
 """
 
+CREATE_RLS_POLICIES = """
+-- 1. Tablolarda RLS etkinleştirme
+ALTER TABLE subeler ENABLE ROW LEVEL SECURITY;
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE menu ENABLE ROW LEVEL SECURITY;
+
+-- 2. Güvenli (Opt-in) RLS Politikaları
+-- 'app.current_tenant' ayarlanmamışsa her şeye izin verir.
+-- Ayarlanmışsa, SADECE o tenant'ın verilerini gösterir.
+
+-- Subeler RLS
+DROP POLICY IF EXISTS subeler_tenant_isolation ON subeler;
+CREATE POLICY subeler_tenant_isolation ON subeler
+    USING (
+        current_setting('app.current_tenant', true) = ''
+        OR current_setting('app.current_tenant', true) IS NULL
+        OR isletme_id = NULLIF(current_setting('app.current_tenant', true), '')::bigint
+    );
+
+-- Users RLS
+DROP POLICY IF EXISTS users_tenant_isolation ON users;
+CREATE POLICY users_tenant_isolation ON users
+    USING (
+        current_setting('app.current_tenant', true) = ''
+        OR current_setting('app.current_tenant', true) IS NULL
+        OR tenant_id IS NULL -- Super Adminleri her zaman göster
+        OR tenant_id = NULLIF(current_setting('app.current_tenant', true), '')::bigint
+    );
+
+-- Menu RLS (sube üzerinden tenant'a ulaşır)
+DROP POLICY IF EXISTS menu_tenant_isolation ON menu;
+CREATE POLICY menu_tenant_isolation ON menu
+    USING (
+        current_setting('app.current_tenant', true) = ''
+        OR current_setting('app.current_tenant', true) IS NULL
+        OR sube_id IN (
+            SELECT id FROM subeler WHERE isletme_id = NULLIF(current_setting('app.current_tenant', true), '')::bigint
+        )
+    );
+"""
+
+
 
 VIEWS_DIR = Path(__file__).resolve().parent / "views"
 AI_VIEW_FILES = [
@@ -604,6 +646,56 @@ async def create_tables(db: Database):
             
     except Exception as e:
         logging.error(f"Migration: tenant_id column error: {e}", exc_info=True)
+        
+    # Migration: users tablosuna MFA kolonlarını ekle (varsa geç)
+    try:
+        mfa_exists = await db.fetch_one("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'mfa_enabled'
+        """)
+        
+        if not mfa_exists:
+            await db.execute("ALTER TABLE users ADD COLUMN mfa_secret TEXT;")
+            await db.execute("ALTER TABLE users ADD COLUMN mfa_enabled BOOLEAN DEFAULT FALSE;")
+            logging.info("Migration [SUCCESS]: Added mfa_secret and mfa_enabled to users table.")
+    except Exception as e:
+        logging.error(f"Migration error for MFA columns: {e}", exc_info=True)
+        
+    # Migration: users tablosuna permissions (Granular RBAC) ekle
+    try:
+        perm_exists = await db.fetch_one("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'users' AND column_name = 'permissions'
+        """)
+        
+        if not perm_exists:
+            await db.execute("ALTER TABLE users ADD COLUMN permissions JSONB DEFAULT '{}'::jsonb;")
+            logging.info("Migration [SUCCESS]: Added permissions to users table.")
+    except Exception as e:
+        logging.error(f"Migration error for permissions column: {e}", exc_info=True)
+
+    # Migration: isletmeler tablosuna allowed_ips (IP Whitelist) ekle
+    try:
+        ip_exists = await db.fetch_one("""
+            SELECT column_name 
+            FROM information_schema.columns 
+            WHERE table_name = 'isletmeler' AND column_name = 'allowed_ips'
+        """)
+        
+        if not ip_exists:
+            await db.execute("ALTER TABLE isletmeler ADD COLUMN allowed_ips JSONB DEFAULT '[]'::jsonb;")
+            logging.info("Migration [SUCCESS]: Added allowed_ips to isletmeler table.")
+    except Exception as e:
+        logging.error(f"Migration error for allowed_ips column: {e}", exc_info=True)
+        
+    # RLS Policies Migration
+    for stmt in [s.strip() for s in CREATE_RLS_POLICIES.split(';') if s.strip()]:
+        try:
+            await db.execute(stmt)
+        except Exception as e:
+            logging.error(f"Migration error applying RLS policy: {e}")
     
     await db.execute(CREATE_MENU)
     for stmt in [s.strip() for s in ALTER_MENU_COMPAT.split(';') if s.strip()]:

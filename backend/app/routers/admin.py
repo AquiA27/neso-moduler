@@ -25,23 +25,39 @@ router = APIRouter(
 async def resolve_sube_id_or_none(
     *,
     tum_subeler: bool,
-    username: str,
+    user: Dict[str, Any],
     x_sube_id: Optional[int],
     sube_id_q: Optional[int],
 ) -> Optional[int]:
     """
     tum_subeler=True ise None döner (şube filtresi yok).
-    Değilse: Header (X-Sube-Id) > query (?sube_id=) > 1
-    + aktif şube kontrolü + kullanıcı şube yetkisi
+    Değilse: Header (X-Sube-Id) > query (?sube_id=) > tenant's default sube
+    + aktif şube kontrolü + kullanıcı şube yetkisi + tenant izolasyonu
     """
     import logging
     if tum_subeler:
         return None
 
     sube_id = x_sube_id if x_sube_id is not None else sube_id_q
-    if sube_id is None:
-        sube_id = 1  # DEMO varsayılanı (prod'da zorunlu yapmayı düşünebiliriz)
+    
+    effective_tenant_id = user.get("switched_tenant_id") or user.get("tenant_id")
+    
+    if effective_tenant_id:
+        if sube_id is not None:
+            check_tid = await db.fetch_val("SELECT id FROM subeler WHERE id = :sid AND isletme_id = :tid", {"sid": sube_id, "tid": effective_tenant_id})
+            if not check_tid:
+                logging.info(f"Sube {sube_id} does not belong to tenant {effective_tenant_id}, falling back to tenant default")
+                sube_id = None
+        
+        if sube_id is None:
+            first_sube = await db.fetch_val("SELECT id FROM subeler WHERE isletme_id = :tid AND aktif = TRUE ORDER BY id ASC LIMIT 1", {"tid": effective_tenant_id})
+            if first_sube:
+                sube_id = first_sube
 
+    if sube_id is None:
+        sube_id = 1  # DEMO varsayılanı
+
+    username = user.get("username", "unknown")
     logging.info(f"resolve_sube_id_or_none: checking sube_id={sube_id} for username={username}")
     
     # Şube aktif mi?
@@ -101,7 +117,7 @@ async def admin_ozet(
         
         sube_id = await resolve_sube_id_or_none(
             tum_subeler=tum_subeler,
-            username=user["username"],
+            user=user,
             x_sube_id=x_sube_id,
             sube_id_q=sube_id_q,
         )
@@ -195,7 +211,7 @@ async def admin_trend(
     """
     sube_id = await resolve_sube_id_or_none(
         tum_subeler=tum_subeler,
-        username=user["username"],
+        user=user,
         x_sube_id=x_sube_id,
         sube_id_q=sube_id_q,
     )
@@ -273,7 +289,7 @@ async def admin_top_urunler(
     """
     sube_id = await resolve_sube_id_or_none(
         tum_subeler=tum_subeler,
-        username=user["username"],
+        user=user,
         x_sube_id=x_sube_id,
         sube_id_q=sube_id_q,
     )
@@ -352,7 +368,7 @@ async def export_siparisler_csv(
 ):
     sube_id = await resolve_sube_id_or_none(
         tum_subeler=tum_subeler,
-        username=user["username"],
+        user=user,
         x_sube_id=x_sube_id,
         sube_id_q=sube_id_q,
     )
@@ -396,7 +412,7 @@ async def export_odemeler_csv(
 ):
     sube_id = await resolve_sube_id_or_none(
         tum_subeler=tum_subeler,
-        username=user["username"],
+        user=user,
         x_sube_id=x_sube_id,
         sube_id_q=sube_id_q,
     )

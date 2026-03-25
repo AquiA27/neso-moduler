@@ -22,6 +22,34 @@ PASSWORD_REQUIRE_SPECIAL = os.getenv("PASSWORD_REQUIRE_SPECIAL", "false").lower(
 BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "12"))
 
 
+BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "12"))
+
+
+# ========== API Key Encryption ==========
+from cryptography.fernet import Fernet
+import base64
+import hashlib
+
+def _get_fernet_key() -> bytes:
+    # Derive a valid url-safe 32-byte key from our SECRET_KEY
+    hasher = hashlib.sha256()
+    hasher.update(SECRET_KEY.encode('utf-8'))
+    return base64.urlsafe_b64encode(hasher.digest())
+
+_fernet = Fernet(_get_fernet_key())
+
+def encrypt_string(plain_text: str) -> str:
+    """Encrypt a string at rest securely using Fernet symmetric encryption"""
+    return _fernet.encrypt(plain_text.encode('utf-8')).decode('utf-8')
+
+def decrypt_string(encrypted_text: str) -> str:
+    """Decrypt a Fernet encrypted string"""
+    try:
+        return _fernet.decrypt(encrypted_text.encode('utf-8')).decode('utf-8')
+    except Exception:
+        return ""
+
+
 class PasswordValidationError(Exception):
     """Raised when password doesn't meet policy requirements"""
     pass

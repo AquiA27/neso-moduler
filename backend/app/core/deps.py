@@ -40,6 +40,15 @@ async def get_current_user(
     Super admin için X-Tenant-Id header'ını veya tenant_id query parameter'ını kontrol eder (tenant switching).
     Dönüş: {"id": ..., "username": ..., "role": ..., "aktif": ..., "tenant_id": ..., "switched_tenant_id": ...}
     """
+    from ..services.cache import cache_service
+    if cache_service.is_enabled():
+        is_denied = await cache_service.exists(f"denylist:{token}")
+        if is_denied:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token has been revoked. Please log in again.",
+            )
+
     payload = decode_token(token)
     sub = payload.get("sub")
     if not sub:
@@ -150,6 +159,37 @@ async def get_current_user(
                 switched_tenant_id = None
         else:
             logging.info(f"[get_current_user] No tenant_id provided for super admin")
+            
+    # IP Whitelist (Kurumsal IP Koruması) Kontrolü
+    effective_tid = switched_tenant_id if user_dict.get("role") == "super_admin" and switched_tenant_id else tenant_id
+    if effective_tid:
+        try:
+            tenant_data = await db.fetch_one("SELECT allowed_ips FROM isletmeler WHERE id = :tid", {"tid": effective_tid})
+            if tenant_data and tenant_data.get("allowed_ips"):
+                allowed_ips_raw = tenant_data["allowed_ips"]
+                import json
+                try:
+                    allowed_ips = json.loads(allowed_ips_raw) if isinstance(allowed_ips_raw, str) else allowed_ips_raw
+                    # Eğer liste boş değilse (yani kısıtlama varsa)
+                    if isinstance(allowed_ips, list) and len(allowed_ips) > 0:
+                        client_ip = request.client.host if request and request.client else None
+                        if client_ip not in allowed_ips:
+                            logging.warning(f"BLOCKED IP {client_ip} for tenant {effective_tid}. User: {sub}")
+                            raise HTTPException(
+                                status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Sisteme sadece kurumsal izinli ağlar üzerinden erişilebilir (IP Whitelist restriction)."
+                            )
+                except Exception as e:
+                    if isinstance(e, HTTPException):
+                        raise e
+        except Exception as e:
+            if isinstance(e, HTTPException):
+                raise e
+            logging.warning(f"Error checking allowed_ips: {e}")
+
+    # SADECE BURADA TENANT ISOLATION AKTİVE EDİLİR: Tüm alt katmanlı işlemlere RLS tetikler
+    from ..db.database import current_tenant_id
+    current_tenant_id.set(effective_tid)
     
     return user_dict
 
@@ -171,6 +211,7 @@ async def get_current_user_and_role(
         "id": user["id"],
         "tenant_id": user.get("tenant_id"),
         "switched_tenant_id": user.get("switched_tenant_id"),
+        "permissions": user.get("permissions", {}), # Add permissions here
     }
     return result
 
@@ -206,7 +247,7 @@ async def check_user_permission(username: str, permission_key: str) -> bool:
     
     # Kullanıcının rolünü kontrol et
     user_row = await db.fetch_one(
-        "SELECT role FROM users WHERE username = :u",
+        "SELECT role, permissions FROM users WHERE username = :u",
         {"u": username},
     )
     if not user_row:
@@ -217,7 +258,21 @@ async def check_user_permission(username: str, permission_key: str) -> bool:
     if role == "super_admin":
         return True
     
-    # Kullanıcının özel izinlerini kontrol et
+    # JSONB'den gelen permissions'ı kontrol et
+    user_permissions = user_row.get("permissions")
+    if isinstance(user_permissions, str):
+        import json
+        try:
+            user_permissions = json.loads(user_permissions)
+        except:
+            user_permissions = {}
+    elif not user_permissions:
+        user_permissions = {}
+
+    if user_permissions.get(permission_key) is True:
+        return True
+
+    # Kullanıcının özel izinlerini kontrol et (eski yöntem, JSONB'ye geçince kaldırılabilir)
     perm_row = await db.fetch_one(
         """
         SELECT enabled FROM user_permissions
@@ -239,29 +294,33 @@ async def check_user_permission(username: str, permission_key: str) -> bool:
         return False
 
 
-def require_permission(permission_key: str):
+def require_permission(required_permission: str):
     """
-    Kullanım: dependencies=[Depends(require_permission('menu_ekle'))]
-    Belirli bir izin gerektiren endpoint'ler için kullanılır.
+    Granular RBAC için permission-based endpoint koruyucusu.
+    Kullanım: async def delete_order(user = Depends(require_permission("delete_order"))):
     """
-    async def _dep(current_user: Mapping[str, Any] = Depends(get_current_user)) -> Mapping[str, Any]:
-        import logging
-        username = current_user.get("username")
-        if not username:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Unauthorized",
-            )
+    async def permission_checker(current_user: Dict[str, Any] = Depends(get_current_user_and_role)):
+        role = current_user.get("role")
         
-        has_permission = await check_user_permission(username, permission_key)
-        if not has_permission:
-            logging.warning(f"Permission denied: user={username}, permission={permission_key}")
+        # Üst düzey yöneticiler her şeye yetkilidir
+        if role in ["super_admin", "isletme_sahibi", "admin"]:
+            return current_user
+            
+        permissions = current_user.get("permissions", {})
+        if not permissions or permissions.get(required_permission) is not True:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Forbidden: {permission_key} permission required",
+                detail=f"Erişim reddedildi: '{required_permission}' yetkisine sahip değilsiniz."
             )
         return current_user
-    return _dep
+    return permission_checker
+
+
+def get_current_isletme_sahibi(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """Sadece isletme_sahibi rolüne erişim verir."""
+    if current_user["role"] != "isletme_sahibi":
+        raise HTTPException(status_code=403, detail="Not enough privileges. Isletme sahibi required.")
+    return current_user
 
 
 # ---------------------------
