@@ -22,33 +22,52 @@ class PublicCreateIn(BaseModel):
     sube_id: Optional[int] = 1
 
 
-def _extract_candidates(text: str) -> List[List[Any]]:
+def _extract_candidates(text: str) -> list:
     import re
     t = text.casefold()
-    t = re.sub(r"[,.;\n]", " ", t)
+    t = re.sub(r"[,.;
+]", " ", t)
+    NUMBER_WORDS = {
+        "bir": 1, "iki": 2, "üç": 3, "uc": 3, "dört": 4, "dort": 4,
+        "beş": 5, "bes": 5, "altı": 6, "alti": 6, "yedi": 7, "sekiz": 8,
+        "dokuz": 9, "on": 10
+    }
+    for word, number in NUMBER_WORDS.items():
+        t = re.sub(r"" + word + r"", str(number), t)
     tokens = t.split()
-    skip_words = {"tane", "adet", "ve"}
-    num_words = {"bir":1, "iki":2, "uc":3, "dort":4, "bes":5, "alti":6, "yedi":7, "sekiz":8, "dokuz":9, "on":10}
+    skip_words = {
+        "tane", "adet", "ve", "de", "da", "ile", 
+        "merhaba", "selam", "selamlar", "hey", "hello", "hi", 
+        "hosgeldin", "hos", "geldin", "günaydın", "gunaydin",
+        "iyi", "günler", "gunler", "akşamlar", "aksamlar",
+        "teşekkürler", "tesekkurler", "sağol", "sagol", "teşekkür", "tesekkur", 
+        "lutfen", "please"
+    }
+    filtered = [tok for tok in tokens if tok not in skip_words]
     pairs = []
-    for i, tok in enumerate(tokens):
-        if tok in skip_words:
-            continue
-        adet = None
+    i = 0
+    while i < len(filtered):
+        tok = filtered[i]
         if tok.isdigit():
-            adet = int(tok)
-        elif tok in num_words:
-            adet = num_words[tok]
-        if adet is not None:
-            if i + 1 < len(tokens):
-                pairs.append([tokens[i + 1], adet])
-            continue
-        if i + 1 < len(tokens) and tokens[i + 1].isdigit():
-            pairs.append([tok, int(tokens[i + 1])])
-    if not pairs and tokens:
-        for tok in tokens:
-            if tok.isdigit():
-                continue
-            pairs.append([tok, 1])
+            count = int(tok)
+            i += 1
+            words = []
+            while i < len(filtered) and not filtered[i].isdigit():
+                words.append(filtered[i])
+                i += 1
+            if words:
+                pairs.append([" ".join(words), count])
+        else:
+            words = []
+            while i < len(filtered) and not filtered[i].isdigit():
+                words.append(filtered[i])
+                i += 1
+            count = 1
+            if i < len(filtered):
+                count = int(filtered[i])
+                i += 1
+            if words:
+                pairs.append([" ".join(words), count])
     return pairs
 
 
@@ -152,6 +171,28 @@ async def public_create_order(
             """,
             {"sid": sube_id, "masa": payload.masa, "adisyon_id": adisyon_id, "sepet": json.dumps(sepet, ensure_ascii=False), "tutar": tutar},
         )
+        try:
+            from ..websocket.manager import manager
+            import asyncio
+            asyncio.create_task(manager.broadcast({
+                "type": "new_order",
+                "message": f"Yeni sipariş",
+                "masa": payload.masa
+            }, topic="orders"))
+            asyncio.create_task(manager.broadcast({
+                "type": "masa_status_change",
+                "masa_adi": payload.masa,
+                "durum": "dolu"
+            }, topic="orders"))
+            # Update table to full if it's currently empty or reserved
+            await db.execute(
+                "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+                {"masa": payload.masa, "sid": sube_id}
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"WebSocket event error: {e}")
+
         
         siparis_id = row["id"]
         

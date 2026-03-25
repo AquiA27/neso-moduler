@@ -80,10 +80,17 @@ async def login(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
             )
 
     # Fetch user from database (tenant_id dahil)
-    user = await db.fetch_one(
-        "SELECT id, username, sifre_hash, role, tenant_id, aktif, mfa_enabled FROM users WHERE username = :u",
-        {"u": username}
-    )
+    # mfa_enabled might not exist yet on older deployments, fallback gracefully
+    try:
+        user = await db.fetch_one(
+            "SELECT id, username, sifre_hash, role, tenant_id, aktif, mfa_enabled FROM users WHERE username = :u",
+            {"u": username}
+        )
+    except Exception:
+        user = await db.fetch_one(
+            "SELECT id, username, sifre_hash, role, tenant_id, aktif FROM users WHERE username = :u",
+            {"u": username}
+        )
 
     if not user:
         # Invalid username - Increment attempt to prevent username enumeration timing attacks easily

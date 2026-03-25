@@ -81,200 +81,52 @@ class ParseOut(BaseModel):
     not_matched: List[str] = []
 
 
-def _extract_candidates(text: str) -> List[Tuple[str, int]]:
-    # Basit kural tabanlı çıkarım: "2 latte", "latte 2 tane", "bir americano"
+def _extract_candidates(text: str) -> list:
+    import re
     t = text.casefold()
-    t = re.sub(r"[,.;\n]", " ", t)
+    t = re.sub(r"[,.;
+]", " ", t)
+    NUMBER_WORDS = {
+        "bir": 1, "iki": 2, "üç": 3, "uc": 3, "dört": 4, "dort": 4,
+        "beş": 5, "bes": 5, "altı": 6, "alti": 6, "yedi": 7, "sekiz": 8,
+        "dokuz": 9, "on": 10
+    }
+    for word, number in NUMBER_WORDS.items():
+        t = re.sub(r"" + word + r"", str(number), t)
     tokens = t.split()
-    # Selamlama kelimeleri ve yardımcı kelimeleri atla
     skip_words = {
-        "tane", "adet", "ve",
+        "tane", "adet", "ve", "de", "da", "ile", 
         "merhaba", "selam", "selamlar", "hey", "hello", "hi", 
-        "hosgeldin", "hos geldin", "günaydın", "gunaydin",
-        "iyi günler", "iyi gunler", "iyi akşamlar", "iyi aksamlar",
-        "teşekkürler", "tesekkurler", "sağol", "sagol", "teşekkür", "tesekkur"
+        "hosgeldin", "hos", "geldin", "günaydın", "gunaydin",
+        "iyi", "günler", "gunler", "akşamlar", "aksamlar",
+        "teşekkürler", "tesekkurler", "sağol", "sagol", "teşekkür", "tesekkur", 
+        "lutfen", "please"
     }
-    variation_keywords = {
-        "orta", "sade", "sekerli", "şekerli", "sekersiz", "şekersiz",
-        "az", "bol", "double", "duble", "single", "shotlu", "shotsuz",
-    "küçük", "kucuk", "buyuk", "büyük", "beyaz", "sicak", "soğuk", "soguk",
-    "ketcapli", "ketçaplı", "ketcapsiz", "ketçapsız", "mayonezli", "mayonezsiz",
-    "acisiz", "acılı", "acili", "acili", "zeytinsiz", "zeytinli"
-    }
-
-    pairs: List[Tuple[str, int]] = []
+    filtered = [tok for tok in tokens if tok not in skip_words]
+    pairs = []
     i = 0
-    while i < len(tokens):
-        tok = tokens[i]
-        if tok in skip_words:
-            i += 1
-            continue
-        adet: Optional[int] = None
-        # sayısal
+    while i < len(filtered):
+        tok = filtered[i]
         if tok.isdigit():
-            adet = int(tok)
-        elif tok in NUMBER_WORDS:
-            adet = NUMBER_WORDS[tok]
-
-        if adet is not None:
-            # Sayıdan önce gelen kelimeyi kontrol et (eğer varsa)
-            # Eğer sayıdan önce gelen kelime skip_words'de ise, onu atla
-            if i > 0 and tokens[i - 1] in skip_words:
-                # Önceki kelime skip_words'de, bu normal (zaten atlandı)
-                pass
-            # Sonraki kelimeleri birleştir (bir sonraki sayıya veya skip_word'e kadar)
-            # ÖNEMLİ: Varyasyon isimleri genelde kısa (1-4 karakter: orta, sade, şekerli) ve ürün adlarından sonra gelir
-            # Bu yüzden maksimum 3 kelime birleştir (çoğu ürün adı 1-3 kelime)
-            product_words = []
-            j = i + 1
-            max_product_words = 3  # Maksimum ürün adı uzunluğu
-            
-            # İlk kelimeyi kontrol et: Eğer çok kısa ise (<=4 karakter) ve sonraki kelime uzunsa, muhtemelen varyasyon
-            # Örnek: "1 orta türk kahvesi" -> "orta" varyasyon (4 karakter, kısa), "türk" ürün adı (uzun)
-            # Ama "1 çay" -> "çay" ürün adı (3 karakter, kısa ama geçerli, sonraki kelime yok)
-            if j < len(tokens):
-                first_tok = tokens[j]
-                # Bir sonraki sayı veya skip_word ise dur
-                if first_tok in skip_words or first_tok.isdigit() or first_tok in NUMBER_WORDS:
-                    # Sonraki kelime yok veya sayı/skip_word, bu durumda ürün adı eksik
-                    i += 1
-                    continue
-                # Eğer ilk kelime çok kısa ise (<=4 karakter), sonraki kelimeleri kontrol et
-                # "1 orta türk kahvesi" gibi: "orta" varyasyon (kısa), "türk kahvesi" ürün adı (uzun birleşik)
-                if len(first_tok) <= 4 and first_tok in variation_keywords and j + 1 < len(tokens):
-                    # Sonraki kelimeleri birleştirerek uzunluk kontrolü yap
-                    potential_product_words = []
-                    k = j + 1
-                    while k < len(tokens) and len(potential_product_words) < max_product_words:
-                        next_tok = tokens[k]
-                        if next_tok in skip_words or next_tok.isdigit() or next_tok in NUMBER_WORDS:
-                            break
-                        potential_product_words.append(next_tok)
-                        k += 1
-                    # Birleştirilmiş kelimelerin toplam uzunluğu 6'dan fazlaysa muhtemelen ürün adı
-                    if potential_product_words:
-                        combined_length = sum(len(w) for w in potential_product_words) + len(potential_product_words) - 1  # + boşluklar
-                        if combined_length >= 6:
-                            # İlk kelime ("orta") muhtemelen varyasyon, sonraki kelimeler ürün adı
-                            # "türk kahvesi"ni parse et (adet'i koruyarak)
-                            product_name = " ".join(potential_product_words)
-                            pairs.append((product_name, adet))
-                            i = k  # "türk kahvesi"nin sonuna atla
-                            continue
-            
-            inline_variations: List[str] = []
-            # ÖNEMLİ: İlk kelimeyi al ve sonraki kelimeleri de kontrol et
-            # Eğer ilk kelime tek başına bir ürün değilse, sonraki kelimeleri de dahil et
-            first_word = tokens[j] if j < len(tokens) else None
-            if first_word:
-                product_words.append(first_word)
-                j += 1
-            
-            # Sonraki kelimeleri birleştir (maksimum 3 kelime toplam)
-            while j < len(tokens) and len(product_words) < max_product_words:
-                next_tok = tokens[j]
-                # Bir sonraki sayı veya skip_word bulunursa dur
-                if next_tok in skip_words or next_tok.isdigit() or next_tok in NUMBER_WORDS:
-                    break
-                if next_tok in variation_keywords:
-                    inline_variations.append(next_tok)
-                    j += 1
-                    continue
-                # Eğer çok kısa bir kelime ise (1-4 karakter, muhtemelen varyasyon ismi) ve zaten 2+ kelime birleştirdiysek, dur
-                # Örnek: "türk kahvesi orta" -> "türk kahvesi" (orta dahil etme)
-                # ANCAK: "menengiç kahvesi" gibi durumlarda "kahvesi" de dahil edilmeli
-                if len(product_words) >= 1 and len(next_tok) <= 7:
-                    # Ürün adı ekleri listesi (Türkçe'de yaygın ekler)
-                    product_suffixes = [
-                        "kahvesi", "kahve", "cayı", "çayı", "çay", "suyu", "suyu", 
-                        "sütü", "sutu", "süt", "suyu", "suyu", "limonatası", "limonata",
-                        "çorbası", "corbası", "çorba", "corbası", "tatlısı", "tatlısı",
-                        "tatlı", "tatlısı", "böreği", "boregi", "börek", "borek"
-                    ]
-                    # Eğer sonraki kelime bir ürün adı eki ise, dahil et
-                    if next_tok.lower() in product_suffixes:
-                        # Bu bir ürün adı eki, dahil et
-                        product_words.append(next_tok)
-                        j += 1
-                        continue
-                    # Eğer zaten 2+ kelime birleştirdiysek ve sonraki kelime kısa ise, muhtemelen varyasyon
-                    if len(product_words) >= 2 and len(next_tok) <= 4:
-                        # Muhtemelen bir varyasyon ismi, dur
-                        break
-                product_words.append(next_tok)
-                j += 1
-            if product_words:
-                # Tüm kelimeleri birleştir: "menengiç kahvesi" -> "menengiç kahvesi"
-                product_name = " ".join(product_words)
-                pairs.append((product_name, adet))
-                if inline_variations:
-                    for var_token in inline_variations:
-                        pairs.append((var_token, adet))
-                i = j  # İşlenen kelimelerin sonuna atla
-                continue
-            else:
-                i += 1
-                continue
-
-        # "urun 2" formu - ama önce selamlama kelimesi olup olmadığını kontrol et
-        if i + 1 < len(tokens) and tokens[i + 1].isdigit():
-            # Eğer bu kelime skip_words'de ise, parse etme (zaten yukarıda atlandı)
-            # Buraya gelmemeli ama yine de kontrol edelim
-            if tok not in skip_words:
-                pairs.append((tok, int(tokens[i + 1])))
-            i += 2
-        else:
-            # Sayı olmayan kelime - zaten skip_words kontrolü yukarıda yapıldı
+            count = int(tok)
             i += 1
-
-    # Parse edilmemiş kelimeleri kontrol et (varyasyon isimleri vb. için)
-    # ÖNEMLİ: Sadece pairs boşsa değil, parse edilmemiş kelimeler varsa da kontrol et
-    greeting_skip = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "hosgeldin", "hos", "geldin", "günaydın", "iyi", "akşamlar", "günler", "lutfen", "please", "tesekkurler", "tesekkur", "thanks"}
-    skip_words_all = skip_words | greeting_skip
-    
-    # Parse edilmiş ürün adlarının tüm kelimelerini topla (alt string kontrolü için)
-    parsed_product_words = set()
-    for name, _ in pairs:
-        # Ürün adındaki tüm kelimeleri normalize edip ekle
-        # Örnek: "türk kahvesi" -> {"turk", "kahvesi", "turk kahvesi"}
-        words = name.split()
-        for word in words:
-            parsed_product_words.add(normalize_name(word))
-        # Tam adı da ekle
-        parsed_product_words.add(normalize_name(name))
-    
-    # Parse edilmemiş token'ları bul (sayı olmayan, skip_words'de olmayan)
-    for i, tok in enumerate(tokens):
-        if tok.isdigit() or tok in skip_words_all or tok in NUMBER_WORDS:
-            continue
-        # Bu token bir pair'de kullanılmış mı kontrol et
-        tok_norm = normalize_name(tok)
-        # Kontrol 1: Token'ın normalize edilmiş hali bir pair isminde geçiyor mu?
-        # Kontrol 2: Token'ın normalize edilmiş hali parse edilmiş ürün adlarının kelimelerinde var mı?
-        tok_in_pairs = False
-        for name, _ in pairs:
-            name_norm = normalize_name(name)
-            # Tam eşleşme veya alt string kontrolü
-            if tok_norm == name_norm or tok_norm in name_norm or name_norm in tok_norm:
-                tok_in_pairs = True
-                break
-        # Eğer token parse edilmiş ürün adlarının kelimelerinden biri ise, ekleme
-        if tok_norm in parsed_product_words:
-            tok_in_pairs = True
-        
-        if not tok_in_pairs:
-            # Parse edilmemiş bir kelime, varyasyon ismi olabilir
-            pairs.append((tok, 1))
-            logging.info(f"[EXTRACT] Added unparsed token as potential variation: '{tok}'")
-    
-    # Eğer hiç pair yoksa (sadece greeting vb. varsa), tüm parse edilmemiş kelimeleri ekle
-    if not pairs and tokens:
-        for tok in tokens:
-            if tok.isdigit():
-                continue
-            if tok not in skip_words_all:
-                pairs.append((tok, 1))
-
+            words = []
+            while i < len(filtered) and not filtered[i].isdigit():
+                words.append(filtered[i])
+                i += 1
+            if words:
+                pairs.append([" ".join(words), count])
+        else:
+            words = []
+            while i < len(filtered) and not filtered[i].isdigit():
+                words.append(filtered[i])
+                i += 1
+            count = 1
+            if i < len(filtered):
+                count = int(filtered[i])
+                i += 1
+            if words:
+                pairs.append([" ".join(words), count])
     return pairs
 
 
@@ -501,6 +353,28 @@ async def create_order_from_text(
             """,
             {"sid": sube_id, "masa": payload.masa, "adisyon_id": adisyon_id, "sepet": json.dumps(sepet, ensure_ascii=False), "tutar": tutar},
         )
+        try:
+            from ..websocket.manager import manager
+            import asyncio
+            asyncio.create_task(manager.broadcast({
+                "type": "new_order",
+                "message": f"Yeni sipariş",
+                "masa": payload.masa
+            }, topic="orders"))
+            asyncio.create_task(manager.broadcast({
+                "type": "masa_status_change",
+                "masa_adi": payload.masa,
+                "durum": "dolu"
+            }, topic="orders"))
+            # Update table to full if it's currently empty or reserved
+            await db.execute(
+                "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+                {"masa": payload.masa, "sid": sube_id}
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"WebSocket event error: {e}")
+
         
         # Adisyon toplamlarını güncelle
         try:
@@ -626,6 +500,27 @@ async def public_create_order(payload: PublicCreateIn):
         """,
         {"sid": sube_id, "masa": payload.masa, "sepet": json_dumps(sepet), "tutar": tutar},
     )
+    try:
+        from ..websocket.manager import manager
+        import asyncio
+        asyncio.create_task(manager.broadcast({
+            "type": "new_order",
+            "message": f"Yeni sipariş",
+            "masa": payload.masa
+        }, topic="orders"))
+        asyncio.create_task(manager.broadcast({
+            "type": "masa_status_change",
+            "masa_adi": payload.masa,
+            "durum": "dolu"
+        }, topic="orders"))
+        await db.execute(
+            "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+            {"masa": payload.masa, "sid": sube_id}
+        )
+    except Exception as e:
+        import logging
+        logging.error(f"WebSocket event error: {e}")
+
     return {
         "id": row["id"],
         "masa": row["masa"],
@@ -2786,6 +2681,28 @@ async def chat_smart(payload: ChatRequest):
                         """,
                         {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
                     )
+        try:
+            from ..websocket.manager import manager
+            import asyncio
+            asyncio.create_task(manager.broadcast({
+                "type": "new_order",
+                "message": f"Yeni sipariş",
+                "masa": payload.masa
+            }, topic="orders"))
+            asyncio.create_task(manager.broadcast({
+                "type": "masa_status_change",
+                "masa_adi": payload.masa,
+                "durum": "dolu"
+            }, topic="orders"))
+            # Update table to full if it's currently empty or reserved
+            await db.execute(
+                "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+                {"masa": payload.masa, "sid": sube_id}
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"WebSocket event error: {e}")
+
                     logging.info(f"[ORDER] Created partial order #{row['id']} with items without variation: {json_dumps(sepet)}")
                     
                     # Adisyon toplamlarını güncelle
@@ -2931,6 +2848,28 @@ async def chat_smart(payload: ChatRequest):
                     """,
                     {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
                 )
+        try:
+            from ..websocket.manager import manager
+            import asyncio
+            asyncio.create_task(manager.broadcast({
+                "type": "new_order",
+                "message": f"Yeni sipariş",
+                "masa": payload.masa
+            }, topic="orders"))
+            asyncio.create_task(manager.broadcast({
+                "type": "masa_status_change",
+                "masa_adi": payload.masa,
+                "durum": "dolu"
+            }, topic="orders"))
+            # Update table to full if it's currently empty or reserved
+            await db.execute(
+                "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+                {"masa": payload.masa, "sid": sube_id}
+            )
+        except Exception as e:
+            import logging
+            logging.error(f"WebSocket event error: {e}")
+
                 logging.info(f"[ORDER] Created order #{row['id']} with sepet: {json_dumps(sepet)}")
             
                 # Adisyon toplamlarını güncelle
