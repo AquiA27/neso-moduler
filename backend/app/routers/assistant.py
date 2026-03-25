@@ -2680,27 +2680,20 @@ async def chat_smart(payload: ChatRequest):
                         """,
                         {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
                     )
-        try:
-            from ..websocket.manager import manager
-            import asyncio
-            asyncio.create_task(manager.broadcast({
-                "type": "new_order",
-                "message": f"Yeni sipariş",
-                "masa": payload.masa
-            }, topic="orders"))
-            asyncio.create_task(manager.broadcast({
-                "type": "masa_status_change",
-                "masa_adi": payload.masa,
-                "durum": "dolu"
-            }, topic="orders"))
-            # Update table to full if it's currently empty or reserved
-            await db.execute(
-                "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
-                {"masa": payload.masa, "sid": sube_id}
-            )
-        except Exception as e:
-            import logging
-            logging.error(f"WebSocket event error: {e}")
+                    try:
+                        from ..websocket.manager import manager as _ws_mgr
+                        import asyncio
+                        asyncio.create_task(_ws_mgr.broadcast({
+                            "type": "masa_status_change",
+                            "masa_adi": masa,
+                            "durum": "dolu"
+                        }, topic="orders"))
+                        await db.execute(
+                            "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+                            {"masa": masa, "sid": sube_id}
+                        )
+                    except Exception as _ws_e:
+                        logging.error(f"WebSocket event error: {_ws_e}")
 
                     logging.info(f"[ORDER] Created partial order #{row['id']} with items without variation: {json_dumps(sepet)}")
                     
@@ -2847,29 +2840,23 @@ async def chat_smart(payload: ChatRequest):
                     """,
                     {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
                 )
-        try:
-            from ..websocket.manager import manager
-            import asyncio
-            asyncio.create_task(manager.broadcast({
-                "type": "new_order",
-                "message": f"Yeni sipariş",
-                "masa": payload.masa
-            }, topic="orders"))
-            asyncio.create_task(manager.broadcast({
-                "type": "masa_status_change",
-                "masa_adi": payload.masa,
-                "durum": "dolu"
-            }, topic="orders"))
-            # Update table to full if it's currently empty or reserved
-            await db.execute(
-                "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
-                {"masa": payload.masa, "sid": sube_id}
-            )
-        except Exception as e:
-            import logging
-            logging.error(f"WebSocket event error: {e}")
+                try:
+                    from ..websocket.manager import manager as _ws_mgr2
+                    import asyncio
+                    asyncio.create_task(_ws_mgr2.broadcast({
+                        "type": "masa_status_change",
+                        "masa_adi": masa,
+                        "durum": "dolu"
+                    }, topic="orders"))
+                    await db.execute(
+                        "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
+                        {"masa": masa, "sid": sube_id}
+                    )
+                except Exception as _ws_e2:
+                    logging.error(f"WebSocket event error: {_ws_e2}")
 
                 logging.info(f"[ORDER] Created order #{row['id']} with sepet: {json_dumps(sepet)}")
+
             
                 # Adisyon toplamlarını güncelle
                 try:
