@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { masalarApi } from '../lib/api';
-import { Plus, Edit, Trash2, LayoutGrid, List, GripHorizontal, Check } from 'lucide-react';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { Plus, Edit, Trash2, LayoutGrid, List, GripHorizontal, Check, QrCode } from 'lucide-react';
 
 interface MasaItem {
   id: number;
@@ -29,6 +30,21 @@ export default function MasalarPage() {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [draggedMasa, setDraggedMasa] = useState<MasaItem | null>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
+
+  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const WS_URL = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/connect/auth';
+
+  useWebSocket({
+    url: WS_URL,
+    topics: ['kitchen', 'orders', 'cashier'],
+    auth: true,
+    onMessage: (data) => {
+      // Sipariş eklendiğinde, durum değiştiğinde (masa dolu/boş/rezerve vs.) tabloyu canlı yenile
+      if (data.type === 'new_order' || data.type === 'status_change' || data.type === 'table_transfer' || data.type === 'masa_status_change') {
+        loadMasalar();
+      }
+    }
+  });
 
   useEffect(() => {
     loadMasalar();
@@ -185,6 +201,20 @@ export default function MasalarPage() {
   const resetForm = () => {
     setEditing(null);
     setFormData({ masa_adi: '', kapasite: '4', pozisyon_x: '', pozisyon_y: '' });
+  };
+
+  const getQRCodeURL = (qr_code: string | null) => {
+    if (!qr_code) return null;
+    const baseURL = window.location.origin;
+    return `${baseURL}/musteri?qr=${qr_code}`;
+  };
+
+  const copyQRCodeURL = (qr_code: string | null) => {
+    const url = getQRCodeURL(qr_code);
+    if (url) {
+      navigator.clipboard.writeText(url);
+      alert("QR Kod bağlantısı başarıyla panoya kopyalandı!");
+    }
   };
 
   const getDurumTheme = (durum: string) => {
@@ -395,7 +425,7 @@ export default function MasalarPage() {
                         <div className={`h-1 w-full ${theme.indicator}`}></div>
 
                         <div className="p-3 pb-4 text-center">
-                          <h4 className="font-extrabold text-white text-lg tracking-tight truncate drop-shadow-md">
+                          <h4 className="font-extrabold text-white text-lg tracking-tight truncate drop-shadow-md pr-4">
                             {masa.masa_adi}
                           </h4>
                           
@@ -403,6 +433,16 @@ export default function MasalarPage() {
                             {masa.durum.toUpperCase()}
                           </div>
                           
+                          {masa.qr_code && !isEditMode && (
+                            <button
+                              onClick={(e) => { e.stopPropagation(); copyQRCodeURL(masa.qr_code); }}
+                              className="absolute top-1 right-1 text-white/30 hover:text-white transition-colors p-1"
+                              title="QR Link Kopyala"
+                            >
+                              <QrCode className="w-5 h-5" />
+                            </button>
+                          )}
+
                           {/* Kapasite */}
                           <div className="absolute bottom-1 right-2 text-[10px] font-bold text-white/30">
                             {masa.kapasite}P
@@ -442,6 +482,7 @@ export default function MasalarPage() {
                       <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">Masa Adı</th>
                       <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">Durum</th>
                       <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">Kapasite</th>
+                      <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">QR Kod</th>
                       <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider text-center">İşlemler</th>
                     </tr>
                   </thead>
@@ -466,6 +507,15 @@ export default function MasalarPage() {
                             </select>
                           </td>
                           <td className="py-4 px-4 text-white/70 font-medium">{masa.kapasite} Kişilik</td>
+                          <td className="py-4 px-4">
+                            {masa.qr_code ? (
+                              <button onClick={() => copyQRCodeURL(masa.qr_code)} className="flex items-center gap-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors text-white/70" title="QR Kopyala">
+                                <QrCode className="w-4 h-4" />
+                              </button>
+                            ) : (
+                              <span className="text-white/30 text-sm">-</span>
+                            )}
+                          </td>
                           <td className="py-4 px-4">
                             <div className="flex items-center justify-center gap-3 opacity-50 group-hover:opacity-100 transition-opacity">
                               <button onClick={() => handleEdit(masa)} className="p-2 bg-white/5 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors">

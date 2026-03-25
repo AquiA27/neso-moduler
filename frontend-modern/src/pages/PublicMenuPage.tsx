@@ -34,6 +34,7 @@ export default function PublicMenuPage() {
   );
   const [masaLoading, setMasaLoading] = useState(false);
   const [masaError, setMasaError] = useState('');
+  const [isReserved, setIsReserved] = useState(false);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,6 +65,11 @@ export default function PublicMenuPage() {
         // Customization bilgisini de kaydet
         if (data.customization) {
           setCustomization(data.customization);
+        }
+        
+        // Rezervasyon durumu kontrolü
+        if (data.durum === 'rezerve') {
+          setIsReserved(true);
         }
       } catch (err) {
         console.error('QR kod masa bilgisi yüklenemedi:', err);
@@ -222,13 +228,15 @@ export default function PublicMenuPage() {
                 )}
               </div>
             </div>
-            <button
-              onClick={handleOrderViaChat}
-              className="px-5 py-3 bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 hover:from-secondary-500/90 hover:to-quaternary-400/90 rounded-xl transition-all shadow-xl shadow-secondary-900/30 flex items-center gap-2 font-semibold"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              Sipariş Ver
-            </button>
+            {!isReserved && (
+              <button
+                onClick={handleOrderViaChat}
+                className="px-5 py-3 bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 hover:from-secondary-500/90 hover:to-quaternary-400/90 rounded-xl transition-all shadow-xl shadow-secondary-900/30 flex items-center gap-2 font-semibold"
+              >
+                <ShoppingCart className="w-5 h-5" />
+                Sipariş Ver
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -269,7 +277,17 @@ export default function PublicMenuPage() {
       {/* Menu Content */}
       <div className="px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-12">
-          {loading ? (
+          {isReserved ? (
+            <div className="flex flex-col items-center justify-center py-20 px-4 text-center space-y-6">
+              <div className="w-24 h-24 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
+                <span className="text-amber-400 font-extrabold text-5xl">!</span>
+              </div>
+              <h2 className="text-3xl font-bold text-white tracking-tight">Masa Rezerve Edilmiştir</h2>
+              <p className="text-white/60 text-lg max-w-md">
+                Bu masa rezervasyonlu olarak işaretlenmiştir. Lütfen farklı boş bir masaya geçebilir veya ilgili görevliye danışarak durum hakkında bilgi alabilirsiniz.
+              </p>
+            </div>
+          ) : loading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {Array.from({ length: 6 }).map((_, idx) => (
                 <div
@@ -365,15 +383,17 @@ export default function PublicMenuPage() {
       </div>
 
       {/* Bottom CTA */}
-      <div className="fixed bottom-4 right-4">
-        <button
-          onClick={handleOrderViaChat}
-          className="px-6 py-3 bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 hover:from-secondary-500/90 hover:to-quaternary-400/90 rounded-full shadow-2xl shadow-secondary-900/30 flex items-center gap-2 font-semibold transition-transform hover:scale-105"
-        >
-          <ShoppingCart className="w-5 h-5" />
-          Sipariş Ver
-        </button>
-      </div>
+      {!isReserved && (
+        <div className="fixed bottom-4 right-4">
+          <button
+            onClick={handleOrderViaChat}
+            className="px-6 py-3 bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 hover:from-secondary-500/90 hover:to-quaternary-400/90 rounded-full shadow-2xl shadow-secondary-900/30 flex items-center gap-2 font-semibold transition-transform hover:scale-105"
+          >
+            <ShoppingCart className="w-5 h-5" />
+            Sipariş Ver
+          </button>
+        </div>
+      )}
     </div>
   );
 }
