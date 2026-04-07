@@ -157,7 +157,8 @@ def upgrade() -> None:
     op.execute("ALTER TABLE stok_kalemleri ADD COLUMN IF NOT EXISTS kod TEXT")
     op.execute("CREATE INDEX IF NOT EXISTS idx_stok_sube_kod ON stok_kalemleri (sube_id, kod)")
 
-    # Create unique index with unaccent
+    # Create unique index with unaccent - making function immutable first
+    op.execute("ALTER FUNCTION unaccent(text) IMMUTABLE")
     op.execute("""
         CREATE UNIQUE INDEX IF NOT EXISTS uq_menu_sube_ad_norm
             ON menu (sube_id, unaccent(lower(ad)))
