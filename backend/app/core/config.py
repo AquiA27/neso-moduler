@@ -81,12 +81,8 @@ class Settings(BaseSettings):
 
     # ---------- CORS ----------
     # Dev: localhost portları açık. Prod'da .env → CORS_ORIGINS=https://yourdomain.com
-    CORS_ORIGINS: Union[str, List[str]] = [
-        "http://localhost:5173",  # frontend-modern
-        "http://localhost:5174",  # super-admin-panel
-        "http://localhost:3000",  # eski frontend
-    ]
-    CORS_ALLOW_CREDENTIALS: bool = True
+    CORS_ORIGINS: Union[str, List[str]] = ["*"]
+    CORS_ALLOW_CREDENTIALS: bool = False  # Must be False when CORS_ORIGINS contains "*"
     CORS_ALLOW_METHODS: List[str] = Field(
         default=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         description="Production'da sadece gerekli method'lar"
