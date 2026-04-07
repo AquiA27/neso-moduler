@@ -148,6 +148,9 @@ def upgrade() -> None:
     op.execute("CREATE INDEX IF NOT EXISTS idx_menu_sube ON menu (sube_id)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_odemeler_created_at ON odemeler (created_at)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_odemeler_sube ON odemeler (sube_id)")
+    
+    # Fix for dirty databases: Ensure urun_norm exists before creating an index on it
+    op.execute("ALTER TABLE receteler ADD COLUMN IF NOT EXISTS urun_norm TEXT")
     op.execute("CREATE INDEX IF NOT EXISTS idx_recete_sube_urun ON receteler (sube_id, urun_norm)")
     op.execute("CREATE INDEX IF NOT EXISTS idx_stok_sube_kod ON stok_kalemleri (sube_id, kod)")
 
