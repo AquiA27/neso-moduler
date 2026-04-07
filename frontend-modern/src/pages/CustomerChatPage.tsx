@@ -16,6 +16,7 @@ export default function CustomerChatPage() {
   const navigate = useNavigate();
   const [masa, setMasa] = useState(searchParams.get('masa') || '');
   const [masaLoading, setMasaLoading] = useState(false);
+  void masaLoading; // used to track QR loading state
   const [subeId, setSubeId] = useState<number>(parseInt(searchParams.get('sube_id') || '1', 10));
   const qrCode = searchParams.get('qr');
   
@@ -132,7 +133,6 @@ export default function CustomerChatPage() {
         try {
           setMasaLoading(true);
           const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
-          // QR kod'u URL encode et (özel karakterler için)
           const encodedQRCode = encodeURIComponent(qrCode);
           console.log('[QR] Loading masa info for QR code:', qrCode.substring(0, 20) + '...');
           const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQRCode}`);
@@ -140,7 +140,6 @@ export default function CustomerChatPage() {
             const data = await response.json();
             console.log('[QR] Masa bilgisi yüklendi:', data);
             setMasa(data.masa_adi);
-            // QR kod response'undan sube_id'yi al
             if (data.sube_id) {
               setSubeId(parseInt(data.sube_id, 10));
               console.log('[QR] sube_id güncellendi:', data.sube_id);
@@ -148,9 +147,13 @@ export default function CustomerChatPage() {
           } else {
             const errorData = await response.json().catch(() => ({ detail: 'Masa bulunamadı' }));
             console.error('[QR] Masa API error:', response.status, errorData);
+            // Fallback: QR lookup failed, allow chat without masa
+            setMasa('');
           }
         } catch (err) {
           console.error('QR kod masa bilgisi yüklenemedi:', err);
+          // Fallback: allow chat without masa info
+          setMasa('');
         } finally {
           setMasaLoading(false);
         }
@@ -161,13 +164,7 @@ export default function CustomerChatPage() {
   }, [qrCode]); // masa dependency'yi kaldır
 
   const handleSend = async () => {
-    if (!inputText.trim() || loading || masaLoading) return;
-    
-    // QR kod varsa masa bilgisinin yüklenmesini bekle
-    if (qrCode && !masa) {
-      alert('Lütfen masa bilgisi yüklenmesini bekleyin...');
-      return;
-    }
+    if (!inputText.trim() || loading) return;
 
     const userMessage: Message = {
       type: 'user',
