@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 if settings.SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
-    from sentry_sdk.integrations.starlette import StarletteIntegration
     from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
     
     sentry_sdk.init(
@@ -41,7 +40,6 @@ if settings.SENTRY_DSN:
         profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
         integrations=[
             FastApiIntegration(),
-            StarletteIntegration(),
             SqlalchemyIntegration(),
         ],
     )
