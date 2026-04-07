@@ -31,9 +31,10 @@ def check_environment_variables() -> Tuple[bool, List[str]]:
             "DATABASE_URL contains 'localhost'. "
             "Make sure this is intentional for production deployment."
         )
-    elif not settings.DATABASE_URL.startswith("postgresql+asyncpg://"):
+    elif not (settings.DATABASE_URL.startswith("postgresql+asyncpg://") or
+              settings.DATABASE_URL.startswith("postgresql://")):
         errors.append(
-            f"DATABASE_URL must start with 'postgresql+asyncpg://' but got: "
+            f"DATABASE_URL must start with 'postgresql+asyncpg://' or 'postgresql://' but got: "
             f"{settings.DATABASE_URL[:30]}..."
         )
 
@@ -126,8 +127,8 @@ def validate_startup():
 
     if not is_valid:
         if settings.ENV == "prod":
-            logger.critical("❌ Startup validation FAILED in production mode. Exiting.")
-            sys.exit(1)
+            logger.critical("Startup validation FAILED in production mode. Exiting.")
+            raise RuntimeError("Startup validation failed: " + "; ".join(errors))
         else:
             logger.warning(
                 "⚠️ Startup validation found issues in dev mode. "

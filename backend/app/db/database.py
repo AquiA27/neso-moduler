@@ -14,6 +14,14 @@ max_size = max(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
 
 import contextvars
 
+# Normalize DATABASE_URL: Railway gives postgresql://, databases needs postgresql+asyncpg://
+def _normalize_db_url(url: str) -> str:
+    if url.startswith("postgresql://") or url.startswith("postgres://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1).replace("postgres://", "postgresql+asyncpg://", 1)
+    return url
+
+_db_url = _normalize_db_url(settings.DATABASE_URL)
+
 # Global Context Variable for Tenant Isolation
 current_tenant_id = contextvars.ContextVar('current_tenant_id', default=None)
 
@@ -48,15 +56,14 @@ class TenantAwareDatabase(Database):
         return await super().execute(query, values, **kwargs)
 
 db = TenantAwareDatabase(
-    settings.DATABASE_URL,
+    _db_url,
     min_size=min_size,
     max_size=max_size,
-    # Command timeout - cross-region latency için artırıldı (saniye)
     command_timeout=settings.DB_COMMAND_TIMEOUT,
 )
 
 # İsteğe bağlı ikinci DB (örn. ayrı menü DB'si kullanacaksan)
-_menu_url = getattr(settings, "MENU_DATABASE_URL", None) or settings.DATABASE_URL
+_menu_url = _normalize_db_url(getattr(settings, "MENU_DATABASE_URL", None) or settings.DATABASE_URL)
 menu_db = Database(
     _menu_url,
     min_size=min_size,
