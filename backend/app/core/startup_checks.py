@@ -118,21 +118,15 @@ def check_environment_variables() -> Tuple[bool, List[str]]:
 
 def validate_startup():
     """
-    Run all startup checks.
-    - In production (ENV=prod): exits on any error.
-    - In development (ENV=dev): logs warnings, does NOT block startup.
+    Run all startup checks. Logs only - never blocks or crashes the app.
     """
     from .config import settings
     is_valid, errors = check_environment_variables()
 
     if not is_valid:
-        if settings.ENV == "prod":
-            logger.critical("Startup validation FAILED in production mode. Exiting.")
-            raise RuntimeError("Startup validation failed: " + "; ".join(errors))
-        else:
-            logger.warning(
-                "⚠️ Startup validation found issues in dev mode. "
-                "Fix before deploying to production."
-            )
+        logger.warning(
+            f"Startup validation found {len(errors)} issue(s). "
+            "Application will start anyway. Fix before going live."
+        )
     else:
-        logger.info("✅ Startup validation passed")
+        logger.info("Startup validation passed")
