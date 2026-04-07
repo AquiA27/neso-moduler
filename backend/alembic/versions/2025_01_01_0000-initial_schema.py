@@ -152,6 +152,9 @@ def upgrade() -> None:
     # Fix for dirty databases: Ensure urun_norm exists before creating an index on it
     op.execute("ALTER TABLE receteler ADD COLUMN IF NOT EXISTS urun_norm TEXT")
     op.execute("CREATE INDEX IF NOT EXISTS idx_recete_sube_urun ON receteler (sube_id, urun_norm)")
+    
+    # Fix for dirty databases: Ensure kod exists before creating an index on it
+    op.execute("ALTER TABLE stok_kalemleri ADD COLUMN IF NOT EXISTS kod TEXT")
     op.execute("CREATE INDEX IF NOT EXISTS idx_stok_sube_kod ON stok_kalemleri (sube_id, kod)")
 
     # Create unique index with unaccent
