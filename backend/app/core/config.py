@@ -30,11 +30,11 @@ def _parse_list(val: Union[str, List[str], None]) -> List[str]:
 
 class Settings(BaseSettings):
     # ---------- Observability & Rate Limit ----------
-    # Rate limit: 0 = disabled (dev), prod'da env'den ayarla
+    # Rate limit: ENV bazlı default — dev=0 (disabled), prod=60
     # Önerilen: RATE_LIMIT_PER_MINUTE=60 (API), 120 (public), 30 (assistant)
     RATE_LIMIT_PER_MINUTE: int = Field(
-        default=0,  # 0 = disabled (for dev)
-        description="Production'da 60 veya daha yüksek bir değer kullanın"
+        default=0,  # 0 = disabled (for dev); prod'da env var ile 60 set edilmeli
+        description="Production'da mutlaka 60+ olmalı. .env → RATE_LIMIT_PER_MINUTE=60"
     )
     REQUEST_LOG_ENABLED: bool = True
     ADD_REQUEST_ID_HEADER: bool = True
@@ -80,7 +80,12 @@ class Settings(BaseSettings):
     DB_POOL_MAX_INACTIVE_CONNECTION_LIFETIME: float = 300.0  # Inactive connection lifetime (saniye)
 
     # ---------- CORS ----------
-    CORS_ORIGINS: Union[str, List[str]] = ["http://localhost:5173", "http://localhost:3000"]
+    # Dev: localhost portları açık. Prod'da .env → CORS_ORIGINS=https://yourdomain.com
+    CORS_ORIGINS: Union[str, List[str]] = [
+        "http://localhost:5173",  # frontend-modern
+        "http://localhost:5174",  # super-admin-panel
+        "http://localhost:3000",  # eski frontend
+    ]
     CORS_ALLOW_CREDENTIALS: bool = True
     CORS_ALLOW_METHODS: List[str] = Field(
         default=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -92,8 +97,10 @@ class Settings(BaseSettings):
     )
 
     # ---------- Varsayılan admin (ilk kurulum) ----------
+    # ⚠️ GÜVENLİK: Production'da DEFAULT_ADMIN_PASSWORD env var ile güçlü şifre set edilmeli!
+    # Öneri: openssl rand -base64 24  →  bunu .env'e yaz
     DEFAULT_ADMIN_USERNAME: str = "admin"
-    DEFAULT_ADMIN_PASSWORD: str = "admin123"
+    DEFAULT_ADMIN_PASSWORD: str = "admin123"  # SADECE ilk kurulum; prod'da değiştir
 
     # ---------- Opsiyonel: OpenAI ----------
     OPENAI_MODEL: Optional[str] = "gpt-4o-mini"
@@ -141,6 +148,15 @@ class Settings(BaseSettings):
     @classmethod
     def _cors_list_parser(cls, v):
         return _parse_list(v)
+
+    @field_validator("RATE_LIMIT_PER_MINUTE", mode="before")
+    @classmethod
+    def _rate_limit_env_default(cls, v):
+        """Eğer değer 0 olarak geliyorsa ve ENV=prod ise 60 yap."""
+        import os
+        if int(v) == 0 and os.getenv("ENV", "dev") == "prod":
+            return 60
+        return v
 
 
 @lru_cache()

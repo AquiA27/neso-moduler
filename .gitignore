@@ -100,6 +100,11 @@ backend/create_views.py
 backend/super-admin-panel/
 backend/super-admin-panel/node_modules/
 backend/super-admin-panel/dist/
+super-admin-panel/node_modules/
+super-admin-panel/dist/
+super-admin-panel/.env
+super-admin-panel/.env.*
+!super-admin-panel/.env.example
 
 ############################
 # Media & Exports

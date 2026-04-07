@@ -156,7 +156,7 @@ async def on_startup():
 
     # Validate environment configuration before starting
     logger.info("[STARTUP] Validating configuration...")
-    # validate_startup()  # Geçici olarak devre dışı (local development için)
+    validate_startup()  # Dev: uyarı verir; Prod: hata varsa başlamaz
     
     # Debug: CORS ayarlarını logla
     logger.info(f"[STARTUP] CORS_ORIGINS (raw): {settings.CORS_ORIGINS}")

@@ -38,23 +38,54 @@ def check_environment_variables() -> Tuple[bool, List[str]]:
         )
 
     # Check SECRET_KEY
-    if not settings.SECRET_KEY or settings.SECRET_KEY == "change-me":
-        errors.append(
-            "SECRET_KEY is not set or using default value. "
-            "Generate a strong key with: openssl rand -hex 32"
+    if not settings.SECRET_KEY or settings.SECRET_KEY in ("change-me", "dev-secret-key-change-me-INSECURE"):
+        if settings.ENV == "prod":
+            errors.append(
+                "SECRET_KEY is not set or using default value in PRODUCTION! "
+                "Generate: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        else:
+            warnings.append(
+                "SECRET_KEY is using default insecure value. "
+                "Set SECRET_KEY in .env for development too."
+            )
+    elif len(settings.SECRET_KEY) < 32:
+        warnings.append(
+            f"SECRET_KEY is only {len(settings.SECRET_KEY)} chars. "
+            "Recommend at least 32 chars for security."
         )
 
-    # Check ENV
-    if settings.ENV not in ["dev", "prod"]:
-        warnings.append(f"ENV is '{settings.ENV}', expected 'dev' or 'prod'")
+    # Check DEFAULT_ADMIN_PASSWORD
+    if settings.DEFAULT_ADMIN_PASSWORD in ("admin123", "admin", "password", "123456"):
+        if settings.ENV == "prod":
+            errors.append(
+                "DEFAULT_ADMIN_PASSWORD is using a weak default value in PRODUCTION! "
+                "Set DEFAULT_ADMIN_PASSWORD in .env with a strong password."
+            )
+        else:
+            warnings.append(
+                "DEFAULT_ADMIN_PASSWORD is weak ('admin123'). "
+                "For production, set a strong password in .env."
+            )
 
-    # Check CORS
+    # Check RATE_LIMIT in production
+    if settings.ENV == "prod" and settings.RATE_LIMIT_PER_MINUTE == 0:
+        errors.append(
+            "RATE_LIMIT_PER_MINUTE is 0 (disabled) in PRODUCTION. "
+            "Set RATE_LIMIT_PER_MINUTE=60 in .env to prevent abuse."
+        )
+
+    # Check CORS in production
     if settings.ENV == "prod" and isinstance(settings.CORS_ORIGINS, list):
         if any("localhost" in origin for origin in settings.CORS_ORIGINS):
             warnings.append(
                 "CORS_ORIGINS contains localhost URLs in production. "
-                "Make sure to add your actual frontend domain."
+                "Set CORS_ORIGINS to your actual frontend domain in .env."
             )
+
+    # Check ENV value
+    if settings.ENV not in ["dev", "prod"]:
+        warnings.append(f"ENV is '{settings.ENV}', expected 'dev' or 'prod'")
 
     # Print warnings
     if warnings:
@@ -67,18 +98,18 @@ def check_environment_variables() -> Tuple[bool, List[str]]:
     # Print errors
     if errors:
         logger.error("=" * 60)
-        logger.error("CONFIGURATION ERRORS - Application cannot start:")
+        logger.error("CONFIGURATION ERRORS - Application cannot start in production:")
         for error in errors:
             logger.error(f"  ❌ {error}")
         logger.error("=" * 60)
         logger.error("")
-        logger.error("For Render deployment, set these in Dashboard > Environment:")
+        logger.error("Production checklist (.env veya Render Dashboard > Environment):")
         logger.error("  1. DATABASE_URL=postgresql+asyncpg://user:pass@host/db")
-        logger.error("  2. SECRET_KEY=your-random-secret-key")
+        logger.error("  2. SECRET_KEY=$(python -c 'import secrets; print(secrets.token_hex(32))')")
         logger.error("  3. ENV=prod")
-        logger.error("  4. CORS_ORIGINS=https://your-frontend.onrender.com")
-        logger.error("")
-        logger.error("See RENDER_DEPLOYMENT.md for detailed instructions.")
+        logger.error("  4. CORS_ORIGINS=https://your-frontend.vercel.app")
+        logger.error("  5. RATE_LIMIT_PER_MINUTE=60")
+        logger.error("  6. DEFAULT_ADMIN_PASSWORD=<strong-password>")
         logger.error("=" * 60)
 
     return len(errors) == 0, errors
@@ -86,12 +117,21 @@ def check_environment_variables() -> Tuple[bool, List[str]]:
 
 def validate_startup():
     """
-    Run all startup checks and exit if critical errors are found.
+    Run all startup checks.
+    - In production (ENV=prod): exits on any error.
+    - In development (ENV=dev): logs warnings, does NOT block startup.
     """
+    from .config import settings
     is_valid, errors = check_environment_variables()
 
     if not is_valid:
-        logger.critical("Startup validation failed. Exiting.")
-        sys.exit(1)
-
-    logger.info("✅ Startup validation passed")
+        if settings.ENV == "prod":
+            logger.critical("❌ Startup validation FAILED in production mode. Exiting.")
+            sys.exit(1)
+        else:
+            logger.warning(
+                "⚠️ Startup validation found issues in dev mode. "
+                "Fix before deploying to production."
+            )
+    else:
+        logger.info("✅ Startup validation passed")

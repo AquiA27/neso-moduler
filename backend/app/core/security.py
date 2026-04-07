@@ -3,26 +3,34 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, Tuple
 from jose import jwt, JWTError
 import bcrypt
-import os
 import re
 
-# Güvenlik: prod'da mutlaka env'den gelsin
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-key-change-me-INSECURE")
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
-REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+# Güvenlik ayarları: config'den al, fallback olarak env var kullan
+import os as _os
 
-# Password Policy Configuration
-PASSWORD_MIN_LENGTH = int(os.getenv("PASSWORD_MIN_LENGTH", "12"))  # Production'da en az 12 karakter
-PASSWORD_REQUIRE_UPPERCASE = os.getenv("PASSWORD_REQUIRE_UPPERCASE", "true").lower() == "true"
-PASSWORD_REQUIRE_LOWERCASE = os.getenv("PASSWORD_REQUIRE_LOWERCASE", "true").lower() == "true"
-PASSWORD_REQUIRE_DIGIT = os.getenv("PASSWORD_REQUIRE_DIGIT", "true").lower() == "true"
-PASSWORD_REQUIRE_SPECIAL = os.getenv("PASSWORD_REQUIRE_SPECIAL", "false").lower() == "true"
+# SECRET_KEY: Önce config, yoksa env var
+try:
+    from .config import settings as _settings
+    SECRET_KEY = _settings.SECRET_KEY
+except Exception:
+    SECRET_KEY = _os.getenv("SECRET_KEY", "dev-secret-key-INSECURE-change-me")
 
-BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "12"))
+ALGORITHM = _os.getenv("ALGORITHM", "HS256")
+ACCESS_TOKEN_EXPIRE_MINUTES = int(_os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "720"))
+REFRESH_TOKEN_EXPIRE_DAYS = int(_os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 
+# Password Policy: ENV=prod'da special karakter de zorunlu
+_env = _os.getenv("ENV", "dev")
+PASSWORD_MIN_LENGTH = int(_os.getenv("PASSWORD_MIN_LENGTH", "12"))
+PASSWORD_REQUIRE_UPPERCASE = _os.getenv("PASSWORD_REQUIRE_UPPERCASE", "true").lower() == "true"
+PASSWORD_REQUIRE_LOWERCASE = _os.getenv("PASSWORD_REQUIRE_LOWERCASE", "true").lower() == "true"
+PASSWORD_REQUIRE_DIGIT = _os.getenv("PASSWORD_REQUIRE_DIGIT", "true").lower() == "true"
+# Production'da özel karakter varsayılan olarak zorunlu; dev'de opsiyonel
+_special_default = "true" if _env == "prod" else "false"
+PASSWORD_REQUIRE_SPECIAL = _os.getenv("PASSWORD_REQUIRE_SPECIAL", _special_default).lower() == "true"
 
-BCRYPT_ROUNDS = int(os.getenv("BCRYPT_ROUNDS", "12"))
+BCRYPT_ROUNDS = int(_os.getenv("BCRYPT_ROUNDS", "12"))
+
 
 
 # ========== API Key Encryption ==========
