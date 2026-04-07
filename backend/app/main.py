@@ -1,6 +1,7 @@
 # backend/app/main.py
 import os
 import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -90,9 +91,60 @@ from .services.scheduler import scheduler_service
 # Cache servisi (performans için)
 from .services.cache import cache_service
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Modern lifespan context manager - replaces deprecated @app.on_event"""
+    # --- STARTUP ---
+    logger.info("[STARTUP] Validating configuration...")
+    validate_startup()
+
+    logger.info(f"[STARTUP] CORS_ORIGINS (parsed): {cors_origins_list}")
+
+    logger.info("[STARTUP] Connecting to database...")
+    min_size = min(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
+    max_size = max(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
+    logger.info(f"[STARTUP] Connection pool: min={min_size}, max={max_size}")
+    await db.connect()
+    logger.info("[STARTUP] Database connected, creating tables...")
+    try:
+        await create_tables(db)
+        logger.info("[STARTUP] Tables created successfully")
+    except Exception as e:
+        logger.error(f"[STARTUP] Error creating tables: {e}", exc_info=True)
+
+    try:
+        await cache_service.connect()
+        logger.info("[STARTUP] Redis cache initialized")
+    except Exception as e:
+        logger.warning(f"[STARTUP] Redis cache error (optional): {e}")
+
+    try:
+        scheduler_service.start()
+        logger.info("[STARTUP] Scheduler started")
+    except Exception as e:
+        logger.error(f"[STARTUP] Scheduler error: {e}", exc_info=True)
+
+    logger.info("[STARTUP] Application startup completed successfully")
+
+    yield  # <- uygulama burada çalışır
+
+    # --- SHUTDOWN ---
+    await db.disconnect()
+    try:
+        await cache_service.disconnect()
+    except Exception:
+        pass
+    try:
+        scheduler_service.shutdown()
+    except Exception:
+        pass
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
+    lifespan=lifespan,
     docs_url="/docs" if settings.ENV != "prod" else None,
     redoc_url="/redoc" if settings.ENV != "prod" else None,
 )
@@ -142,70 +194,6 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # ---- Hata Yakalama Orta Katmanı ----
 app.add_middleware(ErrorMiddleware)
-
-# ---- DB Yaşam Döngüsü ----
-@app.on_event("startup")
-async def on_startup():
-    import logging
-
-    # Validate environment configuration before starting
-    logger.info("[STARTUP] Validating configuration...")
-    validate_startup()  # Dev: uyarı verir; Prod: hata varsa başlamaz
-    
-    # Debug: CORS ayarlarını logla
-    logger.info(f"[STARTUP] CORS_ORIGINS (raw): {settings.CORS_ORIGINS}")
-    logger.info(f"[STARTUP] CORS_ORIGINS (type): {type(settings.CORS_ORIGINS)}")
-    logger.info(f"[STARTUP] CORS_ORIGINS (parsed): {cors_origins_list}")
-    logger.info(f"[STARTUP] CORS_ALLOW_CREDENTIALS: {settings.CORS_ALLOW_CREDENTIALS}")
-    logger.info(f"[STARTUP] CORS_ALLOW_METHODS: {settings.CORS_ALLOW_METHODS}")
-    logger.info(f"[STARTUP] CORS_ALLOW_HEADERS: {settings.CORS_ALLOW_HEADERS}")
-
-    logger.info("[STARTUP] Connecting to database...")
-    # min_size ve max_size validasyonu (min_size max_size'tan küçük veya eşit olmalı)
-    min_size = min(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
-    max_size = max(settings.DB_POOL_MIN_SIZE, settings.DB_POOL_MAX_SIZE)
-    logger.info(f"[STARTUP] Connection pool: min={min_size}, max={max_size}, timeout={settings.DB_COMMAND_TIMEOUT}s")
-    await db.connect()
-    logger.info("[STARTUP] Database connected, creating tables...")
-    try:
-        await create_tables(db)
-        logger.info("[STARTUP] Tables created successfully")
-    except Exception as e:
-        logger.error(f"[STARTUP] Error creating tables: {e}", exc_info=True)
-
-    # Redis Cache'i başlat
-    try:
-        await cache_service.connect()
-        logger.info("[STARTUP] Redis cache initialized")
-    except Exception as e:
-        logger.warning(f"[STARTUP] Error initializing cache: {e}")
-
-    # Scheduler'ı başlat (otomatik yedekleme için)
-    try:
-        scheduler_service.start()
-        logger.info("[STARTUP] Scheduler started successfully")
-    except Exception as e:
-        logger.error(f"[STARTUP] Error starting scheduler: {e}", exc_info=True)
-    
-    logger.info("[STARTUP] Application startup completed successfully")
-
-@app.on_event("shutdown")
-async def on_shutdown():
-    await db.disconnect()
-
-    # Cache'i kapat
-    try:
-        await cache_service.disconnect()
-        print("[SHUTDOWN] Redis cache closed")
-    except Exception as e:
-        print(f"[SHUTDOWN] Error closing cache: {e}")
-
-    # Scheduler'ı kapat
-    try:
-        scheduler_service.shutdown()
-        print("[SHUTDOWN] Scheduler stopped")
-    except Exception as e:
-        print(f"[SHUTDOWN] Error stopping scheduler: {e}")
 
 # ---- Router Kayıtları ----
 app.include_router(system_router)      # /health, /version, /me
