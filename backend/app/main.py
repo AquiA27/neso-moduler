@@ -23,27 +23,23 @@ setup_logging(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Sentry
+# Initialize Sentry (Temporarily disabled to bypass FastAPI lifespan recursion bug)
 if settings.SENTRY_DSN:
     import sentry_sdk
     from sentry_sdk.integrations.fastapi import FastApiIntegration
     from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
     
-    sentry_sdk.init(
-        dsn=settings.SENTRY_DSN,
-        environment=settings.SENTRY_ENVIRONMENT,
-        # Set traces_sample_rate to 1.0 to capture 100%
-        # of transactions for performance monitoring.
-        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
-        # Set profiles_sample_rate to 1.0 to profile 100%
-        # of sampled transactions.
-        profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
-        integrations=[
-            FastApiIntegration(),
-            SqlalchemyIntegration(),
-        ],
-    )
-    logger.info(f"Sentry initialized in environment: {settings.SENTRY_ENVIRONMENT}")
+    # sentry_sdk.init(
+    #     dsn=settings.SENTRY_DSN,
+    #     environment=settings.SENTRY_ENVIRONMENT,
+    #     traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
+    #     profiles_sample_rate=settings.SENTRY_PROFILES_SAMPLE_RATE,
+    #     integrations=[
+    #         FastApiIntegration(),
+    #         SqlalchemyIntegration(),
+    #     ],
+    # )
+    logger.info(f"Sentry integration temporarily disabled to bypass lifespan bug.")
 
 logger.info(f"[STARTUP] Application starting in {settings.ENV} mode")
 
