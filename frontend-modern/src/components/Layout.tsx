@@ -111,25 +111,9 @@ function Layout() {
     return user?.role === 'super_admin' ? 'Neso Modüler' : 'Yönetim Paneli';
   }, [tenantCustomization?.app_name, user?.role]);
 
-  // Header arka plan rengini hesapla
-  const headerBackground = useMemo(() => {
-    if (tenantCustomization?.primary_color) {
-      const primary = hexToRgba(tenantCustomization.primary_color, 0.9);
-      const secondary = tenantCustomization.secondary_color
-        ? hexToRgba(tenantCustomization.secondary_color, 0.9)
-        : primary;
-      return `linear-gradient(to right, ${primary}, ${secondary})`;
-    }
-    return 'linear-gradient(to right, rgb(6 78 59 / 0.9), rgb(5 46 22 / 0.9))';
-  }, [tenantCustomization?.primary_color, tenantCustomization?.secondary_color]);
-
-  const headerShadow = useMemo(() => {
-    if (tenantCustomization?.primary_color) {
-      const shadowColor = hexToRgba(tenantCustomization.primary_color, 0.25);
-      return `0 10px 15px -3px ${shadowColor}, 0 4px 6px -2px ${shadowColor}`;
-    }
-    return '0 10px 15px -3px rgb(5 46 22 / 0.4), 0 4px 6px -2px rgb(5 46 22 / 0.2)';
-  }, [tenantCustomization?.primary_color]);
+  // Header styling
+  const headerBackground = 'rgba(15, 23, 42, 0.8)';
+  const headerShadow = '0 8px 32px 0 rgba(0, 0, 0, 0.36)';
 
   const handleLogout = useCallback(() => {
     logout();
@@ -197,11 +181,9 @@ function Layout() {
 
   const getNavClass = (isActive: boolean, variant: 'desktop' | 'mobile') => {
     if (variant === 'mobile') {
-      return `flex items-center gap-2 rounded-lg border border-white/15 px-4 py-3 text-sm transition-colors ${isActive ? 'bg-white/15 text-white' : 'bg-white/5 text-white/80 hover:bg-white/10'
-        }`;
+      return `flex items-center gap-2 rounded-xl px-4 py-3 text-sm transition-all duration-300 ${isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`;
     }
-    return `px-4 py-2 rounded-lg transition-colors ${isActive ? 'bg-white/15 text-white shadow-inner shadow-primary-900/30' : 'hover:bg-white/10 text-white/80'
-      }`;
+    return `px-4 py-2 rounded-xl transition-all duration-300 font-medium ${isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`;
   };
 
   const renderLink = (to: string, label: string, variant: 'desktop' | 'mobile') => (
@@ -297,13 +279,13 @@ function Layout() {
 
       {/* Header */}
       <header
-        className="relative sticky top-0 z-50 border-b border-white/15 shadow-lg backdrop-blur-md"
+        className="relative sticky top-0 z-50 border-b border-emerald-500/20 backdrop-blur-xl"
         style={{
           background: headerBackground,
           boxShadow: headerShadow,
         }}
       >
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),_transparent_55%)]" aria-hidden="true" />
+        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(163,230,53,0.12),_transparent_65%)]" aria-hidden="true" />
         <div className="relative container mx-auto px-3 py-2 md:px-4 md:py-4">
           <div className="flex flex-wrap items-center gap-2 md:gap-6">
@@ -320,11 +302,11 @@ function Layout() {
                 }}
               />
               <div className="space-y-0.5 md:space-y-1">
-                <h1 className="text-lg md:text-4xl font-extrabold tracking-wide bg-gradient-to-r from-amber-100 via-lime-200 to-emerald-200 bg-clip-text text-transparent">
+                <h1 className="text-xl md:text-3xl font-bold tracking-tight text-gradient">
                   {displayName}
                 </h1>
-                <p className="text-xs md:text-base text-white/70 hidden md:block">
-                  Hoş geldiniz!
+                <p className="text-xs md:text-sm text-slate-400 hidden md:block font-medium">
+                  Professional Business Management
                 </p>
               </div>
             </div>
@@ -353,15 +335,15 @@ function Layout() {
               {showSuperAdmin && <TenantSwitcher />}
               <button
                 onClick={() => navigate('/system')}
-                className="rounded-xl border border-white/20 bg-white/5 px-4 py-2 text-white/80 transition hover:bg-white/10"
+                className="p-2 rounded-xl border border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-slate-400 hover:text-emerald-400 transition-all duration-300"
               >
                 <Settings className="w-5 h-5" />
               </button>
               <button
                 onClick={handleLogout}
-                className="rounded-xl bg-gradient-to-r from-tertiary-500 via-tertiary-400 to-tertiary-500 px-4 py-2 text-white shadow-lg shadow-tertiary-900/40 transition hover:opacity-90"
+                className="glow-button px-5 py-2 rounded-xl text-white font-semibold flex items-center gap-2 text-sm"
               >
-                <LogOut className="w-5 h-5" />
+                <LogOut className="w-4 h-4" /> Çıkış
               </button>
             </div>
 
@@ -396,9 +378,12 @@ function Layout() {
       </main>
 
       {/* Footer */}
-      <footer className="glass border-t border-white/20 py-4">
-        <div className="container mx-auto px-4 text-center text-sm text-white/70">
-          <p>Neso Modüler v0.2.0 - Rol bazlı yetkiler için login sayfasından giriş yapınız.</p>
+      <footer className="mt-auto border-t border-slate-800 bg-slate-950/50 backdrop-blur-md py-6">
+        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
+          <p>© 2024 Neso Modüler. All rights reserved.</p>
+          <div className="flex items-center gap-6">
+            <span className="text-emerald-500 font-medium">v0.2.1-premium</span>
+          </div>
         </div>
       </footer>
     </div>

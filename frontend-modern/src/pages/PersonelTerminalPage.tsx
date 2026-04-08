@@ -175,9 +175,9 @@ export default function PersonelTerminalPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-emerald-950 to-teal-950">
+    <div className="min-h-screen">
       {/* Header */}
-      <div className="bg-white/10 backdrop-blur-md border-b border-white/20 p-4 sticky top-0 z-50">
+      <div className="glass-panel border-b border-emerald-500/20 p-4 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
@@ -187,7 +187,7 @@ export default function PersonelTerminalPage() {
             >
               <Home className="w-6 h-6 text-white" />
             </button>
-            <h1 className="text-2xl font-bold bg-gradient-to-r from-emerald-300 via-cyan-300 to-teal-300 bg-clip-text text-transparent">
+            <h1 className="text-2xl font-bold text-gradient">
               El Terminali
             </h1>
           </div>
@@ -201,19 +201,19 @@ export default function PersonelTerminalPage() {
                   setMasa(e.target.value);
                   setMasaError('');
                 }}
-                className="w-48 px-4 py-2 bg-white/20 border border-white/30 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-white text-lg font-semibold"
+                className="w-48"
               >
                 <option value="">Masa Seçin</option>
                 {masalar.map((m) => (
-                  <option key={m.id} value={m.masa_adi}>{m.masa_adi}</option>
+                  <option key={m.id} value={m.masa_adi} className="bg-slate-900">{m.masa_adi}</option>
                 ))}
               </select>
               {masaError && <p className="text-red-400 text-xs mt-1">{masaError}</p>}
             </div>
             
-            <div className="flex items-center gap-2 px-4 py-2 bg-emerald-600/30 border border-emerald-500/50 rounded-lg">
-              <ShoppingCart className="w-6 h-6 text-emerald-300" />
-              <span className="text-2xl font-bold text-emerald-200">{cart.length}</span>
+            <div className="flex items-center gap-2 px-6 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+              <ShoppingCart className="w-5 h-5 text-emerald-400" />
+              <span className="text-xl font-bold text-emerald-400">{cart.length}</span>
             </div>
           </div>
         </div>
@@ -223,15 +223,18 @@ export default function PersonelTerminalPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Menü */}
           <div className="lg:col-span-2">
-            <div className="card">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-semibold">Menü</h3>
-                <div className="flex items-center gap-2">
-                  <label className="text-sm text-white/70">Kategori:</label>
+            <div className="premium-card rounded-2xl p-6 h-full">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span className="w-8 h-1 bg-emerald-500 rounded-full"></span>
+                  Günün Menüsü
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Kategori</span>
                   <select
                     value={selectedCategory}
                     onChange={(e) => setSelectedCategory(e.target.value)}
-                    className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    className="min-w-[140px]"
                   >
                     {categories.map(cat => (
                       <option key={cat} value={cat}>{cat}</option>
@@ -248,8 +251,11 @@ export default function PersonelTerminalPage() {
                     <button
                       key={item.id}
                       onClick={() => addToCart(item)}
-                      className="p-4 bg-gradient-to-br from-white/5 to-white/10 border border-white/10 rounded-xl hover:border-emerald-500/50 hover:bg-gradient-to-br hover:from-emerald-500/10 hover:to-cyan-500/10 transition-all text-left group"
+                      className="group p-5 bg-white/5 border border-slate-700/50 rounded-2xl hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all duration-300 text-left relative overflow-hidden"
                     >
+                      <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Plus className="w-5 h-5 text-emerald-400" />
+                      </div>
                       <div className="flex justify-between items-start mb-2">
                         <h4 className="font-semibold text-white group-hover:text-emerald-200 transition-colors">
                           {item.ad}
@@ -262,7 +268,7 @@ export default function PersonelTerminalPage() {
                       </div>
                       <p className="text-xs text-white/50 mb-3">{item.kategori}</p>
                       <div className="flex justify-between items-center">
-                        <span className="text-lg font-bold text-emerald-300">
+                        <span className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">
                           {item.fiyat.toFixed(2)} ₺
                         </span>
                         <Plus className="w-5 h-5 text-white/50 group-hover:text-emerald-300 transition-colors" />
@@ -276,8 +282,8 @@ export default function PersonelTerminalPage() {
 
           {/* Sepet */}
           <div className="lg:col-span-1">
-            <div className="card sticky top-24">
-              <h3 className="text-xl font-semibold mb-4 flex items-center justify-between">
+            <div className="premium-card rounded-2xl p-6 sticky top-24">
+              <h3 className="text-xl font-bold mb-6 flex items-center justify-between">
                 <span>Sepet</span>
                 {cart.length > 0 && (
                   <button
@@ -298,10 +304,10 @@ export default function PersonelTerminalPage() {
                 <>
                   <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
                     {cart.map((item, index) => (
-                      <div
-                        key={`${item.id}-${item.varyasyon?.id || 'none'}-${index}`}
-                        className="flex items-center gap-3 p-3 bg-white/5 rounded-lg border border-white/10"
-                      >
+                        <div
+                          key={`${item.id}-${item.varyasyon?.id || 'none'}-${index}`}
+                          className="flex items-center gap-3 p-4 bg-slate-900/50 rounded-xl border border-slate-800"
+                        >
                         <div className="flex-1">
                           <p className="font-medium text-white">{item.ad}</p>
                           {item.varyasyon && (
@@ -345,10 +351,10 @@ export default function PersonelTerminalPage() {
                     </div>
                     <button
                       onClick={handleOrder}
-                      className="w-full px-6 py-4 bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-700 hover:to-cyan-700 rounded-xl transition-colors flex items-center justify-center gap-2 text-white font-bold text-lg shadow-lg shadow-emerald-500/30"
+                      className="glow-button w-full px-6 py-4 rounded-xl flex items-center justify-center gap-3 text-white font-bold text-lg"
                     >
                       <ArrowRight className="w-6 h-6" />
-                      Sipariş Ver
+                      Siparişi Tamamla
                     </button>
                   </div>
                 </>

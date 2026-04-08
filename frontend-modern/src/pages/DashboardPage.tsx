@@ -356,85 +356,86 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8 md:space-y-10">
       <section
-        className={`card relative overflow-hidden bg-gradient-to-br p-6 sm:p-8 ${
-          theme === 'dark'
-            ? 'from-[#0C2F2A]/90 via-[#12352D]/60 to-transparent'
-            : 'from-[#D6F7E9]/80 via-[#F4FFF9]/90 to-transparent'
-        }`}
+        className="premium-card relative overflow-hidden rounded-3xl p-8 md:p-12"
       >
-        <div className="absolute inset-0 pointer-events-none bg-gradient-to-tr from-white/10 via-transparent to-transparent" />
-        <div className="relative flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-3 w-full md:max-w-xl">
-            <span className="chip">{PERIOD_LABELS[summaryPeriod]} Özet</span>
-            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight text-[#0C3832] dark:text-emerald-50">
-              {businessName} Performans Panosu
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+        <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
+              <TrendingUp className="w-3 h-3" />
+              {PERIOD_LABELS[summaryPeriod]} Performans Analizi
+            </div>
+            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+              {businessName} <span className="text-gradient">Analitik</span>
             </h2>
+            <p className="text-slate-400 text-lg max-w-xl">
+              İşletmenizin gerçek zamanlı performans verilerini ve büyüme analizlerini buradan takip edebilirsiniz.
+            </p>
           </div>
-          <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+          <div className="flex flex-col sm:flex-row gap-4">
             <select
               value={summaryPeriod}
               onChange={(e) => setSummaryPeriod(e.target.value as 'gunluk' | 'haftalik' | 'aylik')}
-              className="input-control w-full sm:w-40 bg-white text-[#0C3832] border border-[#CCEBDD] shadow-sm focus:ring-2 focus:ring-[#00C67F]/40 dark:bg-emerald-950/60 dark:text-emerald-100 dark:border-emerald-700/60"
+              className="min-w-[160px]"
             >
               <option value="gunluk">{PERIOD_LABELS.gunluk}</option>
               <option value="haftalik">{PERIOD_LABELS.haftalik}</option>
               <option value="aylik">{PERIOD_LABELS.aylik}</option>
             </select>
-            <button onClick={handleRefresh} className="btn-primary w-full sm:w-auto">
-              Yenile
+            <button 
+              onClick={handleRefresh} 
+              className="glow-button px-8 py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2"
+            >
+              Verileri Güncelle
             </button>
           </div>
         </div>
       </section>
 
       {summary && (
-        <section className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-2 xl:grid-cols-4">
+        <section className="grid grid-cols-1 gap-6 sm:gap-6 md:grid-cols-2 xl:grid-cols-4">
           {stats.map(
             ({ key, label, value, helper, helperLines, icon: Icon, iconColor, accent, dropdown, dropdownLabel }) => (
-              <div key={key} className="card relative overflow-hidden p-5 sm:p-6">
-              <div className={`absolute inset-0 bg-gradient-to-br ${accent} pointer-events-none`} />
-              <div className="relative flex flex-col gap-4">
-                <div className="flex items-center justify-between">
+              <div key={key} className="premium-card group relative overflow-hidden p-6 rounded-2xl">
+                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Icon className="w-12 h-12" style={{ color: iconColor }} />
+                </div>
+                <div className="relative space-y-4">
                   <div>
-                    <p className={`text-xs font-medium uppercase tracking-wide ${textMuted}`}>{label}</p>
-                    <p className="mt-2 text-2xl font-semibold text-[#0C3832] dark:text-white sm:text-3xl">
+                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</p>
+                    <p className="mt-2 text-3xl font-bold text-white tracking-tight">
                       {value ?? '—'}
                     </p>
                   </div>
-                  <div className="rounded-2xl bg-white/20 dark:bg-white/5 p-2.5 sm:p-3">
-                    <Icon className="h-5 w-5 sm:h-6 sm:w-6" style={{ color: iconColor || '#00C67F' }} />
-                  </div>
-                </div>
-                {dropdown ? (
-                  <div className="space-y-2 text-sm">
-                    {helper && <p className={`text-sm ${textMuted}`}>{helper}</p>}
-                    <p className={textMuted}>{dropdownLabel ?? 'Ödeme dağılımı'}</p>
-                    <div className="grid gap-1 text-sm">
-                      {Object.entries(dropdown).map(([method, value]) => {
-                        const amount = typeof value === 'number' ? value : Number(value) || 0;
-                        return (
-                          <div key={method} className="flex items-center justify-between">
-                            <span className="capitalize text-[#104239] dark:text-emerald-100/80">{method}</span>
-                            <span className="font-semibold text-[#0F5132] dark:text-emerald-200">{amount.toFixed(2)} ₺</span>
+                  
+                  {dropdown ? (
+                    <div className="pt-4 border-t border-slate-700/50 space-y-3">
+                      <p className="text-xs font-semibold text-emerald-500/80">{dropdownLabel}</p>
+                      <div className="grid gap-2">
+                        {Object.entries(dropdown).map(([method, val]) => (
+                          <div key={method} className="flex items-center justify-between text-sm">
+                            <span className="capitalize text-slate-400">{method}</span>
+                            <span className="font-bold text-slate-200">{(val as number).toFixed(2)} ₺</span>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                ) : helperLines && helperLines.length > 0 ? (
-                  <div className="space-y-1 text-sm">
-                    {helperLines.map((line, idx) => (
-                      <p key={`${key}-line-${idx}`} className={textMuted}>
-                        {line}
-                      </p>
-                    ))}
-                  </div>
-                ) : helper ? (
-                  <p className={`text-sm ${textMuted}`}>{helper}</p>
-                ) : null}
+                  ) : (
+                    <div className="pt-4 border-t border-slate-700/50">
+                       {helperLines ? (
+                        <div className="space-y-1">
+                          {helperLines.map((line, idx) => (
+                            <p key={idx} className="text-sm text-slate-400 font-medium">{line}</p>
+                          ))}
+                        </div>
+                       ) : (
+                        <p className="text-sm text-slate-400 font-medium">{helper}</p>
+                       )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-            ),
+            )
           )}
         </section>
       )}
@@ -445,12 +446,12 @@ export default function DashboardPage() {
         </p>
       )}
 
-      <section className="card">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4">
+      <section className="premium-card rounded-2xl p-8">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-8">
           <div>
-            <h3 className="text-xl font-semibold text-[#0C3832] dark:text-emerald-50">Saatlik Yoğunluk</h3>
-            <p className={`text-sm ${textMuted}`}>
-              {PERIOD_LABELS[summaryPeriod]} sipariş ve ciro dağılımı
+            <h3 className="text-2xl font-bold text-white">Saatlik Yoğunluk</h3>
+            <p className="text-slate-400 mt-1">
+              Sipariş ve ciro bazlı trafik analizi
             </p>
           </div>
         </div>

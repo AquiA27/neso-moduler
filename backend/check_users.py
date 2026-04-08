@@ -1,16 +1,21 @@
-"""Check users in database."""
-import asyncio
-import asyncpg
+import psycopg2
+import sys
 
-
-async def main():
-    conn = await asyncpg.connect('postgresql://neso:neso123@localhost:5433/neso')
-    rows = await conn.fetch('SELECT username, role FROM users LIMIT 10')
-    print('Users in database:')
-    for r in rows:
-        print(f'  - {r["username"]} (role: {r["role"]})')
-    await conn.close()
-
-
-if __name__ == "__main__":
-    asyncio.run(main())
+try:
+    conn = psycopg2.connect("postgresql://postgres:rELURsUWOMKoXFJMgJrqQzuLcGajERty@maglev.proxy.rlwy.net:46270/railway")
+    cur = conn.cursor()
+    
+    print("--- USERS ---")
+    cur.execute("SELECT id, username, role, tenant_id, aktif FROM users WHERE username IN ('mutfak3131', 'fistik_mutfak')")
+    for row in cur.fetchall():
+        print(row)
+        
+    print("\n--- ISLETMELER ---")
+    cur.execute("SELECT id, ad, aktif, allowed_ips FROM isletmeler")
+    for row in cur.fetchall():
+        print(row)
+        
+    conn.close()
+except Exception as e:
+    print(f"Error: {e}")
+    sys.exit(1)

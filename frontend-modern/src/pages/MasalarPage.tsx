@@ -233,45 +233,35 @@ export default function MasalarPage() {
         };
       default: // bos
         return { 
-          bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', shadow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]', indicator: 'bg-emerald-500' 
-        };
-    }
-  };
-
-  return (
-    <div className="space-y-6">
+          bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', shadow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.2  return (
+    <div className="space-y-8">
       
       {/* ÜST GÖSTERGE VE KONTROLLER (GLASSMORPHISM) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/[0.02] backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-        {/* Dekoratif Işıklar */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-primary-500/10 rounded-full blur-[80px] -z-10 absolute pointer-events-none"></div>
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-[80px] -z-10 absolute pointer-events-none"></div>
-
-        <div>
-          <h2 className="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-            Kroki ve Masalar
-            <span className="text-sm px-3 py-1 bg-white/10 rounded-full text-white/70 font-medium">
-              Devrimsel UI
-            </span>
-          </h2>
-          <p className="text-white/50 text-sm mt-1">İşletmenizin yerleşimini özgürce dizayn edin</p>
+      <div className="premium-card relative overflow-hidden rounded-3xl p-8 md:p-10">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-bold text-white tracking-tight">Kroki & <span className="text-gradient">Yerleşim</span></h2>
+            <p className="text-slate-400 font-medium">İşletmenizin fiziksel yapısını ve masa durumlarını gerçek zamanlı tasarlayın.</p>
+          </div>şletmenizin yerleşimini özgürce dizayn edin</p>
         </div>
         
-        <div className="flex bg-black/40 p-1.5 rounded-xl border border-white/10">
-          <button 
-            onClick={() => setViewMode('canvas')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${viewMode === 'canvas' ? 'bg-primary-500 text-white shadow-lg' : 'text-white/60 hover:text-white'}`}
-          >
-            <LayoutGrid className="w-4 h-4" />
-            <span className="font-semibold text-sm">Kroki</span>
-          </button>
-          <button 
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${viewMode === 'list' ? 'bg-primary-500 text-white shadow-lg' : 'text-white/60 hover:text-white'}`}
-          >
-            <List className="w-4 h-4" />
-            <span className="font-semibold text-sm">Liste</span>
-          </button>
+          <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-700/50">
+            <button 
+              onClick={() => setViewMode('canvas')}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all duration-300 font-bold ${viewMode === 'canvas' ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              <LayoutGrid className="w-5 h-5" />
+              Kroki
+            </button>
+            <button 
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl transition-all duration-300 font-bold ${viewMode === 'list' ? 'bg-emerald-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+            >
+              <List className="w-5 h-5" />
+              Liste
+            </button>
+          </div>
         </div>
       </div>
 
@@ -279,24 +269,22 @@ export default function MasalarPage() {
         
         {/* SOL: MASA EKLEME / KONTROL PANELİ */}
         <div className="xl:col-span-1 space-y-6">
-          <div className="bg-white/[0.03] backdrop-blur-xl border border-white/5 rounded-2xl p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-white mb-5 flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary-500/20 flex items-center justify-center text-primary-400">
-                <Plus className="w-5 h-5"/>
-              </div>
-              {editing ? 'Masayı Düzenle' : 'Yeni Masa Oluştur'}
+          <div className="premium-card rounded-2xl p-8">
+            <h3 className="text-xl font-bold text-white mb-8 flex items-center gap-3">
+              <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+              {editing ? 'Masayı Düzenle' : 'Masa Oluştur'}
             </h3>
             
             <form onSubmit={editing ? handleUpdate : handleSubmit} className="space-y-5">
               <div>
-                <label className="block text-sm font-medium text-white/70 mb-2">Masa AdıVeya Kodu</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Masa Adı / Kodu</label>
                 <input
                   type="text"
                   value={formData.masa_adi}
                   onChange={(e) => setFormData({ ...formData, masa_adi: e.target.value })}
                   required
-                  className="w-full px-4 py-3 bg-black/30 border border-white/10 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary-500/50 text-white placeholder-white/30 transition-all font-medium"
-                  placeholder="Örn: M-01 veya Bahçe-1"
+                  className="w-full"
+                  placeholder="Örn: M-01"
                 />
               </div>
               <div>
@@ -315,18 +303,18 @@ export default function MasalarPage() {
                 </div>
               </div>
               
-              <div className="pt-2 flex gap-3">
+              <div className="pt-4 flex gap-4">
                 <button
                   type="submit"
-                  className="flex-1 py-3 bg-gradient-to-r from-primary-600 to-primary-500 hover:from-primary-500 hover:to-primary-400 rounded-xl font-bold text-white shadow-lg shadow-primary-500/20 transition-all active:scale-95"
+                  className="glow-button flex-1 py-3 rounded-xl font-bold text-white transition-all"
                 >
-                  {editing ? 'Güncelle' : 'Oluştur'}
+                  {editing ? 'Güncelle' : 'Ekle'}
                 </button>
                 {editing && (
                   <button
                     type="button"
                     onClick={resetForm}
-                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-bold text-white transition-all"
+                    className="flex-1 py-3 bg-white/5 hover:bg-white/10 border border-slate-700 rounded-xl font-bold text-slate-300 transition-all"
                   >
                     İptal
                   </button>
@@ -335,23 +323,23 @@ export default function MasalarPage() {
             </form>
           </div>
 
-          {/* İstatistikler (Glassmorphism Pano) */}
-          <div className="bg-gradient-to-br from-white/[0.05] to-transparent backdrop-blur-xl border border-white/5 rounded-2xl p-6">
-            <h4 className="text-white/60 font-semibold mb-4 text-sm tracking-wider uppercase">Canlı Durum</h4>
-            <div className="space-y-4">
+          {/* İstatistikler */}
+          <div className="premium-card rounded-2xl p-6">
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-6">Masa Stok Durumu</h4>
+            <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
-                  <span className="text-white font-medium">Boş Masalar</span>
+                  <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]"></div>
+                  <span className="text-slate-300 font-medium">Müsait</span>
                 </div>
-                <span className="text-xl font-bold text-emerald-100">{masaItems.filter(m=>m.durum === 'bos').length}</span>
+                <span className="text-2xl font-bold text-white">{masaItems.filter(m=>m.durum === 'bos').length}</span>
               </div>
               <div className="flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                  <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
-                  <span className="text-white font-medium">Dolu Masalar</span>
+                  <div className="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]"></div>
+                  <span className="text-slate-300 font-medium">Dolu</span>
                 </div>
-                <span className="text-xl font-bold text-rose-100">{masaItems.filter(m=>m.durum === 'dolu').length}</span>
+                <span className="text-2xl font-bold text-white">{masaItems.filter(m=>m.durum === 'dolu').length}</span>
               </div>
             </div>
           </div>
@@ -474,19 +462,19 @@ export default function MasalarPage() {
           ) : (
             
             /* LİSTE GÖRÜNÜMÜ */
-            <div className="bg-white/[0.02] backdrop-blur-xl border border-white/5 rounded-2xl p-6">
+            <div className="premium-card rounded-2xl p-8">
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left">
                   <thead>
-                    <tr className="border-b border-white/10">
-                      <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">Masa Adı</th>
-                      <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">Durum</th>
-                      <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">Kapasite</th>
-                      <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider">QR Kod</th>
-                      <th className="py-4 px-4 text-white/50 font-semibold text-sm uppercase tracking-wider text-center">İşlemler</th>
+                    <tr className="border-b border-slate-700/50">
+                      <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Masa Adı</th>
+                      <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Durum</th>
+                      <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Kapasite</th>
+                      <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">QR Kod</th>
+                      <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">İşlemler</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-800/30">
                     {masaItems.map((masa) => {
                       const theme = getDurumTheme(masa.durum);
                       return (

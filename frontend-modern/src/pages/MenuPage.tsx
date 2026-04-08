@@ -306,37 +306,41 @@ export default function MenuPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-3xl font-bold">Menü Yönetimi</h2>
+    <div className="space-y-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-4xl font-bold text-white tracking-tight">Menü <span className="text-gradient">Yönetimi</span></h2>
+          <p className="text-slate-400 mt-1 font-medium">İşletmenizin sunduğu ürünleri ve varyasyonları buradan yönetin.</p>
+        </div>
         <button
           onClick={loadMenu}
-          className="px-4 py-2 bg-primary-900/40 hover:bg-primary-800/40 rounded-lg transition-colors text-accent-mist"
+          className="glow-button px-6 py-2.5 rounded-xl font-bold flex items-center justify-center gap-2"
         >
-          Yenile
+          Listeyi Yenile
         </button>
       </div>
 
       {/* Form */}
-      <div className="card relative z-20">
-        <h3 className="text-xl font-semibold mb-4">
-          {editing ? 'Ürün Güncelle' : 'Yeni Ürün Ekle'}
+      <div className="premium-card rounded-2xl p-8 relative z-20">
+        <h3 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
+          <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+          {editing ? 'Ürün Güncelle' : 'Hızlı Ürün Girişi'}
         </h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Ürün Adı</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Ürün Adı</label>
               <input
                 type="text"
                 value={formData.ad}
                 onChange={(e) => setFormData({ ...formData, ad: e.target.value })}
                 required
-                className="w-full px-4 py-2 bg-primary-900/40 border border-primary-500/25 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 text-accent-mist placeholder-accent-mist/40 transition-colors"
+                className="w-full"
                 placeholder="Örn: Latte"
               />
             </div>
             <div className="relative z-10">
-              <label className="block text-sm font-medium mb-2">Kategori</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Kategori</label>
               <div className="relative" ref={categoryDropdownRef}>
                 {/* Kategori Seçici Butonu */}
                 <button
@@ -555,7 +559,7 @@ export default function MenuPage() {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-2">Fiyat (TL)</label>
+              <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-3">Fiyat (TL)</label>
               <input
                 type="number"
                 step="0.01"
@@ -563,20 +567,17 @@ export default function MenuPage() {
                 value={formData.fiyat}
                 onChange={(e) => setFormData({ ...formData, fiyat: e.target.value })}
                 required
-                className="w-full px-4 py-2 bg-primary-900/40 border border-primary-500/25 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 text-accent-mist placeholder-accent-mist/40 transition-colors"
+                className="w-full"
                 placeholder="0.00"
               />
             </div>
           </div>
           {!editing && (
-            <div className="p-4 border border-primary-500/20 rounded-lg bg-primary-900/20 space-y-3">
+            <div className="p-6 rounded-2xl bg-slate-900/50 border border-slate-800 space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-accent-mist">
-                  Varyasyonlar (İsteğe bağlı)
+                <h4 className="text-xs font-bold text-emerald-500 uppercase tracking-widest">
+                  Varyasyon Taslağı (Opsiyonel)
                 </h4>
-                <span className="text-xs text-accent-mist/60">
-                  Ürün kaydedildikten sonra varyasyonlar otomatik eklenir.
-                </span>
               </div>
               <div className="flex flex-col md:flex-row gap-3">
                 <input
@@ -598,10 +599,10 @@ export default function MenuPage() {
                 <button
                   type="button"
                   onClick={handleTempVariationAdd}
-                  className="px-4 py-2 bg-secondary-500/80 hover:bg-secondary-500 rounded-lg transition-colors flex items-center gap-2 text-primary-950 font-semibold"
+                  className="px-6 py-2.5 bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 rounded-xl transition-all duration-300 flex items-center gap-2 text-emerald-400 font-bold"
                 >
-                  <Plus className="w-4 h-4" />
-                  Varyasyon Ekle
+                  <Plus className="w-5 h-5" />
+                  Ekle
                 </button>
               </div>
               {tempVariations.length > 0 && (
@@ -641,13 +642,13 @@ export default function MenuPage() {
             />
             <label htmlFor="aktif" className="text-sm">Aktif</label>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-4 pt-4">
             <button
               type="submit"
-              className="px-6 py-2 bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors flex items-center gap-2"
+              className="glow-button px-8 py-3 rounded-xl font-bold flex items-center gap-2"
             >
-              <Plus className="w-4 h-4" />
-              {editing ? 'Güncelle' : 'Ekle'}
+              {editing ? <Edit className="w-5 h-5" /> : <Plus className="w-5 h-5" />}
+              {editing ? 'Değişiklikleri Kaydet' : 'Ürünü Menüye Ekle'}
             </button>
             {editing && (
               <button
@@ -663,15 +664,18 @@ export default function MenuPage() {
       </div>
 
       {/* Menu List */}
-      <div className="card relative z-0">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold">Menü Listesi</h3>
-          <div className="flex items-center gap-2">
-            <label className="text-sm text-white/70">Kategori:</label>
+      <div className="premium-card rounded-2xl p-8 relative z-0">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <h3 className="text-2xl font-bold text-white flex items-center gap-3">
+            <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+            Ürün Portföyü
+          </h3>
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Kategori Filtresi</span>
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-2 bg-primary-900/40 border border-primary-500/25 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-400 text-accent-mist placeholder-accent-mist/40 transition-colors"
+              className="min-w-[160px]"
             >
               {categories.map(cat => (
                 <option key={cat} value={cat}>{cat}</option>
@@ -687,18 +691,18 @@ export default function MenuPage() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-white/20">
-                  <th className="text-left py-3 px-4">Ürün Adı</th>
-                  <th className="text-left py-3 px-4">Kategori</th>
-                  <th className="text-left py-3 px-4">Görsel</th>
-                  <th className="text-right py-3 px-4">Fiyat</th>
-                  <th className="text-center py-3 px-4">Durum</th>
-                  <th className="text-right py-3 px-4">İşlemler</th>
+                <tr className="border-b border-slate-700/50">
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Ürün Adı</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Kategori</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest">Görsel</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">Fiyat</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-center">Durum</th>
+                  <th className="py-4 px-4 text-xs font-bold text-slate-500 uppercase tracking-widest text-right">İşlemler</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-slate-800/30">
                 {filteredItems.map((item) => (
                   <tr key={item.id} className="border-b border-white/10 hover:bg-white/5">
                     <td className="py-3 px-4">{item.ad}</td>
