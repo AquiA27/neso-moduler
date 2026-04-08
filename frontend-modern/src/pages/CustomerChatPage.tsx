@@ -502,7 +502,6 @@ export default function CustomerChatPage() {
   };
 
   return (
-  return (
     <div className="min-h-screen bg-[#050c0a] text-white font-outfit relative overflow-hidden flex flex-col">
       {/* Background Decorative Elements */}
       <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
