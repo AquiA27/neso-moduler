@@ -15,28 +15,45 @@ class LLMProvider:
 
 
 class RuleBasedProvider(LLMProvider):
+    def __init__(self, assistant_type: str = "general"):
+        self.assistant_type = assistant_type
+
     async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
-        # Very small, safe fallback that explains capabilities and routes to parse/siparis flow
-        text = (
-            "Asistan aktif. Doğal dilde sipariş verebilirsiniz. Örn: 'iki latte bir americano'. "
-            "Menüye göre eşleşen ürünleri ayıklar ve siparişe çeviririm. Sorularınıza da kısa cevap veririm. "
-            "Devam etmek için bir sipariş metni söyleyin ya da sistemle ilgili soru sorun."
-        )
+        # Fallback text based on assistant type
+        if self.assistant_type == "business":
+            text = (
+                "Neso İşletme Zekası Asistanı devrede. Şu an sınırlı yeteneklerle çalışıyorum ancak "
+                "bana ciro, giderler, profit marjı veya stok durumu hakkında sorular sorabilirsiniz. "
+                "Örn: 'Bugünkü ciro ne kadar?' veya 'Kritik stokları listele'."
+            )
+        else:
+            text = (
+                "Asistan aktif. Doğal dilde sipariş verebilirsiniz. Örn: 'iki latte bir americano'. "
+                "Menüye göre eşleşen ürünleri ayıklar ve siparişe çeviririm. Sorularınıza da kısa cevap veririm."
+            )
+        
         for chunk in text.split(" "):
             yield chunk + " "
             await asyncio.sleep(0.01)
 
-    async def chat(self, messages: List[Dict[str, str]]) -> str:
+    async def chat(self, messages: List[Dict[str, str]], task_type: Optional[str] = None) -> str:
         # Improved rule-based responder when no OpenAI API key is available
         if not messages:
             return "Merhaba, size nasıl yardımcı olabilirim?"
+        
         last = messages[-1]["content"].lower().strip()
+        assistant_mode = task_type or self.assistant_type
         
         # Greeting
-        greeting_words = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "günaydın"}
+        greeting_words = {"merhaba", "selam", "selamlar", "hey", "hello", "hi", "günaydın", "nasıl"}
         first_word = last.split()[0].strip(".,!?") if last else ""
-        if first_word in greeting_words:
-            return "Merhaba! Hoş geldiniz. Size menümüzden bir şeyler önerebilirim veya sipariş alabilrim. Ne istersiniz?"
+        
+        if assistant_mode == "business" or assistant_mode == "bi_analysis":
+            if first_word in greeting_words or "nasılsın" in last:
+                return "Merhaba! Neso İşletme Zekası asistanı olarak performans analizi, ciro raporları ve stok durumu hakkında size yardımcı olabilirim. Ne öğrenmek istersiniz?"
+        else:
+            if first_word in greeting_words:
+                return "Merhaba! Hoş geldiniz. Size menümüzden bir şeyler önerebilirim veya sipariş alabilirim. Ne istersiniz?"
         
         # Math / calculation
         import re
@@ -46,32 +63,43 @@ class RuleBasedProvider(LLMProvider):
                 a, b = math_match.group(1), math_match.group(2)
                 op_char = re.search(r'[\+\-\*\/x]', last[math_match.start():math_match.end()]).group()
                 try:
-                    if op_char in ('+',):
-                        result = int(a) + int(b)
-                    elif op_char in ('-',):
-                        result = int(a) - int(b)
-                    elif op_char in ('*', 'x'):
-                        result = int(a) * int(b)
-                    elif op_char in ('/',):
-                        result = round(int(a) / int(b), 2) if int(b) != 0 else "tanımsız"
-                    else:
-                        result = "hesaplayamadım"
+                    if op_char in ('+',): result = int(a) + int(b)
+                    elif op_char in ('-',): result = int(a) - int(b)
+                    elif op_char in ('*', 'x'): result = int(a) * int(b)
+                    elif op_char in ('/',): result = round(int(a) / int(b), 2) if int(b) != 0 else "tanımsız"
+                    else: result = "hesaplayamadım"
                     return f"{a} {op_char} {b} = {result}. Başka bir şey sormak ister misiniz?"
                 except Exception:
                     pass
+            
+            if assistant_mode == "business":
+                return "Matematik sorunuza tam yanıt veremiyorum ancak işletme verileriniz üzerinden analiz yapabilirim."
             return "Matematik sorunuza yanıt vermekte zorlanıyorum. Ama menümüzden sipariş almakta yardımcı olabilirim!"
         
-        # Süt / dairy
-        if "süt" in last and ("süz" in last or "içermeyen" in last):
-            return "Süt içermeyen seçenekler listesine bakıyorum; örnek: Americano ve Cola sütsüzdür."
-        if "kafeinsiz" in last:
-            return "Menüde kafeinsiz içecek olarak şu an için Cola'yı önerebilirim."
-        
-        # General question
-        if "?" in last or any(kw in last for kw in ["nedir", "nasıl", "ne var", "öneri", "tavsiye"]):
-            return "Sorunuzu yanıtlamaya çalışıyorum. Menümüzdeki ürünler hakkında soru sorabilir veya sipariş verebilirsiniz."
-        
-        return "Size menümüzden sipariş almak veya önerilerde bulunmak için buradayım. Ne istersiniz?"
+        # Süt / dairy / General
+        if assistant_mode == "business" or assistant_mode == "bi_analysis":
+            if "ciro" in last or "gelir" in last or "kazanç" in last:
+                return "Şu an LLM bağlantısı kurulamadığı için canlı veri analizi yapamıyorum, ancak raporlar sayfasından detaylı ciro grafiklerinize ulaşabilirsiniz."
+            if "stok" in last or "envanter" in last:
+                return "Stok durumunuzu analiz etmek için veritabanına erişimim kısıtlı. Lütfen Stok sayfasını kontrol edin veya API anahtarınızı güncelleyin."
+            if "kar" in last or "marj" in last:
+                return "Kar marjı analizi için gelişmiş AI modeline ihtiyaç duyuyorum. Lütfen sistem ayarlarına geçerli bir OpenAI anahtarı girildiğinden emin olun."
+            
+            if "?" in last or any(kw in last for kw in ["rapor", "analiz", "durum", "nabız"]):
+                return "Ben bir İşletme Zekası (BI) asistanıyım. Görevim sipariş almak değil, size işletme verileriniz üzerinden analiz ve öneriler sunmaktır. Şu an servis dışıyım ama yakında tüm verilere hakim olacağım."
+            
+            return "İşletme sahibi asistanı olarak buradayım. Size analiz, kampanya önerileri ve finansal durum hakkında bilgi verebilirim."
+        else:
+            if "süt" in last and ("süz" in last or "içermeyen" in last):
+                return "Süt içermeyen seçenekler listesine bakıyorum; örnek: Americano ve Cola sütsüzdür."
+            if "kafeinsiz" in last:
+                return "Menüde kafeinsiz içecek olarak şu an için Cola'yı önerebilirim."
+            
+            # General question
+            if "?" in last or any(kw in last for kw in ["nedir", "nasıl", "ne var", "öneri", "tavsiye"]):
+                return "Sorunuzu yanıtlamaya çalışıyorum. Menümüzdeki ürünler hakkında soru sorabilir veya sipariş verebilirsiniz."
+            
+            return "Size menümüzden sipariş almak veya önerilerde bulunmak için buradayım. Ne istersiniz?"
 
 
 class OpenAIProvider(LLMProvider):
@@ -425,6 +453,6 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
         if not has_api_key:
             logging.warning(f"[LLM_PROVIDER] ❌ No API key found from any source (tenant_id={tenant_id})")
     
-    logging.warning("[LLM_PROVIDER] ⚠️ Falling back to RuleBasedProvider - responses will be limited")
-    return RuleBasedProvider()
+    logging.warning(f"[LLM_PROVIDER] ⚠️ Falling back to RuleBasedProvider ({assistant_type}) - responses will be limited")
+    return RuleBasedProvider(assistant_type=assistant_type or "general")
 
