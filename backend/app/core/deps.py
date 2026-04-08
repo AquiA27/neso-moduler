@@ -165,8 +165,9 @@ async def get_current_user(
     if effective_tid:
         try:
             tenant_data = await db.fetch_one("SELECT allowed_ips FROM isletmeler WHERE id = :tid", {"tid": effective_tid})
-            if tenant_data and tenant_data.get("allowed_ips"):
-                allowed_ips_raw = tenant_data["allowed_ips"]
+            tenant_dict = dict(tenant_data) if tenant_data and hasattr(tenant_data, 'keys') else (tenant_data if tenant_data else {})
+            if tenant_dict and tenant_dict.get("allowed_ips"):
+                allowed_ips_raw = tenant_dict["allowed_ips"]
                 import json
                 try:
                     allowed_ips = json.loads(allowed_ips_raw) if isinstance(allowed_ips_raw, str) else allowed_ips_raw
