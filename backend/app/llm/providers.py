@@ -249,12 +249,6 @@ class OpenAIProvider(LLMProvider):
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
     """
     Tenant-specific veya global API key ile LLM provider döndürür.
-    
-    Öncelik sırası:
-    1. customer/business_assistant_openai_api_key (tenant-specific, asistan-specific)
-    2. openai_api_key (tenant-specific, genel)
-    3. settings.OPENAI_API_KEY (global/ortam değişkeni)
-    4. RuleBasedProvider (hiçbir key yoksa)
     """
     import logging
     from ..db.database import db
@@ -263,194 +257,67 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
     model = settings.OPENAI_MODEL or "gpt-4o-mini"
     key_source = "none"
     
-    # Önce tenant-specific API key'i kontrol et
+    # 1. Tenant-specific key'i kontrol et
     if tenant_id:
         try:
-            # Asistan tipine göre kolon seç
             api_key_col = "openai_api_key"
-            model_col = "openai_model"
-            if assistant_type == "customer":
-                api_key_col = "customer_assistant_openai_api_key"
-                model_col = "customer_assistant_openai_model"
-            elif assistant_type == "business":
-                api_key_col = "business_assistant_openai_api_key"
-                model_col = "business_assistant_openai_model"
+            if assistant_type == "customer": api_key_col = "customer_assistant_openai_api_key"
+            elif assistant_type == "business": api_key_col = "business_assistant_openai_api_key"
             
-            logging.info(f"[LLM_PROVIDER] Looking for key in column '{api_key_col}' for tenant_id={tenant_id}")
+            # Asistan-specific key
+            cust = await db.fetch_one(
+                f"SELECT {api_key_col} as k FROM tenant_customizations WHERE isletme_id = :id", 
+                {"id": tenant_id}
+            )
+            if cust and cust["k"]:
+                api_key = cust["k"].strip()
+                key_source = f"tenant_{assistant_type}"
             
-            # Önce tüm key kolonlarını tek sorguda çek
-            try:
-                all_keys_query = """
-                    SELECT 
-                        openai_api_key,
-                        openai_model
-                    FROM tenant_customizations
-                    WHERE isletme_id = :id
-                """
-                base_row = await db.fetch_one(all_keys_query, {"id": tenant_id})
-                
-                if base_row:
-                    base_dict = dict(base_row) if hasattr(base_row, 'keys') else base_row
-                    logging.info(f"[LLM_PROVIDER] Found tenant_customizations row for tenant_id={tenant_id}, openai_api_key={'SET' if base_dict.get('openai_api_key') else 'EMPTY'}")
-                else:
-                    logging.warning(f"[LLM_PROVIDER] No tenant_customizations row found for tenant_id={tenant_id}")
-            except Exception as base_err:
-                logging.warning(f"[LLM_PROVIDER] Error checking base row: {base_err}")
-                base_row = None
-            
-            # Asistan-specific kolonları kontrol et
-            if assistant_type and api_key_col != "openai_api_key":
-                try:
-                    # Kolon varlığını kontrol et
-                    column_check = await db.fetch_one(
-                        """
-                        SELECT column_name 
-                        FROM information_schema.columns 
-                        WHERE table_name = 'tenant_customizations' 
-                        AND column_name = :api_key_col
-                        """,
-                        {"api_key_col": api_key_col}
-                    )
-                    
-                    if column_check:
-                        logging.info(f"[LLM_PROVIDER] Column '{api_key_col}' exists in DB")
-                        customization = await db.fetch_one(
-                            f"""
-                            SELECT {api_key_col} as api_key, {model_col} as model
-                            FROM tenant_customizations
-                            WHERE isletme_id = :id AND {api_key_col} IS NOT NULL AND {api_key_col} != ''
-                            """,
-                            {"id": tenant_id}
-                        )
-                        if customization:
-                            cust_dict = dict(customization) if hasattr(customization, 'keys') else customization
-                            tenant_key = cust_dict.get("api_key")
-                            tenant_model = cust_dict.get("model")
-                            if tenant_key and tenant_key.strip():
-                                api_key = tenant_key.strip()
-                                if tenant_model:
-                                    model = tenant_model
-                                key_source = f"tenant_{assistant_type}_specific"
-                                logging.info(f"[LLM_PROVIDER] ✅ Using {assistant_type}-specific API key for tenant_id={tenant_id}, model={model}, key=sk-...{api_key[-4:]}")
-                            else:
-                                logging.info(f"[LLM_PROVIDER] {assistant_type}-specific key exists but is empty/null for tenant_id={tenant_id}")
-                        else:
-                            logging.info(f"[LLM_PROVIDER] No {assistant_type}-specific key row found for tenant_id={tenant_id}")
-                    else:
-                        logging.warning(f"[LLM_PROVIDER] Column '{api_key_col}' does NOT exist in DB - schema migration may be needed")
-                except Exception as col_err:
-                    logging.warning(f"[LLM_PROVIDER] Error checking {api_key_col}: {col_err}")
-            
-            # Asistan-specific key bulunamadıysa, genel key'e bak
-            if not api_key and base_row:
-                base_dict = dict(base_row) if hasattr(base_row, 'keys') else base_row
-                general_key = base_dict.get("openai_api_key")
-                general_model = base_dict.get("openai_model")
-                if general_key and general_key.strip():
-                    api_key = general_key.strip()
-                    if general_model:
-                        model = general_model
-                    key_source = "tenant_general"
-                    logging.info(f"[LLM_PROVIDER] ✅ Using tenant general API key for tenant_id={tenant_id}, model={model}, key=sk-...{api_key[-4:]}")
-                else:
-                    logging.info(f"[LLM_PROVIDER] Tenant general openai_api_key is empty for tenant_id={tenant_id}")
-                    
-        except Exception as e:
-            logging.error(f"[LLM_PROVIDER] ❌ Failed to fetch tenant API key for tenant_id={tenant_id}, assistant_type={assistant_type}: {e}", exc_info=True)
-    else:
-        logging.info(f"[LLM_PROVIDER] No tenant_id provided, skipping tenant-specific key lookup")
-    
-    # Tenant-specific key yoksa global key'i kontrol et
-    if not api_key:
-        api_key_col = "openai_api_key"
-        model_col = "openai_model"
-        if assistant_type == "customer":
-            api_key_col = "customer_assistant_openai_api_key"
-            model_col = "customer_assistant_openai_model"
-        elif assistant_type == "business":
-            api_key_col = "business_assistant_openai_api_key"
-            model_col = "business_assistant_openai_model"
-
-        # 1) Önce platform_settings tablosundan (Kullanıcı arayüzünden girilenler önceliklidir)
-        try:
-            # Asistan-spesifik kontrol et
-            if assistant_type and api_key_col != "openai_api_key":
-                ps_row = await db.fetch_one(
-                    "SELECT value FROM platform_settings WHERE key = :key", {"key": api_key_col}
-                )
-                if ps_row:
-                    ps_dict = dict(ps_row) if hasattr(ps_row, 'keys') else ps_row
-                    ps_key = ps_dict.get("value")
-                    if ps_key and ps_key.strip():
-                        api_key = ps_key.strip()
-                        key_source = "platform_settings_db_specific"
-                        
-                        # Asistan-spesifik model
-                        ps_model_row = await db.fetch_one(
-                            "SELECT value FROM platform_settings WHERE key = :key", {"key": model_col}
-                        )
-                        if ps_model_row:
-                            ps_model_dict = dict(ps_model_row) if hasattr(ps_model_row, 'keys') else ps_model_row
-                            if ps_model_dict.get("value") and ps_model_dict.get("value").strip():
-                                model = ps_model_dict.get("value").strip()
-                        
-                        logging.info(f"[LLM_PROVIDER] ✅ Using global {assistant_type}-specific API key from platform_settings DB, model={model}, key=sk-...{api_key[-4:]}")
-            
-            # Asistan-spesifik yoksa, genel platform_settings anahtarını kKontrol et
+            # Genel tenant key (asistan specific yoksa)
             if not api_key:
-                ps_row = await db.fetch_one(
-                    "SELECT value FROM platform_settings WHERE key = 'openai_api_key'",
+                cust_gen = await db.fetch_one(
+                    "SELECT openai_api_key as k FROM tenant_customizations WHERE isletme_id = :id", 
+                    {"id": tenant_id}
                 )
-                if ps_row:
-                    ps_dict = dict(ps_row) if hasattr(ps_row, 'keys') else ps_row
-                    ps_key = ps_dict.get("value")
-                    if ps_key and ps_key.strip():
-                        api_key = ps_key.strip()
-                        key_source = "platform_settings_db"
-                        
-                        # Model de platform_settings'den alınabilir
-                        ps_model_row = await db.fetch_one(
-                            "SELECT value FROM platform_settings WHERE key = 'openai_model'",
-                        )
-                        if ps_model_row:
-                            ps_model_dict = dict(ps_model_row) if hasattr(ps_model_row, 'keys') else ps_model_row
-                            if ps_model_dict.get("value") and ps_model_dict.get("value").strip():
-                                model = ps_model_dict.get("value").strip()
-                        
-                        logging.info(f"[LLM_PROVIDER] ✅ Using global general API key from platform_settings DB, model={model}, key=sk-...{api_key[-4:]}")
+                if cust_gen and cust_gen["k"]:
+                    api_key = cust_gen["k"].strip()
+                    key_source = "tenant_general"
+        except Exception as e:
+            logging.warning(f"[LLM_PROVIDER] Tenant key lookup failed for {tenant_id}: {e}")
 
-        except Exception as ps_err:
-            logging.warning(f"[LLM_PROVIDER] platform_settings lookup failed (table may not exist): {ps_err}")
-
-        # 2) Hala platform_settings içinde bulamadıysa, .env ortam değişkenini kontrol et
-        if not api_key:
-            api_key_env = settings.OPENAI_API_KEY
-            if api_key_env and api_key_env.strip():
-                api_key = api_key_env.strip()
-                key_source = "global_env"
-                logging.info(f"[LLM_PROVIDER] ✅ Using global API key from env, model={model}, key=sk-...{api_key[-4:]}")
+    # 2. Platform settings (DB) kontrol et
+    if not api_key:
+        try:
+            ps_key = "openai_api_key"
+            if assistant_type == "customer": ps_key = "customer_assistant_openai_api_key"
+            elif assistant_type == "business": ps_key = "business_assistant_openai_api_key"
+            
+            row = await db.fetch_one("SELECT value FROM platform_settings WHERE key = :k", {"k": ps_key})
+            if row and row["value"]:
+                api_key = row["value"].strip()
+                key_source = f"platform_{ps_key}"
             else:
-                logging.warning(f"[LLM_PROVIDER] ❌ No global OPENAI_API_KEY in platform_settings or env")
-    
-    has_api_key = bool(api_key)
+                row_gen = await db.fetch_one("SELECT value FROM platform_settings WHERE key = 'openai_api_key'")
+                if row_gen and row_gen["value"]:
+                    api_key = row_gen["value"].strip()
+                    key_source = "platform_general"
+        except Exception as e:
+            logging.warning(f"[LLM_PROVIDER] Platform settings lookup failed: {e}")
+
+    # 3. Global Env (.env / environments) kontrol et
+    if not api_key:
+        api_key_env = settings.OPENAI_API_KEY
+        if api_key_env and api_key_env.strip():
+            api_key = api_key_env.strip()
+            key_source = "global_env"
+
+    # Karar ve Provider oluşturma
     is_llm_enabled = settings.ASSISTANT_ENABLE_LLM
     
-    logging.info(f"[LLM_PROVIDER] FINAL: ASSISTANT_ENABLE_LLM={is_llm_enabled}, HAS_API_KEY={has_api_key}, key_source={key_source}, tenant_id={tenant_id}, assistant_type={assistant_type}")
+    if is_llm_enabled and api_key:
+        logging.info(f"[LLM_PROVIDER] ✅ Using {key_source} key for {assistant_type}")
+        return OpenAIProvider(api_key, model)
     
-    if is_llm_enabled and has_api_key:
-        try:
-            provider = OpenAIProvider(api_key, model)
-            logging.info(f"[LLM_PROVIDER] ✅ OpenAI provider created with model: {model}")
-            return provider
-        except Exception as e:
-            logging.error(f"[LLM_PROVIDER] ❌ Failed to initialize OpenAI provider: {e}")
-            pass
-    else:
-        if not is_llm_enabled:
-            logging.warning("[LLM_PROVIDER] ❌ LLM disabled in settings (ASSISTANT_ENABLE_LLM=False)")
-        if not has_api_key:
-            logging.warning(f"[LLM_PROVIDER] ❌ No API key found from any source (tenant_id={tenant_id})")
-    
-    logging.warning(f"[LLM_PROVIDER] ⚠️ Falling back to RuleBasedProvider ({assistant_type}) - responses will be limited")
+    logging.warning(f"[LLM_PROVIDER] ⚠️ Fallback to RuleBasedProvider (Source: {key_source}, LLM_Enabled: {is_llm_enabled})")
     return RuleBasedProvider(assistant_type=assistant_type or "general")
 
