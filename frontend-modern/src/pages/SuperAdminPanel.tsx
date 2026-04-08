@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import apiClient, { superadminApi, subscriptionApi, paymentApi, customizationApi, platformSettingsApi } from '../lib/api';
+import apiClient, { superadminApi, subscriptionApi, paymentApi, customizationApi, platformSettingsApi, normalizeApiUrl } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import {
   Building2, CreditCard, Settings, Plus, Search,
@@ -2011,7 +2011,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
                 {formData.logo_url && (
                   <div className="mb-3">
                     <img
-                      src={formData.logo_url.startsWith('http') ? formData.logo_url : `${import.meta.env?.VITE_API_URL || 'http://localhost:8000'}${formData.logo_url}`}
+                      src={formData.logo_url.startsWith('http') ? formData.logo_url : `${normalizeApiUrl(import.meta.env.VITE_API_URL as string)}${formData.logo_url}`}
                       alt="Logo"
                       className="h-24 w-24 object-contain border border-gray-300 rounded-lg p-2 bg-gray-50"
                       onError={(e) => {

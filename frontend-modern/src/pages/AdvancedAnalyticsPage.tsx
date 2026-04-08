@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuthStore } from '../store/authStore';
 import { useCache } from '../hooks/useCache';
 import { performanceUtils } from '../hooks/usePerformance';
+import { normalizeApiUrl } from '../lib/api';
 import {
   TrendingUp,
   Users,
@@ -15,28 +16,7 @@ import {
   Download,
 } from 'lucide-react';
 
-// API URL'ini normalize et (protokol eksikse veya yanlışsa düzelt)
-const normalizeApiUrl = (url: string | undefined): string => {
-  if (!url) {
-    return 'http://localhost:8000';
-  }
-  
-  url = url.trim();
-  
-  if (!url.startsWith('http://') && !url.startsWith('https://')) {
-    if (url.startsWith('ttps://')) {
-      url = 'https://' + url.substring(7);
-    } else {
-      url = 'https://' + url;
-    }
-  }
-  
-  url = url.replace(/\/$/, '');
-  
-  return url;
-};
-
-const API_BASE_URL = normalizeApiUrl(import.meta.env?.VITE_API_URL as string);
+const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
 
 interface ProductProfitability {
   urun: string;

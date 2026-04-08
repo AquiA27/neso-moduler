@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 // API URL'ini normalize et (protokol eksikse veya yanlışsa düzelt)
-const normalizeApiUrl = (url: string | undefined): string => {
+export const normalizeApiUrl = (url: string | undefined): string => {
   if (!url) {
     return 'http://localhost:8000';
   }
@@ -26,7 +26,7 @@ const normalizeApiUrl = (url: string | undefined): string => {
   return url;
 };
 
-const API_BASE_URL = normalizeApiUrl(import.meta.env?.VITE_API_URL as string);
+const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
 
 // Axios instance oluştur
 const apiClient: AxiosInstance = axios.create({

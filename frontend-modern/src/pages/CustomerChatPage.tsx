@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Send, ArrowLeft, Mic, Volume2 } from 'lucide-react';
-import { assistantApi } from '../lib/api';
+import { assistantApi, normalizeApiUrl } from '../lib/api';
 
 interface Message {
   type: 'user' | 'assistant';
@@ -53,7 +53,7 @@ export default function CustomerChatPage() {
   useEffect(() => {
     const loadRecommendedItems = async () => {
       try {
-        const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
+        const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
         const response = await fetch(`${API_BASE_URL}/public/menu?sube_id=${subeId}`);
         if (!response.ok) {
           throw new Error(`Menü yüklenemedi (${response.status})`);
@@ -132,7 +132,7 @@ export default function CustomerChatPage() {
       if (qrCode && !masa) {
         try {
           setMasaLoading(true);
-          const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
+          const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
           const encodedQRCode = encodeURIComponent(qrCode);
           console.log('[QR] Loading masa info for QR code:', qrCode.substring(0, 20) + '...');
           const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQRCode}`);

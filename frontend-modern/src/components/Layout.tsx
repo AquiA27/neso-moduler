@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
-import { customizationApi, subscriptionApi } from '../lib/api';
+import { customizationApi, subscriptionApi, normalizeApiUrl } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
 import { Menu, Settings, LogOut, AlertTriangle, X } from 'lucide-react';
 import logo from '../assets/neso-logo.svg';
@@ -32,7 +32,7 @@ function Layout() {
       const subdomain = getCurrentSubdomain();
       if (subdomain) {
         try {
-          const API_BASE_URL = import.meta.env?.VITE_API_URL || 'http://localhost:8000';
+          const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
           const customization = await loadTenantByDomain(subdomain, API_BASE_URL);
           if (customization) {
             setTenantCustomization({

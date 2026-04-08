@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { masalarApi } from '../lib/api';
+import { masalarApi, normalizeApiUrl } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Plus, Edit, Trash2, LayoutGrid, List, GripHorizontal, Check, QrCode } from 'lucide-react';
 
@@ -31,7 +31,7 @@ export default function MasalarPage() {
   const [draggedMasa, setDraggedMasa] = useState<MasaItem | null>(null);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
 
-  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
   const WS_URL = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/connect/auth';
 
   useWebSocket({

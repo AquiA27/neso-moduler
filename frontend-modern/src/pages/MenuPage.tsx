@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useState, useRef } from 'react';
-import { menuApi, menuVaryasyonlarApi } from '../lib/api';
+import { menuApi, menuVaryasyonlarApi, normalizeApiUrl } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
 import { Plus, Edit, Trash2, Settings, X, ChevronDown, Search, Tag, Image, Loader2, MinusCircle } from 'lucide-react';
 
@@ -46,7 +46,7 @@ export default function MenuPage() {
   const [tempVariations, setTempVariations] = useState<Array<{ ad: string; ek_fiyat: string }>>([]);
   const [variationDraft, setVariationDraft] = useState<{ ad: string; ek_fiyat: string }>({ ad: '', ek_fiyat: '0' });
 
-  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
 
   const resolveImageUrl = (url?: string) => {
     if (!url) return '';

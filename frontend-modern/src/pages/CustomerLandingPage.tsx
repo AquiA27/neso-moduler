@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { MessageCircle, Menu as MenuIcon } from 'lucide-react';
+import { normalizeApiUrl } from '../lib/api';
 
 export default function CustomerLandingPage() {
   const navigate = useNavigate();
@@ -21,25 +22,23 @@ export default function CustomerLandingPage() {
       try {
         setLoading(true);
         setError('');
-        const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
+        const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
         const encodedQrCode = encodeURIComponent(qrCode);
         const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQrCode}`);
         if (!response.ok) {
-          throw new Error('Masaya ulaşılamadı');
+          const detail = await response.json().catch(() => ({}));
+          const msg = detail?.detail || `HTTP ${response.status}`;
+          throw new Error(msg);
         }
         const data = await response.json();
         setMasa(data.masa_adi || initialMasa);
         if (data.sube_id) {
           setSubeId(String(data.sube_id));
-        } else if (!subeId) {
-          setSubeId('1');
         }
       } catch (err) {
-        console.error('QR kod masa bilgisi yüklenemedi:', err);
-        setError('Masa bilgisi alınamadı. Lütfen tekrar deneyin.');
-        if (!subeId) {
-          setSubeId('1');
-        }
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error('QR kod masa bilgisi yüklenemedi:', msg);
+        setError(`Masa bilgisi alınamadı: ${msg}`);
       } finally {
         setLoading(false);
       }

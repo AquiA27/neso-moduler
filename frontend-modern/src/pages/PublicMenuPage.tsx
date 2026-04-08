@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
-import { publicMenuApi } from '../lib/api';
+import { publicMenuApi, normalizeApiUrl } from '../lib/api';
 
 interface Varyasyon {
   id: number;
@@ -48,7 +48,7 @@ export default function PublicMenuPage() {
       try {
         setMasaLoading(true);
         setMasaError('');
-        const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+        const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
         // QR kod'u URL encode et (özel karakterler için)
         const encodedQRCode = encodeURIComponent(qrCode);
         console.log('[QR] Loading masa info for QR code:', qrCode.substring(0, 20) + '...');
@@ -158,7 +158,7 @@ export default function PublicMenuPage() {
     return acc;
   }, {} as Record<string, MenuItem[]>);
 
-  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
   const resolveImageUrl = (url?: string) => {
     if (!url) return '';
     if (url.startsWith('http://') || url.startsWith('https://')) return url;

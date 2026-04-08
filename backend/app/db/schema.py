@@ -811,6 +811,12 @@ async def create_tables(db: Database):
         await db.execute("CREATE INDEX IF NOT EXISTS idx_recete_sube_urun ON receteler (sube_id, urun);")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_stok_sube_ad ON stok_kalemleri (sube_id, ad);")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_masalar_sube_durum ON masalar (sube_id, durum);")
+        # Migration: masalar tablosuna qr_code kolonu ekle (eski kurulumlar için)
+        try:
+            await db.execute("ALTER TABLE masalar ADD COLUMN IF NOT EXISTS qr_code TEXT;")
+            await db.execute("CREATE UNIQUE INDEX IF NOT EXISTS uq_masalar_qr_code ON masalar (qr_code) WHERE qr_code IS NOT NULL;")
+        except Exception:
+            pass
         await db.execute("CREATE INDEX IF NOT EXISTS idx_user_permissions_username ON user_permissions (username);")
 
         # Performans İyileştirme İndeksleri (Redis cache + query optimization)

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { mutfakApi } from '../lib/api';
+import { mutfakApi, normalizeApiUrl } from '../lib/api';
 import { Clock, CheckCircle, Wifi, WifiOff } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
@@ -39,7 +39,7 @@ export default function MutfakPage() {
     }
   }, [filter]);
   
-  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
   const WS_URL = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/connect/auth';
   
   // WebSocket connection

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { kasaApi, adisyonApi } from '../lib/api';
+import { kasaApi, adisyonApi, normalizeApiUrl } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface Table {
@@ -123,7 +123,7 @@ export default function KasaPage() {
     }
   }, [adisyonFilter, activeTab, loadAdisyons]);
 
-  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
   const WS_URL = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/connect/auth';
 
   // WebSocket connection for real-time updates

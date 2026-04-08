@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { stokApi } from '../lib/api';
+import { stokApi, normalizeApiUrl } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { Plus, Edit, Trash2, AlertTriangle } from 'lucide-react';
 
@@ -97,7 +97,7 @@ export default function StokPage() {
   }, []);
 
   // WebSocket connection for real-time stock alerts
-  const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+  const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
   const WS_URL = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/connect/auth';
   
   useWebSocket({
