@@ -53,7 +53,7 @@ export default function CustomerChatPage() {
   useEffect(() => {
     const loadRecommendedItems = async () => {
       try {
-        const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+        const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
         const response = await fetch(`${API_BASE_URL}/public/menu?sube_id=${subeId}`);
         if (!response.ok) {
           throw new Error(`Menü yüklenemedi (${response.status})`);
@@ -132,7 +132,7 @@ export default function CustomerChatPage() {
       if (qrCode && !masa) {
         try {
           setMasaLoading(true);
-          const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
+          const API_BASE_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000';
           const encodedQRCode = encodeURIComponent(qrCode);
           console.log('[QR] Loading masa info for QR code:', qrCode.substring(0, 20) + '...');
           const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQRCode}`);
