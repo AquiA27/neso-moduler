@@ -30,7 +30,6 @@ export default function CustomerChatPage() {
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [detectedLanguage, setDetectedLanguage] = useState<string>('tr');
   const [isListening, setIsListening] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
@@ -191,10 +190,6 @@ export default function CustomerChatPage() {
         sessionStorage.setItem('neso-conversation-id', response.data.conversation_id);
       }
 
-      // Dil algılama sonucunu sakla
-      if (response.data.detected_language) {
-        setDetectedLanguage(response.data.detected_language);
-      }
 
       // Önerileri ve diğer verileri mesaja ekle
       const fallbackText = 'Şu an seni tam anlayamadım ama menümüzden öneriler sunabilirim.';
@@ -286,9 +281,6 @@ export default function CustomerChatPage() {
           if (response.data.conversation_id) {
             setConversationId(response.data.conversation_id);
             sessionStorage.setItem('neso-conversation-id', response.data.conversation_id);
-          }
-          if (response.data.detected_language) {
-            setDetectedLanguage(response.data.detected_language);
           }
 
           const fallbackText = 'Şu an seni tam anlayamadım ama menümüzden öneriler sunabilirim.';

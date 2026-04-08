@@ -32,8 +32,6 @@ export default function PublicMenuPage() {
   const [subeId, setSubeId] = useState<number | undefined>(
     initialSubeId ? Number.parseInt(initialSubeId, 10) : undefined
   );
-  const [masaLoading, setMasaLoading] = useState(false);
-  const [masaError, setMasaError] = useState('');
   const [isReserved, setIsReserved] = useState(false);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -46,8 +44,7 @@ export default function PublicMenuPage() {
     const loadMasaFromQR = async () => {
       if (!qrCode) return;
       try {
-        setMasaLoading(true);
-        setMasaError('');
+
         const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
         // QR kod'u URL encode et (özel karakterler için)
         const encodedQRCode = encodeURIComponent(qrCode);
@@ -72,13 +69,7 @@ export default function PublicMenuPage() {
           setIsReserved(true);
         }
       } catch (err) {
-        console.error('QR kod masa bilgisi yüklenemedi:', err);
-        setMasaError('Masa bilgisi alınamadı. Varsayılan menü gösteriliyor.');
-        if (subeId === undefined) {
-          setSubeId(1);
-        }
-      } finally {
-        setMasaLoading(false);
+        console.error('QR Masa Yükleme Hatası:', err);
       }
     };
 
