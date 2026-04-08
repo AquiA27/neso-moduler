@@ -580,10 +580,13 @@ export default function RaporlarPage() {
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(0,0,0,0.95)',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      borderRadius: '8px'
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                     }}
+                    itemStyle={{ color: '#fff' }}
+                    labelStyle={{ color: '#94a3b8' }}
                   />
                   <Legend />
                   <Line
@@ -631,10 +634,13 @@ export default function RaporlarPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
+                          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                     </PieChart>
@@ -664,11 +670,13 @@ export default function RaporlarPage() {
                         formatter={(value: number) => [`${value.toFixed(2)} ₺`, 'Tutar']}
                         labelFormatter={(label) => label.toUpperCase()}
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px',
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                           color: '#fff',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                       <Bar dataKey="tutar" name="Tutar (₺)" radius={[8, 8, 0, 0]}>
@@ -718,10 +726,13 @@ export default function RaporlarPage() {
                   <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)' }} />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(0,0,0,0.95)',
-                      border: '1px solid rgba(255,255,255,0.3)',
-                      borderRadius: '8px'
+                      backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'
                     }}
+                    itemStyle={{ color: '#fff' }}
+                    labelStyle={{ color: '#94a3b8' }}
                   />
                   <Legend />
                   <Bar dataKey="satis_adeti" fill="#06b6d4" name="Satış Adedi" radius={[8, 8, 0, 0]} />
@@ -1011,10 +1022,12 @@ export default function RaporlarPage() {
                       <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)' }} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                       <Bar dataKey="total_revenue" fill="#22c55e" name="Ciro (₺)" radius={[8, 8, 0, 0]} />
@@ -1126,10 +1139,12 @@ export default function RaporlarPage() {
                       <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)' }} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                       <Bar dataKey="order_count" fill="#06b6d4" name="Sipariş Sayısı" radius={[8, 8, 0, 0]} />
@@ -1159,10 +1174,12 @@ export default function RaporlarPage() {
                       </Pie>
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                     </PieChart>
@@ -1300,10 +1317,12 @@ export default function RaporlarPage() {
                       <Tooltip
                         formatter={(value: number) => `₺${value.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}`}
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                     </PieChart>
@@ -1421,10 +1440,12 @@ export default function RaporlarPage() {
                       />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                       <Line
@@ -1463,10 +1484,12 @@ export default function RaporlarPage() {
                       <YAxis stroke="rgba(255,255,255,0.5)" tick={{ fill: 'rgba(255,255,255,0.7)' }} />
                       <Tooltip
                         contentStyle={{
-                          backgroundColor: 'rgba(0,0,0,0.95)',
-                          border: '1px solid rgba(255,255,255,0.3)',
-                          borderRadius: '8px'
+                          backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '12px',
                         }}
+                        itemStyle={{ color: '#fff' }}
+                        labelStyle={{ color: '#94a3b8' }}
                       />
                       <Legend />
                       <Bar dataKey="order_count" fill="#06b6d4" name="Sipariş Sayısı" radius={[8, 8, 0, 0]} />
