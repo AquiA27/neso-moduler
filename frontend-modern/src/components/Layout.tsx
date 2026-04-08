@@ -7,13 +7,6 @@ import { Menu, Settings, LogOut, AlertTriangle, X } from 'lucide-react';
 import logo from '../assets/neso-logo.svg';
 import TenantSwitcher from './TenantSwitcher';
 
-// Hex renk kodunu rgba'ya çevir
-const hexToRgba = (hex: string, alpha: number = 0.9): string => {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-};
 
 function Layout() {
   const { user, logout, tenantId, tenantCustomization, setTenantCustomization, selectedTenantId } = useAuthStore();

@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { masalarApi, normalizeApiUrl } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { Plus, Edit, Trash2, LayoutGrid, List, GripHorizontal, Check, QrCode } from 'lucide-react';
+import { Edit, Trash2, LayoutGrid, List, GripHorizontal, Check, QrCode } from 'lucide-react';
 
 interface MasaItem {
   id: number;

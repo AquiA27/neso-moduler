@@ -395,7 +395,7 @@ export default function DashboardPage() {
       {summary && (
         <section className="grid grid-cols-1 gap-6 sm:gap-6 md:grid-cols-2 xl:grid-cols-4">
           {stats.map(
-            ({ key, label, value, helper, helperLines, icon: Icon, iconColor, accent, dropdown, dropdownLabel }) => (
+            ({ key, label, value, helper, helperLines, icon: Icon, iconColor, dropdown, dropdownLabel }) => (
               <div key={key} className="premium-card group relative overflow-hidden p-6 rounded-2xl">
                 <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
                   <Icon className="w-12 h-12" style={{ color: iconColor }} />
