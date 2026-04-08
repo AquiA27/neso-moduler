@@ -55,8 +55,8 @@ class RuleBasedProvider(LLMProvider):
             if first_word in greeting_words:
                 return "Merhaba! Hoş geldiniz. Size menümüzden bir şeyler önerebilirim veya sipariş alabilirim. Ne istersiniz?"
         
-        # Math / calculation (only for short messages to avoid accidental prompt matching)
-        if len(last) < 150:
+        # Math / calculation (only for general assistants to avoid accidental prompt matching in BI)
+        if assistant_mode != "business" and assistant_mode != "bi_analysis" and len(last) < 150:
             import re
             math_match = re.search(r'(\d+)\s*([\+\-\*\/x])\s*(\d+)', last)
             if math_match or any(kw in last for kw in ["kaç eder", "kaç yapar", "toplam", "artı", "eksi", "çarpı"]):
@@ -72,9 +72,6 @@ class RuleBasedProvider(LLMProvider):
                         return f"{a} {op_char} {b} = {result}. Başka bir şey sormak ister misiniz?"
                     except Exception:
                         pass
-                
-                if assistant_mode == "business":
-                    return "Matematik sorunuza tam yanıt veremiyorum ancak işletme verileriniz üzerinden analiz yapabilirim."
                 return "Matematik sorunuza yanıt vermekte zorlanıyorum. Ama menümüzden sipariş almakta yardımcı olabilirim!"
         
         # Süt / dairy / General
