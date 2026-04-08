@@ -1487,9 +1487,9 @@ async def get_morning_brief(
 Lütfen aşağıdaki verileri kullanarak enerjik, motive edici ve yöneticiyi yönlendirici kısa bir özet metni hazırla.
 
 # Veriler:
-- Dünkü Ciro: {yesterday_revenue.get('total_revenue', 0):.2f} TL
-- Dünkü Sipariş Sayısı: {yesterday_revenue.get('total_orders', 0)}
-- Kritik Stok Uyarıları: {len(critical_stocks)} ürün kritik seviyede. {', '.join([s['ad'] for s in critical_stocks[:3]])} {'ve diğerleri' if len(critical_stocks) > 3 else ''}
+* Dünkü Ciro: {yesterday_revenue.get('total_revenue', 0):.2f} TL
+* Dünkü Sipariş Sayısı: {yesterday_revenue.get('total_orders', 0)}
+* Kritik Stok Uyarıları: {len(critical_stocks)} ürün kritik seviyede. {', '.join([s['ad'] for s in critical_stocks[:3]])} {'ve diğerleri' if len(critical_stocks) > 3 else ''}
 
 Yanıtını şu formatta yapılandır:
 1. Günaydın mesajı ve dünün kısa değerlendirmesi (Örn: "Dün harika bir gündü, X TL ciro yaptık...")

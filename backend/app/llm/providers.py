@@ -55,26 +55,27 @@ class RuleBasedProvider(LLMProvider):
             if first_word in greeting_words:
                 return "Merhaba! Hoş geldiniz. Size menümüzden bir şeyler önerebilirim veya sipariş alabilirim. Ne istersiniz?"
         
-        # Math / calculation
-        import re
-        math_match = re.search(r'(\d+)\s*[\+\-\*\/x]\s*(\d+)', last)
-        if math_match or any(kw in last for kw in ["kaç eder", "kaç yapar", "toplam", "artı", "eksi", "çarpı"]):
-            if math_match:
-                a, b = math_match.group(1), math_match.group(2)
-                op_char = re.search(r'[\+\-\*\/x]', last[math_match.start():math_match.end()]).group()
-                try:
-                    if op_char in ('+',): result = int(a) + int(b)
-                    elif op_char in ('-',): result = int(a) - int(b)
-                    elif op_char in ('*', 'x'): result = int(a) * int(b)
-                    elif op_char in ('/',): result = round(int(a) / int(b), 2) if int(b) != 0 else "tanımsız"
-                    else: result = "hesaplayamadım"
-                    return f"{a} {op_char} {b} = {result}. Başka bir şey sormak ister misiniz?"
-                except Exception:
-                    pass
-            
-            if assistant_mode == "business":
-                return "Matematik sorunuza tam yanıt veremiyorum ancak işletme verileriniz üzerinden analiz yapabilirim."
-            return "Matematik sorunuza yanıt vermekte zorlanıyorum. Ama menümüzden sipariş almakta yardımcı olabilirim!"
+        # Math / calculation (only for short messages to avoid accidental prompt matching)
+        if len(last) < 150:
+            import re
+            math_match = re.search(r'(\d+)\s*([\+\-\*\/x])\s*(\d+)', last)
+            if math_match or any(kw in last for kw in ["kaç eder", "kaç yapar", "toplam", "artı", "eksi", "çarpı"]):
+                if math_match:
+                    a, b = math_match.group(1), math_match.group(3)
+                    op_char = math_match.group(2)
+                    try:
+                        if op_char in ('+',): result = int(a) + int(b)
+                        elif op_char in ('-',): result = int(a) - int(b)
+                        elif op_char in ('*', 'x'): result = int(a) * int(b)
+                        elif op_char in ('/',): result = round(int(a) / int(b), 2) if int(b) != 0 else "tanımsız"
+                        else: result = "hesaplayamadım"
+                        return f"{a} {op_char} {b} = {result}. Başka bir şey sormak ister misiniz?"
+                    except Exception:
+                        pass
+                
+                if assistant_mode == "business":
+                    return "Matematik sorunuza tam yanıt veremiyorum ancak işletme verileriniz üzerinden analiz yapabilirim."
+                return "Matematik sorunuza yanıt vermekte zorlanıyorum. Ama menümüzden sipariş almakta yardımcı olabilirim!"
         
         # Süt / dairy / General
         if assistant_mode == "business" or assistant_mode == "bi_analysis":
