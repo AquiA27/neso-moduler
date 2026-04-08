@@ -502,78 +502,100 @@ export default function CustomerChatPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 flex flex-col">
+  return (
+    <div className="min-h-screen bg-[#050c0a] text-white font-outfit relative overflow-hidden flex flex-col">
+      {/* Background Decorative Elements */}
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-[400px] h-[400px] bg-emerald-600/5 blur-[100px] rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
       {/* Header */}
-      <div className="bg-primary-800/50 backdrop-blur-sm border-b border-white/10 p-2 md:p-4">
-        <div className="mx-auto flex max-w-4xl flex-col gap-2 md:gap-3 sm:flex-row sm:items-center">
-          <div className="flex items-center gap-2 md:gap-3">
+      <div className="relative z-10 border-b border-white/5 bg-white/[0.02] backdrop-blur-xl">
+        <div className="max-w-4xl mx-auto px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-6">
             <button
               onClick={handleBack}
-              className="rounded-lg p-1.5 md:p-2 transition-colors hover:bg-white/10"
+              className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
             >
-              <ArrowLeft className="h-4 w-4 md:h-5 md:w-5 text-white" />
+              <ArrowLeft className="h-5 w-5 text-white/50 group-hover:text-white transition-colors" />
             </button>
             <div>
-              <h1 className="text-base md:text-lg font-semibold text-white sm:text-xl">Neso Asistanı</h1>
-              <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                {masa && <p className="text-xs md:text-sm text-white/70">Masa: {masa}</p>}
-                {detectedLanguage && (
-                  <span className="rounded bg-white/10 px-1.5 py-0.5 md:px-2 md:py-1 text-xs text-white/50">
-                    {detectedLanguage.toUpperCase()}
-                  </span>
-                )}
+              <h1 className="text-xl font-black text-white tracking-tight">NESO<span className="text-emerald-500">.</span> ASİSTAN</h1>
+              <div className="flex items-center gap-3">
+                 {masa && (
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-[10px] uppercase">
+                      MASA: {masa}
+                    </div>
+                  )}
+                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Çevrimiçi</span>
               </div>
             </div>
+          </div>
+          
+          <div className="flex items-center gap-3">
+             <button
+                onClick={isSpeaking ? stopSpeaking : undefined}
+                className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${isSpeaking ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-white/5 text-slate-500'}`}
+             >
+                <Volume2 className={`w-5 h-5 ${isSpeaking ? 'animate-pulse' : ''}`} />
+             </button>
           </div>
         </div>
       </div>
 
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-4xl mx-auto space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-8 relative">
+        <div className="max-w-4xl mx-auto space-y-8">
           {messages.map((msg, idx) => (
             <div
               key={idx}
-              className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex items-end gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
             >
+              {msg.type === 'assistant' && (
+                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20 text-[10px] font-black">N</div>
+              )}
               <div
-                className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+                className={`max-w-[85%] relative ${
                   msg.type === 'user'
-                    ? 'bg-primary-600 text-white'
-                    : 'bg-white/10 text-white backdrop-blur-sm'
+                    ? 'bg-emerald-600 text-white rounded-3xl rounded-br-none px-6 py-4 shadow-xl shadow-emerald-900/20 shadow-inner border border-emerald-400/20'
+                    : 'glass-panel text-slate-200 rounded-3xl rounded-bl-none px-6 py-4 border border-white/5'
                 }`}
               >
-                <div className="whitespace-pre-wrap text-sm leading-relaxed">
+                <div className="whitespace-pre-wrap text-[15px] leading-relaxed font-medium">
                   {msg.text}
                 </div>
+                
                 {msg.type === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && (
-                  <div className="mt-3 flex flex-wrap gap-2">
+                  <div className="mt-6 flex flex-wrap gap-2">
                     {msg.suggestions.map((suggestion, i) => (
                       <button
                         key={i}
                         onClick={() => handleSuggestionClick(suggestion)}
-                        className="px-3 py-1.5 bg-white/20 hover:bg-white/30 rounded-full text-xs text-white transition-colors"
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs font-bold text-emerald-400 transition-all hover:scale-105"
                       >
                         {suggestion}
                       </button>
                     ))}
                   </div>
                 )}
-                <div className="text-xs opacity-60 mt-2 text-right">
+                
+                <div className={`text-[10px] font-bold mt-3 uppercase tracking-widest opacity-30 ${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
                   {msg.timestamp.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
               </div>
             </div>
           ))}
+          
           {loading && (
-            <div className="flex justify-start">
-              <div className="bg-white/10 text-white backdrop-blur-sm rounded-2xl px-4 py-3">
-                <div className="flex gap-2">
-                  <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                  <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                  <div className="w-2 h-2 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                </div>
-              </div>
+            <div className="flex justify-start items-center gap-3">
+               <div className="w-8 h-8 rounded-full bg-slate-800 animate-pulse shrink-0" />
+               <div className="glass-panel px-6 py-4 rounded-3xl rounded-bl-none border border-white/5">
+                  <div className="flex gap-2">
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                  </div>
+               </div>
             </div>
           )}
           <div ref={chatEndRef} />
@@ -581,69 +603,56 @@ export default function CustomerChatPage() {
       </div>
 
       {/* Input Area */}
-       <div className="bg-primary-800/50 backdrop-blur-sm border-t border-white/10 p-4">
-        <div className="mx-auto max-w-4xl">
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <textarea
-              ref={inputRef}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="Mesajınızı yazın veya mikrofon butonuna basarak konuşun..."
-              className="w-full flex-1 resize-none rounded-lg border border-white/20 bg-white/10 px-4 py-3 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              rows={1}
-              disabled={loading || isListening}
-            />
-            <button
-              onClick={isListening ? stopListening : startListening}
-              disabled={loading}
-              className={`flex items-center gap-2 rounded-lg px-4 py-3 transition-colors w-full sm:w-auto ${
-                isListening
-                  ? 'bg-tertiary-600 hover:bg-tertiary-700 text-white'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-              title={isListening ? 'Dinlemeyi Durdur' : 'Sesli Konuşma'}
-            >
-              <Mic className={`w-5 h-5 ${isListening ? 'animate-pulse' : ''}`} />
-            </button>
-            <button
-              onClick={
-                isSpeaking
-                  ? stopSpeaking
-                  : () => {
-                      const lastMessage = messages[messages.length - 1];
-                      if (lastMessage?.type === 'assistant') {
-                        playAssistantSpeech(lastMessage).catch(err => {
-                          console.warn('Failed to play assistant speech:', err);
-                        });
-                      }
-                    }
-              }
-              disabled={loading || messages.length === 0}
-              className={`flex items-center gap-2 rounded-lg px-4 py-3 transition-colors w-full sm:w-auto ${
-                isSpeaking
-                  ? 'bg-primary-600 hover:bg-primary-700 text-white'
-                  : 'bg-white/10 hover:bg-white/20 text-white'
-              }`}
-              title={isSpeaking ? 'Okumayı Durdur' : 'Son Mesajı Oku'}
-            >
-              <Volume2 className={`w-5 h-5 ${isSpeaking ? 'animate-pulse' : ''}`} />
-            </button>
+      <div className="relative z-10 p-6 bg-white/[0.02] backdrop-blur-2xl border-t border-white/5">
+        <div className="max-w-4xl mx-auto flex flex-col gap-4">
+          {isListening && (
+            <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+              <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+              Sizi Dinliyorum...
+            </div>
+          )}
+          
+          <div className="flex items-center gap-3">
+            <div className="flex-1 relative group">
+              <textarea
+                ref={inputRef}
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="Neso'yla konuşun..."
+                className="w-full bg-white/[0.03] border border-white/10 rounded-[1.5rem] px-6 py-4 pr-14 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all resize-none min-h-[60px] max-h-[150px]"
+                rows={1}
+                disabled={loading || isListening}
+              />
+              <button
+                onClick={isListening ? stopListening : startListening}
+                disabled={loading}
+                className={`absolute right-3 bottom- side-y-1/2 -translate-y-1/2 md:translate-y-0 md:static p-3 rounded-2xl transition-all ${
+                  isListening
+                    ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20 scale-110'
+                    : 'text-slate-500 hover:text-white hover:bg-white/5'
+                }`}
+                aria-label="Sesli Komut"
+              >
+                <div className="relative">
+                  {isListening && <div className="absolute inset-0 bg-white rounded-full animate-ping opacity-20" />}
+                  <Mic className={`w-6 h-6 ${isListening ? 'animate-pulse' : ''}`} />
+                </div>
+              </button>
+            </div>
+
             <button
               onClick={handleSend}
               disabled={!inputText.trim() || loading || isListening}
-              className="flex items-center gap-2 rounded-lg bg-primary-600 px-6 py-3 font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 hover:bg-primary-700 w-full sm:w-auto"
+              className="glow-button w-14 h-14 rounded-[1.5rem] flex items-center justify-center shrink-0 disabled:opacity-50 disabled:grayscale transition-all hover:scale-105 active:scale-90"
             >
-              <Send className="w-5 h-5" />
-              Gönder
+              <Send className="w-6 h-6 text-white" />
             </button>
           </div>
-          {isListening && (
-            <div className="mt-2 text-sm text-white/70 flex items-center gap-2">
-              <div className="w-2 h-2 bg-tertiary-500 rounded-full animate-pulse"></div>
-              <span>Dinleniyor... Konuşun</span>
-            </div>
-          )}
+          
+          <div className="flex justify-center md:hidden">
+             <div className="w-12 h-1 bg-white/10 rounded-full" />
+          </div>
         </div>
       </div>
     </div>

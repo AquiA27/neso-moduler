@@ -168,102 +168,90 @@ export default function PublicMenuPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 text-white">
+  return (
+    <div className="min-h-screen bg-[#050c0a] text-white font-outfit relative overflow-hidden">
+      {/* Background Decorative Elemets */}
+      <div className="fixed top-0 right-0 w-[500px] h-[500px] bg-emerald-500/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
+      <div className="fixed bottom-0 left-0 w-[400px] h-[400px] bg-emerald-600/5 blur-[100px] rounded-full translate-y-1/2 -translate-x-1/2 pointer-events-none" />
+
       {/* Header */}
-      <div className="relative overflow-hidden border-b border-white/10">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.15),_transparent_55%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(56,189,248,0.12),_transparent_60%)]" />
-        <div className="relative max-w-6xl mx-auto px-3 py-3 md:px-4 md:py-6 flex flex-col gap-3 md:gap-6">
-          <div className="flex items-start gap-2 md:gap-4">
-            <button
-              onClick={handleBack}
-              className="p-1.5 md:p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-              aria-label="Geri dön"
-            >
-              <ArrowLeft className="w-4 h-4 md:w-5 md:h-5" />
-            </button>
-            <div className="flex-1 space-y-2 md:space-y-3">
-              <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                {customization?.logo_url && (
-                  <img
-                    src={resolveImageUrl(customization.logo_url)}
-                    alt={customization.app_name || 'Logo'}
-                    className="h-10 w-10 md:h-12 md:w-12 object-contain rounded-lg bg-white/5 border border-white/15"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = 'none';
-                    }}
-                  />
-                )}
-                <h1 className="text-xl md:text-3xl lg:text-4xl font-bold tracking-tight">
-                  {customization?.app_name ? `${customization.app_name} Menü` : (subeId ? 'Menü' : 'Neso Menü')}
-                </h1>
-                <span className="px-2 py-0.5 md:px-3 md:py-1 text-xs font-semibold rounded-full bg-white/10 border border-white/15">
-                  Şefin Önerileri
-                </span>
-              </div>
-              <p className="text-xs md:text-sm lg:text-base text-white/70 leading-relaxed max-w-3xl hidden md:block">
-                Günün en sevilen lezzetlerini keşfedin. Seçtiğiniz ürünleri doğrudan asistanımıza ileterek sipariş verebilir veya menüyü incelemeye devam edebilirsiniz.
-              </p>
-              <div className="flex flex-wrap gap-1.5 md:gap-3 text-xs">
-                {masaLoading ? (
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">
-                    Masa bilgisi yükleniyor...
-                  </span>
-                ) : (
-                  masa && (
-                    <span className="px-3 py-1 rounded-full bg-primary-900/60 border border-primary-400/40 text-primary-100">
-                      Masa: {masa}
-                    </span>
-                  )
-                )}
-                {subeId && (
-                  <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10 text-white/70">
-                    Şube #{subeId}
-                  </span>
-                )}
-                {masaError && (
-                  <span className="px-3 py-1 rounded-full bg-tertiary-500/20 border border-tertiary-400/40 text-tertiary-200">
-                    {masaError}
-                  </span>
-                )}
+      <div className="relative border-b border-white/5 bg-white/[0.02] backdrop-blur-xl">
+        <div className="max-w-6xl mx-auto px-6 py-8 md:py-12 flex flex-col gap-8">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <button
+                onClick={handleBack}
+                className="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all group"
+                aria-label="Geri dön"
+              >
+                <ArrowLeft className="w-5 h-5 text-white/50 group-hover:text-white transition-colors" />
+              </button>
+              
+              <div className="space-y-1">
+                 {customization?.logo_url && (
+                    <img
+                      src={resolveImageUrl(customization.logo_url)}
+                      alt={customization.app_name || 'Logo'}
+                      className="h-12 w-auto object-contain mb-4"
+                    />
+                  )}
+                 <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter">
+                    {customization?.app_name ? customization.app_name : 'NESO'} <span className="text-emerald-500">MENÜ</span>
+                 </h1>
+                 <p className="text-slate-400 font-medium tracking-wide uppercase text-sm">Gurme Lezzetler & Özel Sunumlar</p>
               </div>
             </div>
+
             {!isReserved && (
               <button
                 onClick={handleOrderViaChat}
-                className="px-5 py-3 bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 hover:from-secondary-500/90 hover:to-quaternary-400/90 rounded-xl transition-all shadow-xl shadow-secondary-900/30 flex items-center gap-2 font-semibold"
+                className="glow-button px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-2xl transition-all hover:scale-[1.02] active:scale-95"
               >
                 <ShoppingCart className="w-5 h-5" />
-                Sipariş Ver
+                Siparişinizi Verin
               </button>
             )}
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+             {masa && (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-xs">
+                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                  MASA: {masa}
+                </div>
+              )}
+              {subeId && (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-400 font-bold text-xs">
+                   ŞUBE #{subeId}
+                </div>
+              )}
           </div>
         </div>
       </div>
 
       {/* Category Filter */}
       {categories.length > 0 && (
-        <div className="bg-white/5 border-b border-white/10 backdrop-blur-sm">
-          <div className="max-w-6xl mx-auto px-4 py-4">
-            <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
+        <div className="sticky top-0 z-20 bg-[#050c0a]/80 backdrop-blur-xl border-b border-white/5">
+          <div className="max-w-6xl mx-auto px-6 py-4">
+            <div className="flex gap-3 overflow-x-auto hide-scrollbar">
               <button
                 onClick={() => setSelectedCategory(null)}
-                className={`flex-shrink-0 px-4 py-2 rounded-full transition-all border ${
+                className={`flex-shrink-0 px-6 py-2.5 rounded-xl font-bold text-sm transition-all ${
                   selectedCategory === null
-                    ? 'bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 text-primary-950 border-transparent shadow-lg shadow-secondary-900/30'
-                    : 'bg-white/10 text-white/80 border-white/10 hover:bg-white/15'
+                    ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                    : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-white/5'
                 }`}
               >
-                Tümü
+                TÜMÜ
               </button>
               {categories.map((cat) => (
                 <button
                   key={cat}
                   onClick={() => setSelectedCategory(cat)}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full transition-all border ${
+                  className={`flex-shrink-0 px-6 py-2.5 rounded-xl font-bold text-sm transition-all uppercase tracking-wide ${
                     selectedCategory === cat
-                      ? 'bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 text-primary-950 border-transparent shadow-lg shadow-secondary-900/30'
-                      : 'bg-white/10 text-white/80 border-white/10 hover:bg-white/15'
+                      ? 'bg-emerald-500 text-white shadow-[0_0_15px_rgba(16,185,129,0.3)]'
+                      : 'bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 border border-white/5'
                   }`}
                 >
                   {cat}
@@ -309,69 +297,50 @@ export default function PublicMenuPage() {
                     {category}
                   </h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
                   {items.map((item) => (
                     <div
                       key={item.id}
-                      className="group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm transition-all hover:-translate-y-1 hover:border-secondary-400/80 hover:bg-secondary-900/30"
+                      className="premium-card group rounded-3xl overflow-hidden flex flex-col h-full transition-all duration-500 hover:scale-[1.02] active:scale-95"
                     >
-                      <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.12),_transparent_55%)]" />
-                      <div className="relative p-6 space-y-4">
-                        {item.gorsel_url && (
-                          <div className="overflow-hidden rounded-xl border border-white/10">
-                            <img
-                              src={resolveImageUrl(item.gorsel_url)}
-                              alt={`${item.ad} görseli`}
-                              className="w-full h-40 object-cover transition-transform duration-300 group-hover:scale-105"
-                              loading="lazy"
-                              onError={(e) => {
-                                console.error('Görsel yüklenemedi:', item.gorsel_url, 'Resolved URL:', resolveImageUrl(item.gorsel_url));
-                                (e.target as HTMLImageElement).style.display = 'none';
-                              }}
-                            />
-                          </div>
-                        )}
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <h3 className="text-xl font-semibold tracking-tight text-white">
-                              {item.ad}
-                            </h3>
-                            {item.aciklama && (
-                              <p className="text-sm text-white/60 mt-1 leading-relaxed">
-                                {item.aciklama}
-                              </p>
-                            )}
-                          </div>
-                          <span className="px-3 py-1 rounded-full bg-secondary-500/20 text-secondary-100 font-semibold border border-secondary-400/40">
+                      {item.gorsel_url ? (
+                        <div className="relative h-56 overflow-hidden">
+                          <img
+                            src={resolveImageUrl(item.gorsel_url)}
+                            alt={item.ad}
+                            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#050c0a] via-transparent to-transparent opacity-60" />
+                        </div>
+                      ) : (
+                        <div className="h-56 bg-slate-900/50 flex items-center justify-center">
+                           <ShoppingCart className="w-12 h-12 text-slate-700" />
+                        </div>
+                      )}
+                      
+                      <div className="p-8 flex-1 flex flex-col">
+                        <div className="flex justify-between items-start gap-4 mb-4">
+                          <h3 className="text-2xl font-bold text-white tracking-tight">{item.ad}</h3>
+                          <span className="shrink-0 px-4 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold">
                             {item.fiyat.toFixed(2)} ₺
                           </span>
                         </div>
+                        
+                        {item.aciklama && (
+                          <p className="text-slate-400 font-medium text-sm leading-relaxed mb-6 line-clamp-2">
+                            {item.aciklama}
+                          </p>
+                        )}
+
                         {item.varyasyonlar && item.varyasyonlar.length > 0 && (
-                          <div className="space-y-2 pt-2 border-t border-white/10">
-                            <div className="text-xs font-semibold text-white/70 uppercase tracking-wide">
-                              Varyasyonlar:
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                              {item.varyasyonlar.map((variation: Varyasyon) => (
-                                <span
-                                  key={variation.id}
-                                  className="px-2 py-1 rounded-lg bg-white/10 text-white/90 text-xs border border-white/20"
-                                >
-                                  {variation.ad} (+{variation.ek_fiyat.toFixed(2)} ₺)
-                                </span>
-                              ))}
-                            </div>
+                          <div className="mt-auto pt-6 border-t border-white/5 flex flex-wrap gap-2">
+                             {item.varyasyonlar.map((v) => (
+                               <span key={v.id} className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 bg-white/5 border border-white/10 text-slate-500 rounded-md">
+                                 {v.ad} (+{v.ek_fiyat}₺)
+                               </span>
+                             ))}
                           </div>
                         )}
-                        <div className="flex items-center justify-between text-xs text-white/50">
-                          <span className="flex items-center gap-1">
-                            <span className="inline-block h-2 w-2 rounded-full bg-secondary-300" />
-                            Hazırlanma süresi: 5-10 dk
-                          </span>
-                          <span className="uppercase tracking-widest text-white/40">
-                            {category}
-                          </span>
-                        </div>
                       </div>
                     </div>
                   ))}
@@ -382,14 +351,14 @@ export default function PublicMenuPage() {
         </div>
       </div>
 
-      {/* Bottom CTA */}
+      {/* Floating CTA */}
       {!isReserved && (
-        <div className="fixed bottom-4 right-4">
-          <button
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 md:hidden pb-safe">
+           <button
             onClick={handleOrderViaChat}
-            className="px-6 py-3 bg-gradient-to-r from-secondary-500 via-secondary-400 to-quaternary-400 hover:from-secondary-500/90 hover:to-quaternary-400/90 rounded-full shadow-2xl shadow-secondary-900/30 flex items-center gap-2 font-semibold transition-transform hover:scale-105"
+            className="glow-button px-10 py-5 rounded-full font-bold text-shadow-lg shadow-2xl flex items-center gap-3 active:scale-90 transition-transform"
           >
-            <ShoppingCart className="w-5 h-5" />
+            <ShoppingCart className="w-6 h-6" />
             Sipariş Ver
           </button>
         </div>
