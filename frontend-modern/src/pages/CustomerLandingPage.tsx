@@ -22,7 +22,8 @@ export default function CustomerLandingPage() {
         setLoading(true);
         setError('');
         const API_BASE_URL = (import.meta.env?.VITE_API_URL as string) || 'http://localhost:8000';
-        const response = await fetch(`${API_BASE_URL}/public/masa/${qrCode}`);
+        const encodedQrCode = encodeURIComponent(qrCode);
+        const response = await fetch(`${API_BASE_URL}/public/masa/${encodedQrCode}`);
         if (!response.ok) {
           throw new Error('Masaya ulaşılamadı');
         }
