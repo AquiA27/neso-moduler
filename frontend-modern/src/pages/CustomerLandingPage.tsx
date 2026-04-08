@@ -70,61 +70,104 @@ export default function CustomerLandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-900 via-primary-800 to-primary-900 flex items-center justify-center p-4">
-      <div className="max-w-md w-full space-y-8">
-        {/* Logo/Brand */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Neso</h1>
-          <p className="text-white/70">Sipariş Asistanı</p>
+    <div className="min-h-screen bg-[#050c0a] flex items-center justify-center p-6 relative overflow-hidden font-outfit">
+      {/* Premium Background Elements */}
+      <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-emerald-500/10 blur-[120px] rounded-full animate-pulse-slow" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-emerald-600/5 blur-[100px] rounded-full animate-pulse-slow delay-700" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,rgba(16,185,129,0.03)_0%,transparent_70%)] pointer-events-none" />
+
+      <div className="max-w-md w-full relative z-10 space-y-12">
+        {/* Brand Identity */}
+        <div className="text-center space-y-4 animate-fade-in-down">
+          <div className="inline-block px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
+            Neso Intelligence
+          </div>
+          <h1 className="text-6xl font-black text-white tracking-tighter">
+            NESO<span className="text-emerald-500">.</span>
+          </h1>
+          <p className="text-slate-400 font-medium text-lg tracking-wide uppercase">Dijital Sipariş Deneyimi</p>
         </div>
 
-        {/* Main Card */}
-        <div className="card p-8 space-y-6">
-          <div className="text-center mb-6">
-            <h2 className="text-2xl font-semibold mb-2">Hoş Geldiniz!</h2>
-            <p className="text-white/70">
+        {/* Main Interface Card */}
+        <div className="glass-panel p-10 rounded-[2.5rem] border border-white/5 shadow-2xl space-y-10 relative group overflow-hidden animate-fade-in-up">
+          <div className="absolute inset-0 bg-gradient-to-br from-white/[0.02] to-transparent pointer-events-none" />
+          
+          <div className="text-center space-y-3 relative">
+            <h2 className="text-3xl font-bold text-white tracking-tight">Hoş Geldiniz</h2>
+            <div className="h-1 w-12 bg-emerald-500 mx-auto rounded-full" />
+            <p className="text-slate-400 font-medium pt-2">
               {loading
-                ? 'Masa bilgileriniz yükleniyor...'
-                : 'Size nasıl yardımcı olabiliriz?'}
+                ? 'Masa kimliğiniz doğrulanıyor...'
+                : 'Dijital asistanımız sizi bekliyor.'}
             </p>
+            
             {masa && !loading && (
-              <p className="text-sm text-primary-300 mt-2">Masa: {masa}</p>
+              <div className="mt-6 inline-flex items-center gap-2 px-6 py-2 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-bold text-sm">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                MASA: {masa}
+              </div>
             )}
+            
             {error && (
-              <p className="text-xs text-tertiary-300 mt-2">{error}</p>
+              <div className="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium">
+                {error}
+              </div>
             )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="space-y-4">
+          {/* Premium Actions */}
+          <div className="space-y-4 relative">
             <button
               onClick={handleAsistan}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-gradient-to-r from-secondary-600 to-secondary-500 hover:from-secondary-600/90 hover:to-secondary-500/90 rounded-lg transition-colors text-accent-mist font-semibold text-lg shadow-lg shadow-secondary-900/30 hover:shadow-secondary-800/40 transform hover:scale-[1.02]"
+              className="glow-button w-full group flex items-center justify-between px-8 py-5 rounded-[1.5rem] text-white font-bold text-lg transition-all duration-500 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:grayscale"
             >
-              <MessageCircle className="w-6 h-6" />
-              <span>{loading ? 'Bekleyin...' : 'Asistana Bağlan'}</span>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                  <MessageCircle className="w-6 h-6 text-emerald-300" />
+                </div>
+                <span>{loading ? 'Hazırlanıyor...' : 'Asistanı Başlat'}</span>
+              </div>
+              <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                →
+              </div>
             </button>
 
             <button
               onClick={handleMenu}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-primary-900/40 hover:bg-primary-800/40 rounded-lg transition-colors text-accent-mist font-semibold text-lg border border-primary-500/25"
+              className="w-full group flex items-center justify-between px-8 py-5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 rounded-[1.5rem] text-slate-200 font-bold text-lg transition-all duration-500 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
             >
-              <MenuIcon className="w-6 h-6" />
-              <span>{loading ? 'Bekleyin...' : 'Menüyü Gör'}</span>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                  <MenuIcon className="w-6 h-6 text-slate-400" />
+                </div>
+                <span>Menüyü Keşfet</span>
+              </div>
+              <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                →
+              </div>
             </button>
           </div>
 
-          {/* Info */}
-          <div className="text-center text-sm text-white/50 pt-4 border-t border-white/10">
-            <p>QR kodunu okutarak hızlıca sipariş verebilirsiniz</p>
+          {/* Visual Trust Indicator */}
+          <div className="text-center pt-4 opacity-30 group-hover:opacity-60 transition-opacity">
+             <div className="flex justify-center gap-3">
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="text-center text-white/40 text-xs">
-          <p>Herhangi bir kimlik bilgisi gerektirmez</p>
+        {/* Global Branding Footer */}
+        <div className="text-center space-y-4 animate-fade-in opacity-50">
+          <p className="text-slate-500 text-sm font-medium tracking-widest uppercase">
+            Powered by Neso Advanced AI
+          </p>
+          <div className="text-[10px] text-slate-600 font-bold uppercase tracking-[0.3em]">
+            Zero Identity Tracking • Secure Session
+          </div>
         </div>
       </div>
     </div>
