@@ -233,7 +233,12 @@ export default function MasalarPage() {
         };
       default: // bos
         return { 
-          bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', shadow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.2  return (
+          bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', shadow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]', indicator: 'bg-emerald-500' 
+        };
+    }
+  };
+
+  return (
     <div className="space-y-8">
       
       {/* ÜST GÖSTERGE VE KONTROLLER (GLASSMORPHISM) */}
@@ -243,8 +248,7 @@ export default function MasalarPage() {
           <div className="space-y-2">
             <h2 className="text-4xl font-bold text-white tracking-tight">Kroki & <span className="text-gradient">Yerleşim</span></h2>
             <p className="text-slate-400 font-medium">İşletmenizin fiziksel yapısını ve masa durumlarını gerçek zamanlı tasarlayın.</p>
-          </div>şletmenizin yerleşimini özgürce dizayn edin</p>
-        </div>
+          </div>
         
           <div className="flex bg-slate-900/50 p-1.5 rounded-2xl border border-slate-700/50">
             <button 
