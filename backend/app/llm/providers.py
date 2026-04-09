@@ -177,9 +177,19 @@ class OpenAIProvider(LLMProvider):
                     headers=headers,
                     content=json.dumps(payload),
                 )
+                # Model bulunamazsa (404/400) daha basit modele düş
+                if resp.status_code in (400, 404) and self.model != "gpt-4o-mini":
+                    logging.warning(f"[OpenAI] Model {self.model} not available ({resp.status_code}), falling back to gpt-4o-mini")
+                    self.model = "gpt-4o-mini"
+                    payload["model"] = self.model
+                    resp = await client.post(
+                        "https://api.openai.com/v1/chat/completions",
+                        headers=headers,
+                        content=json.dumps(payload),
+                    )
                 resp.raise_for_status()
                 data = resp.json()
-                
+
             response_text = data["choices"][0]["message"]["content"]
             response_time_ms = int((time.time() - start_time) * 1000)
             
@@ -298,21 +308,36 @@ class GeminiProvider(LLMProvider):
             payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
 
         start_time = time.time()
-        try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(url, json=payload)
-                resp.raise_for_status()
-                data = resp.json()
-                
+        # Deneme sırası: istenen model → gemini-1.5-flash (fallback)
+        models_to_try = [self.model]
+        if self.model != "gemini-1.5-flash":
+            models_to_try.append("gemini-1.5-flash")
+
+        last_error = None
+        for attempt_model in models_to_try:
+            attempt_url = f"https://generativelanguage.googleapis.com/v1beta/models/{attempt_model}:generateContent?key={self.api_key}"
+            try:
+                async with httpx.AsyncClient(timeout=60) as client:
+                    resp = await client.post(attempt_url, json=payload)
+                    if resp.status_code == 404 and attempt_model != models_to_try[-1]:
+                        logging.warning(f"[Gemini] Model {attempt_model} not found (404), trying fallback...")
+                        continue
+                    resp.raise_for_status()
+                    data = resp.json()
+
+                if attempt_model != self.model:
+                    logging.info(f"[Gemini] Using fallback model: {attempt_model}")
+                    self.model = attempt_model
+
                 response_text = data["candidates"][0]["content"]["parts"][0]["text"]
                 response_time_ms = int((time.time() - start_time) * 1000)
-                
-                # Usage extraction (Gemini output is slightly different)
+
+                # Usage extraction
                 usage = data.get("usageMetadata", {})
                 prompt_tokens = usage.get("promptTokenCount", 0)
                 completion_tokens = usage.get("candidatesTokenCount", 0)
                 total_tokens = usage.get("totalTokenCount", 0)
-                
+
                 # Gemini model costs (per 1M tokens)
                 _GEMINI_COSTS = {
                     "gemini-2.5-pro": (1.25, 10.00),
@@ -320,13 +345,12 @@ class GeminiProvider(LLMProvider):
                     "gemini-1.5-pro": (1.25, 5.00),
                     "gemini-1.5-flash": (0.075, 0.30),
                 }
-                model_lower = self.model.lower()
                 g_cost_input, g_cost_output = next(
-                    (v for k, v in _GEMINI_COSTS.items() if k in model_lower),
+                    (v for k, v in _GEMINI_COSTS.items() if k in self.model.lower()),
                     (0.10, 0.40)
                 )
                 cost_usd = (prompt_tokens / 1_000_000 * g_cost_input) + (completion_tokens / 1_000_000 * g_cost_output)
-                
+
                 usage_info = {
                     "prompt_tokens": prompt_tokens,
                     "completion_tokens": completion_tokens,
@@ -334,11 +358,15 @@ class GeminiProvider(LLMProvider):
                     "cost_usd": round(cost_usd, 7),
                     "response_time_ms": response_time_ms,
                 }
-                
+
                 return response_text, usage_info
-        except Exception as e:
-            logging.error(f"[Gemini] Error: {e}")
-            return f"Gemini API hatası: {str(e)[:100]}", None
+            except Exception as e:
+                last_error = e
+                if "404" not in str(e):
+                    break  # 404 değilse retry etme
+
+        logging.error(f"[Gemini] All models failed. Last error: {last_error}")
+        return f"Gemini API hatası: {str(last_error)[:150]}", None
 
 
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
