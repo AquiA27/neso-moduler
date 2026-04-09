@@ -105,17 +105,17 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
         # Önce kolonların varlığını kontrol et
         column_check = await db.fetch_one(
             """
-            SELECT column_name 
+            SELECT count(*) as count
             FROM information_schema.columns 
             WHERE table_name = 'tenant_customizations' 
-            AND column_name IN ('openai_api_key', 'openai_model')
+            AND column_name IN ('customer_assistant_openai_api_key', 'business_assistant_openai_api_key')
             """
         )
         
-        has_openai_columns = column_check is not None
+        has_new_columns = column_check and column_check["count"] >= 2
         
-        # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları çek
-        if has_openai_columns:
+        # Kolonlar varsa dahil et
+        if has_new_columns:
             customization = await db.fetch_one(
                 """
                 SELECT domain, app_name, logo_url, primary_color, secondary_color,
@@ -127,14 +127,29 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
                 {"id": id}
             )
         else:
-            customization = await db.fetch_one(
-                """
-                SELECT domain, app_name, logo_url, primary_color, secondary_color
-                FROM tenant_customizations
-                WHERE isletme_id = :id
-                """,
-                {"id": id}
+            # Sadece temel ve eski OpenAI kolonlarını çek (varsa)
+            openai_col_exists = await db.fetch_one(
+                "SELECT column_name FROM information_schema.columns WHERE table_name = 'tenant_customizations' AND column_name = 'openai_api_key'"
             )
+            
+            if openai_col_exists:
+                customization = await db.fetch_one(
+                    """
+                    SELECT domain, app_name, logo_url, primary_color, secondary_color, openai_api_key, openai_model
+                    FROM tenant_customizations
+                    WHERE isletme_id = :id
+                    """,
+                    {"id": id}
+                )
+            else:
+                customization = await db.fetch_one(
+                    """
+                    SELECT domain, app_name, logo_url, primary_color, secondary_color
+                    FROM tenant_customizations
+                    WHERE isletme_id = :id
+                    """,
+                    {"id": id}
+                )
             # Kolonlar yoksa None olarak ekle
             if customization:
                 customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
@@ -1052,17 +1067,16 @@ async def quick_setup(
             # Kolonların varlığını kontrol et
             column_check = await db.fetch_one(
                 """
-                SELECT column_name 
+                SELECT count(*) as count
                 FROM information_schema.columns 
                 WHERE table_name = 'tenant_customizations' 
-                AND column_name IN ('openai_api_key', 'openai_model')
+                AND column_name IN ('customer_assistant_openai_api_key', 'business_assistant_openai_api_key')
                 """
             )
             
-            has_openai_columns = column_check is not None
+            has_new_columns = column_check and column_check["count"] >= 2
             
-            # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları kullan
-            if has_openai_columns:
+            if has_new_columns:
                 await db.execute(
                     """
                     INSERT INTO tenant_customizations (
@@ -1099,7 +1113,6 @@ async def quick_setup(
                     },
                 )
             else:
-                # Kolonlar yoksa sadece mevcut kolonları kullan
                 await db.execute(
                     """
                     INSERT INTO tenant_customizations (
