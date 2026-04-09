@@ -1722,16 +1722,16 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
     telefon: '',
     adres: '',
     openai_api_key: '',
-    openai_model: 'gpt-4o-mini',
+    openai_model: 'gpt-4o',
     // Müşteri asistanı ayarları
     customer_assistant_openai_api_key: '',
-    customer_assistant_openai_model: 'gpt-4o-mini',
+    customer_assistant_openai_model: 'gpt-4o',
     customer_assistant_tts_voice_id: '',
     customer_assistant_tts_speech_rate: 1.0,
     customer_assistant_tts_provider: 'system',
     // İşletme asistanı ayarları
     business_assistant_openai_api_key: '',
-    business_assistant_openai_model: 'gpt-4o-mini',
+    business_assistant_openai_model: 'gpt-4o',
     business_assistant_tts_voice_id: '',
     business_assistant_tts_speech_rate: 1.0,
     business_assistant_tts_provider: 'system',
@@ -1755,16 +1755,16 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
       telefon: '',
       adres: '',
       openai_api_key: '',
-      openai_model: 'gpt-4o-mini',
+      openai_model: 'gpt-4o',
       // Müşteri asistanı ayarları
       customer_assistant_openai_api_key: '',
-      customer_assistant_openai_model: 'gpt-4o-mini',
+      customer_assistant_openai_model: 'gpt-4o',
       customer_assistant_tts_voice_id: '',
       customer_assistant_tts_speech_rate: 1.0,
       customer_assistant_tts_provider: 'system',
       // İşletme asistanı ayarları
       business_assistant_openai_api_key: '',
-      business_assistant_openai_model: 'gpt-4o-mini',
+      business_assistant_openai_model: 'gpt-4o',
       business_assistant_tts_voice_id: '',
       business_assistant_tts_speech_rate: 1.0,
       business_assistant_tts_provider: 'system',
@@ -1810,16 +1810,16 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
           telefon: response.data.telefon || '',
           adres: response.data.adres || '',
           openai_api_key: maskApiKey(response.data.openai_api_key),
-          openai_model: response.data.openai_model || 'gpt-4o-mini',
+          openai_model: response.data.openai_model || 'gpt-4o',
           // Müşteri asistanı ayarları
           customer_assistant_openai_api_key: maskApiKey(response.data.customer_assistant_openai_api_key),
-          customer_assistant_openai_model: response.data.customer_assistant_openai_model || 'gpt-4o-mini',
+          customer_assistant_openai_model: response.data.customer_assistant_openai_model || 'gpt-4o',
           customer_assistant_tts_voice_id: response.data.customer_assistant_tts_voice_id || '',
           customer_assistant_tts_speech_rate: typeof response.data.customer_assistant_tts_speech_rate === 'number' ? response.data.customer_assistant_tts_speech_rate : parseFloat(String(response.data.customer_assistant_tts_speech_rate || '1.0')) || 1.0,
           customer_assistant_tts_provider: response.data.customer_assistant_tts_provider || 'system',
           // İşletme asistanı ayarları
           business_assistant_openai_api_key: maskApiKey(response.data.business_assistant_openai_api_key),
-          business_assistant_openai_model: response.data.business_assistant_openai_model || 'gpt-4o-mini',
+          business_assistant_openai_model: response.data.business_assistant_openai_model || 'gpt-4o',
           business_assistant_tts_voice_id: response.data.business_assistant_tts_voice_id || '',
           business_assistant_tts_speech_rate: typeof response.data.business_assistant_tts_speech_rate === 'number' ? response.data.business_assistant_tts_speech_rate : parseFloat(String(response.data.business_assistant_tts_speech_rate || '1.0')) || 1.0,
           business_assistant_tts_provider: response.data.business_assistant_tts_provider || 'system',
@@ -1863,12 +1863,12 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         openai_api_key: formData.openai_api_key && !formData.openai_api_key.includes('...')
           ? formData.openai_api_key
           : undefined,
-        openai_model: formData.openai_model || 'gpt-4o-mini',
+        openai_model: formData.openai_model || 'gpt-4o',
         // Müşteri asistanı ayarları
         customer_assistant_openai_api_key: formData.customer_assistant_openai_api_key && !formData.customer_assistant_openai_api_key.includes('...')
           ? formData.customer_assistant_openai_api_key
           : undefined,
-        customer_assistant_openai_model: formData.customer_assistant_openai_model || 'gpt-4o-mini',
+        customer_assistant_openai_model: formData.customer_assistant_openai_model || 'gpt-4o',
         customer_assistant_tts_voice_id: formData.customer_assistant_tts_voice_id || undefined,
         customer_assistant_tts_speech_rate: formData.customer_assistant_tts_speech_rate || 1.0,
         customer_assistant_tts_provider: formData.customer_assistant_tts_provider || 'system',
@@ -1876,7 +1876,7 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         business_assistant_openai_api_key: formData.business_assistant_openai_api_key && !formData.business_assistant_openai_api_key.includes('...')
           ? formData.business_assistant_openai_api_key
           : undefined,
-        business_assistant_openai_model: formData.business_assistant_openai_model || 'gpt-4o-mini',
+        business_assistant_openai_model: formData.business_assistant_openai_model || 'gpt-4o',
         business_assistant_tts_voice_id: formData.business_assistant_tts_voice_id || undefined,
         business_assistant_tts_speech_rate: formData.business_assistant_tts_speech_rate || 1.0,
         business_assistant_tts_provider: formData.business_assistant_tts_provider || 'system',
@@ -1911,16 +1911,16 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
         telefon: response.data.telefon || '',
         adres: response.data.adres || '',
         openai_api_key: maskApiKey(response.data.openai_api_key),
-        openai_model: response.data.openai_model || 'gpt-4o-mini',
+        openai_model: response.data.openai_model || 'gpt-4o',
         // Müşteri asistanı ayarları
         customer_assistant_openai_api_key: maskApiKey(response.data.customer_assistant_openai_api_key),
-        customer_assistant_openai_model: response.data.customer_assistant_openai_model || 'gpt-4o-mini',
+        customer_assistant_openai_model: response.data.customer_assistant_openai_model || 'gpt-4o',
         customer_assistant_tts_voice_id: response.data.customer_assistant_tts_voice_id || '',
         customer_assistant_tts_speech_rate: typeof response.data.customer_assistant_tts_speech_rate === 'number' ? response.data.customer_assistant_tts_speech_rate : (parseFloat(String(response.data.customer_assistant_tts_speech_rate || '1.0')) || 1.0),
         customer_assistant_tts_provider: response.data.customer_assistant_tts_provider || 'system',
         // İşletme asistanı ayarları
         business_assistant_openai_api_key: maskApiKey(response.data.business_assistant_openai_api_key),
-        business_assistant_openai_model: response.data.business_assistant_openai_model || 'gpt-4o-mini',
+        business_assistant_openai_model: response.data.business_assistant_openai_model || 'gpt-4o',
         business_assistant_tts_voice_id: response.data.business_assistant_tts_voice_id || '',
         business_assistant_tts_speech_rate: typeof response.data.business_assistant_tts_speech_rate === 'number' ? response.data.business_assistant_tts_speech_rate : (parseFloat(String(response.data.business_assistant_tts_speech_rate || '1.0')) || 1.0),
         business_assistant_tts_provider: response.data.business_assistant_tts_provider || 'system',
@@ -2134,19 +2134,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
               <p className="text-sm text-gray-600 mb-4">Asistan-specific ayarlar yoksa kullanılacak genel ayarlar</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field
-                  label="OpenAI API Key (Genel)"
+                  label="API Key (Genel)"
                   type="password"
                   value={formData.openai_api_key}
                   onChange={(value) => setFormData((prev) => ({ ...prev, openai_api_key: value }))}
-                  placeholder="sk-..."
-                  helpText="İşletme bazında genel OpenAI API anahtarı. Boş bırakılırsa global API key kullanılır."
+                  placeholder="sk-... veya AIza..."
+                  helpText="OpenAI (sk-...) veya Google Gemini (AIza...) API anahtarı. Boş bırakılırsa global API key kullanılır."
                 />
-                <Field
-                  label="OpenAI Model (Genel)"
+                <ModelSelect
+                  label="AI Model (Genel)"
                   value={formData.openai_model}
                   onChange={(value) => setFormData((prev) => ({ ...prev, openai_model: value }))}
-                  placeholder="gpt-4o-mini"
-                  helpText="Genel OpenAI model (örn: gpt-4o-mini, gpt-4o)"
+                  helpText="Genel asistan modeli. OpenAI (sk-...) veya Google Gemini (AIza...) key'i ile çalışır."
                 />
               </div>
             </div>
@@ -2157,19 +2156,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
               <p className="text-sm text-gray-600 mb-4">Müşteri sipariş asistanı için özel ayarlar</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field
-                  label="OpenAI API Key (Müşteri Asistanı)"
+                  label="API Key (Müşteri Asistanı)"
                   type="password"
                   value={formData.customer_assistant_openai_api_key}
                   onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_openai_api_key: value }))}
-                  placeholder="sk-..."
-                  helpText="Müşteri asistanı için özel API anahtarı. Boş bırakılırsa genel veya global API key kullanılır."
+                  placeholder="sk-... veya AIza..."
+                  helpText="OpenAI (sk-...) veya Google Gemini (AIza...) key. Boş bırakılırsa genel key kullanılır."
                 />
-                <Field
-                  label="OpenAI Model (Müşteri Asistanı)"
+                <ModelSelect
+                  label="AI Model (Müşteri Asistanı)"
                   value={formData.customer_assistant_openai_model}
                   onChange={(value) => setFormData((prev) => ({ ...prev, customer_assistant_openai_model: value }))}
-                  placeholder="gpt-4o-mini"
-                  helpText="Müşteri asistanı için OpenAI model (örn: gpt-4o-mini)"
+                  helpText="Müşteri sipariş asistanı için AI modeli. GPT-4o veya Gemini 2.0 Flash önerilir."
                 />
                 <Field
                   label="TTS Ses ID (Müşteri Asistanı)"
@@ -2205,19 +2203,18 @@ function CustomizationsTab({ tenants, onRefresh }: { tenants: Tenant[]; onRefres
               <p className="text-sm text-gray-600 mb-4">İşletme analiz asistanı için özel ayarlar</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Field
-                  label="OpenAI API Key (İşletme Asistanı)"
+                  label="API Key (İşletme Asistanı)"
                   type="password"
                   value={formData.business_assistant_openai_api_key}
                   onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_openai_api_key: value }))}
-                  placeholder="sk-..."
-                  helpText="İşletme asistanı için özel API anahtarı. Boş bırakılırsa genel veya global API key kullanılır."
+                  placeholder="sk-... veya AIza..."
+                  helpText="OpenAI (sk-...) veya Google Gemini (AIza...) key. Boş bırakılırsa genel key kullanılır."
                 />
-                <Field
-                  label="OpenAI Model (İşletme Asistanı)"
+                <ModelSelect
+                  label="AI Model (İşletme Asistanı)"
                   value={formData.business_assistant_openai_model}
                   onChange={(value) => setFormData((prev) => ({ ...prev, business_assistant_openai_model: value }))}
-                  placeholder="gpt-4o-mini"
-                  helpText="İşletme asistanı için OpenAI model (örn: gpt-4o, gpt-4o-mini)"
+                  helpText="İşletme analiz asistanı için AI modeli. Analitik görevler için GPT-4o veya Gemini 2.5 Pro önerilir."
                 />
                 <Field
                   label="TTS Ses ID (İşletme Asistanı)"
@@ -2655,7 +2652,7 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
     openai_api_key: '',
     customer_assistant_openai_api_key: '',
     business_assistant_openai_api_key: '',
-    openai_model: 'gpt-4o-mini',
+    openai_model: 'gpt-4o',
   };
 
   const [formData, setFormData] = useState(initialForm);
@@ -3008,12 +3005,11 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
                 placeholder="sk-..."
                 helpText="Daha spesifik bir key girilmezse kullanılacak genel anahtar"
               />
-              <Field
-                label="OpenAI Model"
+              <ModelSelect
+                label="AI Model (Varsayılan)"
                 value={formData.openai_model}
                 onChange={(value) => handleChange('openai_model', value)}
-                placeholder="gpt-4o-mini"
-                helpText="Kullanılacak varsayılan model (örn: gpt-4o-mini)"
+                helpText="İşletme için varsayılan AI modeli"
               />
               <Field
                 label="Müşteri Asistanı API Key"
@@ -3045,6 +3041,61 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
           </button>
         </div>
       </form>
+    </div>
+  );
+}
+
+const AI_MODEL_OPTIONS = [
+  {
+    group: 'OpenAI (sk-... ile başlayan key)',
+    models: [
+      { value: 'gpt-4.1', label: 'GPT-4.1 — En Güçlü (2025)' },
+      { value: 'gpt-4o', label: 'GPT-4o — Güçlü & Dengeli' },
+      { value: 'gpt-4o-mini', label: 'GPT-4o Mini — Ekonomik' },
+      { value: 'gpt-4.1-mini', label: 'GPT-4.1 Mini — Hızlı & Uygun Fiyatlı' },
+    ],
+  },
+  {
+    group: 'Google Gemini (AIza... ile başlayan key)',
+    models: [
+      { value: 'gemini-2.5-pro-preview-03-25', label: 'Gemini 2.5 Pro — En Güçlü' },
+      { value: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash — Hızlı & Güçlü' },
+      { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
+      { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash — Ekonomik' },
+    ],
+  },
+];
+
+function ModelSelect({
+  label,
+  value,
+  onChange,
+  helpText,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  helpText?: string;
+}) {
+  return (
+    <div className="flex flex-col">
+      <label className="block text-sm font-medium text-gray-700 mb-2">{label}</label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-gray-900"
+      >
+        {AI_MODEL_OPTIONS.map((group) => (
+          <optgroup key={group.group} label={group.group}>
+            {group.models.map((m) => (
+              <option key={m.value} value={m.value}>
+                {m.label}
+              </option>
+            ))}
+          </optgroup>
+        ))}
+      </select>
+      {helpText && <span className="text-xs text-gray-500 mt-1">{helpText}</span>}
     </div>
   );
 }

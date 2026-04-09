@@ -103,7 +103,7 @@ class RuleBasedProvider(LLMProvider):
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
-        self.model = model or "gpt-4o-mini"
+        self.model = model or "gpt-4o"
 
     async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
         import json
@@ -186,8 +186,18 @@ class OpenAIProvider(LLMProvider):
             usage_info = None
             if "usage" in data:
                 usage = data["usage"]
-                cost_per_1m_input = 0.15 if "gpt-4o-mini" in self.model.lower() else 2.50
-                cost_per_1m_output = 0.60 if "gpt-4o-mini" in self.model.lower() else 10.00
+                _MODEL_COSTS = {
+                    "gpt-4o-mini": (0.15, 0.60),
+                    "gpt-4.1-mini": (0.40, 1.60),
+                    "gpt-4.1-nano": (0.10, 0.40),
+                    "gpt-4.1": (2.00, 8.00),
+                    "gpt-4o": (2.50, 10.00),
+                }
+                model_lower = self.model.lower()
+                cost_per_1m_input, cost_per_1m_output = next(
+                    (v for k, v in _MODEL_COSTS.items() if k in model_lower),
+                    (2.50, 10.00)
+                )
                 cost_usd = (usage.get("prompt_tokens", 0) / 1_000_000 * cost_per_1m_input) + (usage.get("completion_tokens", 0) / 1_000_000 * cost_per_1m_output)
                 
                 usage_info = {
@@ -207,7 +217,7 @@ class OpenAIProvider(LLMProvider):
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
-        self.model = model or "gemini-1.5-flash"
+        self.model = model or "gemini-2.0-flash"
 
     async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
         import json
@@ -303,8 +313,19 @@ class GeminiProvider(LLMProvider):
                 completion_tokens = usage.get("candidatesTokenCount", 0)
                 total_tokens = usage.get("totalTokenCount", 0)
                 
-                # Gemini 1.5 Flash Costs (Approximate: $0.075 / 1M input, $0.30 / 1M output)
-                cost_usd = (prompt_tokens / 1_000_000 * 0.075) + (completion_tokens / 1_000_000 * 0.30)
+                # Gemini model costs (per 1M tokens)
+                _GEMINI_COSTS = {
+                    "gemini-2.5-pro": (1.25, 10.00),
+                    "gemini-2.0-flash": (0.10, 0.40),
+                    "gemini-1.5-pro": (1.25, 5.00),
+                    "gemini-1.5-flash": (0.075, 0.30),
+                }
+                model_lower = self.model.lower()
+                g_cost_input, g_cost_output = next(
+                    (v for k, v in _GEMINI_COSTS.items() if k in model_lower),
+                    (0.10, 0.40)
+                )
+                cost_usd = (prompt_tokens / 1_000_000 * g_cost_input) + (completion_tokens / 1_000_000 * g_cost_output)
                 
                 usage_info = {
                     "prompt_tokens": prompt_tokens,
@@ -406,15 +427,15 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
         # Gemini Kontrolü: Key AIza ile başlıyorsa veya modelde gemini geçiyorsa
         if api_key.startswith("AIza") or (model and "gemini" in model.lower()):
             provider_type = "gemini"
-            if not model or "gpt" in model.lower(): # Model ismi hatalıysa düzelt
-                model = "gemini-1.5-flash"
+            if not model or "gpt" in model.lower():  # Model ismi hatalıysa düzelt
+                model = "gemini-2.0-flash"
         
         if provider_type == "gemini":
             logging.info(f"[LLM_PROVIDER] ♊ Using Gemini ({model}) via {key_source}")
             return GeminiProvider(api_key, model)
         else:
-            logging.info(f"[LLM_PROVIDER] 🤖 Using OpenAI ({model or 'gpt-4o-mini'}) via {key_source}")
-            return OpenAIProvider(api_key, model or "gpt-4o-mini")
+            logging.info(f"[LLM_PROVIDER] 🤖 Using OpenAI ({model or 'gpt-4o'}) via {key_source}")
+            return OpenAIProvider(api_key, model or "gpt-4o")
 
     return RuleBasedProvider(assistant_type=assistant_type or "general")
 
