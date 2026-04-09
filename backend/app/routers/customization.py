@@ -141,7 +141,9 @@ async def upsert_customization(
 
     # Kolonların varlığını kontrol et
     from .customization_helper import check_assistant_columns
-    has_assistant_columns = await check_assistant_columns()
+    has_assistant_columns_dict = await check_assistant_columns()
+    # En azından API key kolonunun varlığından emin olalım
+    has_assistant_columns = has_assistant_columns_dict.get("customer_assistant_openai_api_key", False)
     
     # Sadece temel OpenAI kolonlarını kontrol et (eski yapı için)
     openai_col_row = await db.fetch_one(
@@ -263,7 +265,7 @@ async def upsert_customization(
     if "openai_model" not in row_dict: row_dict["openai_model"] = "gpt-4o-mini"
     
     from .customization_helper import add_default_assistant_fields
-    row_dict = add_default_assistant_fields(row_dict, has_assistant_columns)
+    row_dict = add_default_assistant_fields(row_dict, has_assistant_columns_dict)
 
     if isinstance(row_dict.get("meta_settings"), str):
         row_dict["meta_settings"] = json.loads(row_dict["meta_settings"])
