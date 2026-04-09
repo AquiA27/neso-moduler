@@ -125,233 +125,151 @@ async def get_customization(
 
 
 @router.post("/create", response_model=CustomizationOut)
-async def create_customization(
+@router.patch("/isletme/{isletme_id}", response_model=CustomizationOut)
+async def upsert_customization(
     payload: CustomizationIn,
+    isletme_id: Optional[int] = None,
     user: Dict[str, Any] = Depends(get_current_user),
 ):
-    """Yeni özelleştirme oluştur (super admin only)"""
-    # Super admin kontrolü
+    """Özelleştirme oluştur veya güncelle (Super Admin Only)"""
     if user.get("role") != "super_admin":
-        raise HTTPException(403, "Sadece super admin özelleştirme oluşturabilir")
+        raise HTTPException(403, "Sadece super admin bu işlemi yapabilir")
     
-    # İşletme kontrolü
-    isletme = await db.fetch_one(
-        "SELECT id FROM isletmeler WHERE id = :id",
-        {"id": payload.isletme_id},
-    )
-    if not isletme:
-        raise HTTPException(404, "İşletme bulunamadı")
-    
-    # Domain benzersizlik kontrolü
-    if payload.domain:
-        existing = await db.fetch_one(
-            "SELECT id FROM tenant_customizations WHERE domain = :domain AND isletme_id != :id",
-            {"domain": payload.domain, "id": payload.isletme_id},
-        )
-        if existing:
-            raise HTTPException(400, "Bu domain zaten kullanılıyor")
-    
-    # Mevcut özelleştirme kontrolü
-    existing = await db.fetch_one(
-        "SELECT id FROM tenant_customizations WHERE isletme_id = :id",
-        {"id": payload.isletme_id},
-    )
-    if existing:
-        raise HTTPException(400, "Bu işletme için zaten özelleştirme mevcut. Güncelleme yapın.")
-    
+    target_id = isletme_id or payload.isletme_id
+    if not target_id:
+        raise HTTPException(400, "isletme_id zorunludur")
+
     # Kolonların varlığını kontrol et
-    column_check = await db.fetch_one(
-        """
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'tenant_customizations' 
-        AND column_name IN ('openai_api_key', 'openai_model')
-        """
-    )
+    from .customization_helper import check_assistant_columns
+    has_assistant_columns = await check_assistant_columns()
     
-    has_openai_columns = column_check is not None
+    # Sadece temel OpenAI kolonlarını kontrol et (eski yapı için)
+    openai_col_row = await db.fetch_one(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'tenant_customizations' AND column_name = 'openai_api_key'"
+    )
+    has_openai_columns = openai_col_row is not None
     
     import json
     data = payload.model_dump()
+    data["isletme_id"] = target_id
     data["meta_settings"] = json.dumps(data.get("meta_settings", {}))
     
-    # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları kullan
-    if has_openai_columns:
+    if has_assistant_columns:
+        # En güncel ve tam yapı
         row = await db.fetch_one(
             """
             INSERT INTO tenant_customizations (
                 isletme_id, domain, app_name, logo_url, primary_color,
                 secondary_color, footer_text, email, telefon, adres, 
-                openai_api_key, openai_model, meta_settings
-            )
-            VALUES (
-                :isletme_id, :domain, :app_name, :logo_url, :primary_color,
-                :secondary_color, :footer_text, :email, :telefon, :adres, 
-                :openai_api_key, :openai_model, CAST(:meta_settings AS JSONB)
-            )
-            RETURNING id, isletme_id, domain, app_name, logo_url, primary_color,
-                      secondary_color, footer_text, email, telefon, adres, 
-                      openai_api_key, openai_model, meta_settings,
-                      created_at, updated_at
-            """,
-            data,
-        )
-    else:
-        # Kolonlar yoksa sadece mevcut kolonları kullan
-        row = await db.fetch_one(
-            """
-            INSERT INTO tenant_customizations (
-                isletme_id, domain, app_name, logo_url, primary_color,
-                secondary_color, footer_text, email, telefon, adres, 
+                openai_api_key, openai_model,
+                customer_assistant_openai_api_key, customer_assistant_openai_model,
+                customer_assistant_tts_voice_id, customer_assistant_tts_speech_rate, customer_assistant_tts_provider,
+                business_assistant_openai_api_key, business_assistant_openai_model,
+                business_assistant_tts_voice_id, business_assistant_tts_speech_rate, business_assistant_tts_provider,
                 meta_settings
             )
             VALUES (
                 :isletme_id, :domain, :app_name, :logo_url, :primary_color,
                 :secondary_color, :footer_text, :email, :telefon, :adres, 
+                :openai_api_key, :openai_model,
+                :customer_assistant_openai_api_key, :customer_assistant_openai_model,
+                :customer_assistant_tts_voice_id, :customer_assistant_tts_speech_rate, :customer_assistant_tts_provider,
+                :business_assistant_openai_api_key, :business_assistant_openai_model,
+                :business_assistant_tts_voice_id, :business_assistant_tts_speech_rate, :business_assistant_tts_provider,
                 CAST(:meta_settings AS JSONB)
             )
-            RETURNING id, isletme_id, domain, app_name, logo_url, primary_color,
-                      secondary_color, footer_text, email, telefon, adres, 
-                      meta_settings, created_at, updated_at
+            ON CONFLICT (isletme_id) DO UPDATE SET
+                domain = EXCLUDED.domain,
+                app_name = EXCLUDED.app_name,
+                logo_url = EXCLUDED.logo_url,
+                primary_color = EXCLUDED.primary_color,
+                secondary_color = EXCLUDED.secondary_color,
+                footer_text = EXCLUDED.footer_text,
+                email = EXCLUDED.email,
+                telefon = EXCLUDED.telefon,
+                adres = EXCLUDED.adres,
+                openai_api_key = EXCLUDED.openai_api_key,
+                openai_model = EXCLUDED.openai_model,
+                customer_assistant_openai_api_key = EXCLUDED.customer_assistant_openai_api_key,
+                customer_assistant_openai_model = EXCLUDED.customer_assistant_openai_model,
+                customer_assistant_tts_voice_id = EXCLUDED.customer_assistant_tts_voice_id,
+                customer_assistant_tts_speech_rate = EXCLUDED.customer_assistant_tts_speech_rate,
+                customer_assistant_tts_provider = EXCLUDED.customer_assistant_tts_provider,
+                business_assistant_openai_api_key = EXCLUDED.business_assistant_openai_api_key,
+                business_assistant_openai_model = EXCLUDED.business_assistant_openai_model,
+                business_assistant_tts_voice_id = EXCLUDED.business_assistant_tts_voice_id,
+                business_assistant_tts_speech_rate = EXCLUDED.business_assistant_tts_speech_rate,
+                business_assistant_tts_provider = EXCLUDED.business_assistant_tts_provider,
+                meta_settings = EXCLUDED.meta_settings,
+                updated_at = NOW()
+            RETURNING *
             """,
-            {k: v for k, v in data.items() if k not in ["openai_api_key", "openai_model"]},
+            data,
         )
-        # Kolonlar yoksa None olarak ekle
-        if row:
-            row_dict = dict(row) if hasattr(row, 'keys') else row
-            row_dict["openai_api_key"] = None
-            row_dict["openai_model"] = "gpt-4o-mini"
-            row = row_dict
-    
-    result = dict(row)
-    if isinstance(result.get("meta_settings"), str):
-        result["meta_settings"] = json.loads(result["meta_settings"])
-    return result
-
-
-@router.patch("/isletme/{isletme_id}", response_model=CustomizationOut)
-async def update_customization(
-    isletme_id: int,
-    payload: CustomizationIn,
-    user: Dict[str, Any] = Depends(get_current_user),
-):
-    """Özelleştirmeyi güncelle"""
-    # Super admin kontrolü
-    if user.get("role") != "super_admin":
-        raise HTTPException(403, "Sadece super admin özelleştirme güncelleyebilir")
-    
-    existing = await db.fetch_one(
-        "SELECT id FROM tenant_customizations WHERE isletme_id = :id",
-        {"id": isletme_id},
-    )
-    if not existing:
-        raise HTTPException(404, "Özelleştirme bulunamadı")
-    
-    # Domain benzersizlik kontrolü
-    if payload.domain:
-        existing_domain = await db.fetch_one(
-            "SELECT id FROM tenant_customizations WHERE domain = :domain AND isletme_id != :id",
-            {"domain": payload.domain, "id": isletme_id},
+    elif has_openai_columns:
+        # Sadece OpenAI kolonları olan yapı
+        base_cols = ["isletme_id", "domain", "app_name", "logo_url", "primary_color", "secondary_color", "footer_text", "email", "telefon", "adres", "openai_api_key", "openai_model", "meta_settings"]
+        row = await db.fetch_one(
+            """
+            INSERT INTO tenant_customizations (
+                isletme_id, domain, app_name, logo_url, primary_color,
+                secondary_color, footer_text, email, telefon, adres, openai_api_key, openai_model, meta_settings
+            )
+            VALUES (
+                :isletme_id, :domain, :app_name, :logo_url, :primary_color,
+                :secondary_color, :footer_text, :email, :telefon, :adres, :openai_api_key, :openai_model, CAST(:meta_settings AS JSONB)
+            )
+            ON CONFLICT (isletme_id) DO UPDATE SET
+                domain = EXCLUDED.domain,
+                app_name = EXCLUDED.app_name,
+                logo_url = EXCLUDED.logo_url,
+                primary_color = EXCLUDED.primary_color,
+                secondary_color = EXCLUDED.secondary_color,
+                openai_api_key = EXCLUDED.openai_api_key,
+                openai_model = EXCLUDED.openai_model,
+                updated_at = NOW()
+            RETURNING *
+            """,
+            {k: v for k, v in data.items() if k in base_cols},
         )
-        if existing_domain:
-            raise HTTPException(400, "Bu domain zaten kullanılıyor")
+    else:
+        # En temel yapı
+        base_cols = ["isletme_id", "domain", "app_name", "logo_url", "primary_color", "secondary_color", "footer_text", "email", "telefon", "adres", "meta_settings"]
+        row = await db.fetch_one(
+            """
+            INSERT INTO tenant_customizations (
+                isletme_id, domain, app_name, logo_url, primary_color,
+                secondary_color, footer_text, email, telefon, adres, meta_settings
+            )
+            VALUES (
+                :isletme_id, :domain, :app_name, :logo_url, :primary_color,
+                :secondary_color, :footer_text, :email, :telefon, :adres, CAST(:meta_settings AS JSONB)
+            )
+            ON CONFLICT (isletme_id) DO UPDATE SET
+                domain = EXCLUDED.domain,
+                app_name = EXCLUDED.app_name,
+                logo_url = EXCLUDED.logo_url,
+                primary_color = EXCLUDED.primary_color,
+                secondary_color = EXCLUDED.secondary_color,
+                updated_at = NOW()
+            RETURNING *
+            """,
+            {k: v for k, v in data.items() if k in base_cols},
+        )
     
-    # Kolonların varlığını kontrol et
-    column_check = await db.fetch_one(
-        """
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'tenant_customizations' 
-        AND column_name IN ('openai_api_key', 'openai_model')
-        """
-    )
+    # Eksik kolonları varsayılanlarla doldur (model response_model için)
+    row_dict = dict(row)
+    if "openai_api_key" not in row_dict: row_dict["openai_api_key"] = None
+    if "openai_model" not in row_dict: row_dict["openai_model"] = "gpt-4o-mini"
     
-    has_openai_columns = column_check is not None
+    from .customization_helper import add_default_assistant_fields
+    row_dict = add_default_assistant_fields(row_dict, has_assistant_columns)
+
+    if isinstance(row_dict.get("meta_settings"), str):
+        row_dict["meta_settings"] = json.loads(row_dict["meta_settings"])
     
-    # Assistant kolonlarını kontrol et
-    from .customization_helper import check_assistant_columns
-    has_assistant_columns = await check_assistant_columns()
-    
-    import json
-    data = payload.model_dump(exclude={"isletme_id"}, exclude_unset=False)
-    data["isletme_id"] = isletme_id
-    data["meta_settings"] = json.dumps(data.get("meta_settings", {}))
-    data["updated_at"] = datetime.utcnow()
-    
-    # Sadece verilen alanları güncelle (None olmayan ve boş string olmayan değerler)
-    update_fields = []
-    update_values = {"isletme_id": isletme_id, "updated_at": data["updated_at"]}
-    
-    # OpenAI kolonları varsa dahil et
-    fields_to_update = ["domain", "app_name", "logo_url", "primary_color", "secondary_color",
-                        "footer_text", "email", "telefon", "adres", "meta_settings"]
-    if has_openai_columns:
-        fields_to_update.extend(["openai_api_key", "openai_model"])
-    
-    # Assistant kolonlarını ekle
-    if has_assistant_columns.get("customer_assistant_openai_api_key"):
-        fields_to_update.extend([
-            "customer_assistant_openai_api_key",
-            "customer_assistant_openai_model",
-            "customer_assistant_tts_voice_id",
-            "customer_assistant_tts_speech_rate",
-            "customer_assistant_tts_provider",
-        ])
-    if has_assistant_columns.get("business_assistant_openai_api_key"):
-        fields_to_update.extend([
-            "business_assistant_openai_api_key",
-            "business_assistant_openai_model",
-            "business_assistant_tts_voice_id",
-            "business_assistant_tts_speech_rate",
-            "business_assistant_tts_provider",
-        ])
-    
-    for field in fields_to_update:
-        if field in data and data[field] is not None:
-            # Boş string'leri None'a çevir (opsiyonel alanlar için)
-            optional_string_fields = [
-                "domain", "app_name", "logo_url", "footer_text", "email", "telefon", "adres",
-                "openai_api_key", "customer_assistant_openai_api_key", "business_assistant_openai_api_key",
-                "customer_assistant_tts_voice_id", "business_assistant_tts_voice_id"
-            ]
-            if field in optional_string_fields:
-                if data[field] == "":
-                    update_fields.append(f"{field} = NULL")
-                else:
-                    update_fields.append(f"{field} = :{field}")
-                    update_values[field] = data[field]
-            else:
-                # primary_color, secondary_color, openai_model, meta_settings, speech_rate, provider her zaman güncellenmeli
-                update_fields.append(f"{field} = :{field}")
-                update_values[field] = data[field]
-    
-    if not update_fields:
-        raise HTTPException(400, "Güncellenecek alan yok")
-    
-    # RETURNING kısmını da kolon varlığına göre ayarla
-    from .customization_helper import get_select_fields
-    returning_fields = get_select_fields(has_openai_columns, has_assistant_columns)
-    
-    query = f"""
-        UPDATE tenant_customizations
-        SET {', '.join(update_fields)}, updated_at = :updated_at
-        WHERE isletme_id = :isletme_id
-        RETURNING {returning_fields}
-    """
-    
-    row = await db.fetch_one(query, update_values)
-    
-    # Kolonlar yoksa None olarak ekle
-    if row and not has_openai_columns:
-        row_dict = dict(row) if hasattr(row, 'keys') else row
-        row_dict["openai_api_key"] = None
-        row_dict["openai_model"] = "gpt-4o-mini"
-        row = row_dict
-    
-    result = dict(row)
-    if isinstance(result.get("meta_settings"), str):
-        result["meta_settings"] = json.loads(result["meta_settings"])
-    return result
+    return row_dict
+    return row_dict
 
 
 @router.get("/domain/{domain}", response_model=CustomizationOut)
@@ -360,67 +278,39 @@ async def get_customization_by_domain(
 ):
     """Domain'e göre özelleştirmeyi getir (public endpoint)"""
     # Kolonların varlığını kontrol et
-    column_check = await db.fetch_one(
-        """
-        SELECT column_name 
-        FROM information_schema.columns 
-        WHERE table_name = 'tenant_customizations' 
-        AND column_name IN ('openai_api_key', 'openai_model')
-        """
+    from .customization_helper import check_assistant_columns, get_select_fields, add_default_assistant_fields
+    
+    column_check_row = await db.fetch_one(
+        "SELECT column_name FROM information_schema.columns WHERE table_name = 'tenant_customizations' AND column_name = 'openai_api_key'"
     )
+    has_openai_columns = column_check_row is not None
     
-    has_openai_columns = column_check is not None
+    has_assistant_columns = await check_assistant_columns()
+    select_fields = get_select_fields(has_openai_columns, has_assistant_columns)
     
-    # Kolonlar varsa dahil et, yoksa sadece mevcut kolonları çek
-    if has_openai_columns:
-        row = await db.fetch_one(
-            """
-            SELECT id, isletme_id, domain, app_name, logo_url, primary_color,
-                   secondary_color, footer_text, email, telefon, adres, 
-                   openai_api_key, openai_model, meta_settings,
-                   created_at, updated_at
-            FROM tenant_customizations
-            WHERE domain = :domain
-            """,
-            {"domain": domain},
-        )
-    else:
-        row = await db.fetch_one(
-            """
-            SELECT id, isletme_id, domain, app_name, logo_url, primary_color,
-                   secondary_color, footer_text, email, telefon, adres, 
-                   meta_settings, created_at, updated_at
-            FROM tenant_customizations
-            WHERE domain = :domain
-            """,
-            {"domain": domain},
-        )
-        # Kolonlar yoksa None olarak ekle
-        if row:
-            row_dict = dict(row) if hasattr(row, 'keys') else row
-            row_dict["openai_api_key"] = None
-            row_dict["openai_model"] = "gpt-4o-mini"
-            row = row_dict
+    row = await db.fetch_one(
+        f"SELECT {select_fields} FROM tenant_customizations WHERE domain = :domain",
+        {"domain": domain},
+    )
     
     if not row:
         raise HTTPException(404, "Özelleştirme bulunamadı")
     
-    import json
-    # Record objesini güvenli şekilde dict'e çevir
-    if hasattr(row, 'keys'):
-        result = dict(row)
-    elif isinstance(row, dict):
-        result = row
-    else:
-        result = dict(row) if row else {}
+    row_dict = dict(row)
+    if not has_openai_columns:
+        row_dict["openai_api_key"] = None
+        row_dict["openai_model"] = "gpt-4o-mini"
     
-    if isinstance(result.get("meta_settings"), str):
+    row_dict = add_default_assistant_fields(row_dict, has_assistant_columns)
+    
+    if isinstance(row_dict.get("meta_settings"), str):
+        import json
         try:
-            result["meta_settings"] = json.loads(result["meta_settings"])
-        except (json.JSONDecodeError, TypeError):
-            result["meta_settings"] = {}
-    
-    return result
+            row_dict["meta_settings"] = json.loads(row_dict["meta_settings"])
+        except:
+            row_dict["meta_settings"] = {}
+            
+    return row_dict
 
 
 def resolve_media_path(url: Optional[str]) -> Optional[Path]:
