@@ -875,9 +875,10 @@ async def create_tables(db: Database):
             await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_tts_voice_id TEXT;")
             await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_tts_speech_rate NUMERIC(3,2) DEFAULT 1.0;")
             await db.execute("ALTER TABLE tenant_customizations ADD COLUMN IF NOT EXISTS business_assistant_tts_provider TEXT DEFAULT 'system';")
-        except Exception:
-            pass
-        
+        except Exception as col_err:
+            import logging as _log
+            _log.warning(f"[SCHEMA] tenant_customizations assistant column migration warning: {col_err}")
+
         # Eski kolonları yeni kolonlara migrate et
         await db.execute("ALTER TABLE stok_kalemleri ADD COLUMN IF NOT EXISTS kategori TEXT;")
         await db.execute("ALTER TABLE stok_kalemleri ADD COLUMN IF NOT EXISTS min NUMERIC(12,3) DEFAULT 0;")
