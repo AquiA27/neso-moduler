@@ -2653,6 +2653,8 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
     theme: 'green' as keyof typeof themePresets,
     odeme_turu: 'odeme_sistemi' as 'odeme_sistemi' | 'nakit' | 'havale' | 'kredi_karti',
     openai_api_key: '',
+    customer_assistant_openai_api_key: '',
+    business_assistant_openai_api_key: '',
     openai_model: 'gpt-4o-mini',
   };
 
@@ -2999,19 +3001,35 @@ function QuickSetupTab({ onComplete }: { onComplete: () => void }) {
             <h3 className="text-lg font-semibold text-gray-900 mb-4">OpenAI API Ayarları</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <Field
-                label="OpenAI API Key"
+                label="Genel OpenAI API Key"
                 type="password"
                 value={formData.openai_api_key}
                 onChange={(value) => handleChange('openai_api_key', value)}
                 placeholder="sk-..."
-                helpText="İşletme bazında OpenAI API anahtarı (opsiyonel)"
+                helpText="Daha spesifik bir key girilmezse kullanılacak genel anahtar"
               />
               <Field
                 label="OpenAI Model"
                 value={formData.openai_model}
                 onChange={(value) => handleChange('openai_model', value)}
                 placeholder="gpt-4o-mini"
-                helpText="Kullanılacak OpenAI model"
+                helpText="Kullanılacak varsayılan model (örn: gpt-4o-mini)"
+              />
+              <Field
+                label="Müşteri Asistanı API Key"
+                type="password"
+                value={formData.customer_assistant_openai_api_key}
+                onChange={(value) => handleChange('customer_assistant_openai_api_key', value)}
+                placeholder="sk-..."
+                helpText="Müşteri sipariş asistanı için özel anahtar"
+              />
+              <Field
+                label="İşletme Asistanı API Key"
+                type="password"
+                value={formData.business_assistant_openai_api_key}
+                onChange={(value) => handleChange('business_assistant_openai_api_key', value)}
+                placeholder="sk-..."
+                helpText="İşletme analiz asistanı için özel anahtar"
               />
             </div>
           </div>

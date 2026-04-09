@@ -347,7 +347,9 @@ CREATE TABLE IF NOT EXISTS tenant_customizations (
     email TEXT,
     telefon TEXT,
     adres TEXT,
-    openai_api_key TEXT, -- OpenAI API anahtarı (işletme bazında)
+    openai_api_key TEXT, -- Genel OpenAI API anahtarı
+    customer_assistant_openai_api_key TEXT, -- Müşteri asistanı için özel anahtar
+    business_assistant_openai_api_key TEXT, -- İşletme asistanı için özel anahtar
     openai_model TEXT DEFAULT 'gpt-4o-mini', -- OpenAI model (varsayılan: gpt-4o-mini)
     meta_settings JSONB DEFAULT '{}'::jsonb, -- Ek özelleştirme ayarları
     created_at TIMESTAMPTZ DEFAULT NOW(),

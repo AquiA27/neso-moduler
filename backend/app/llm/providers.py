@@ -106,7 +106,6 @@ class OpenAIProvider(LLMProvider):
         self.model = model or "gpt-4o-mini"
 
     async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
-        # Use httpx directly to avoid hard dep on openai package
         import json
         import httpx
 
@@ -143,44 +142,27 @@ class OpenAIProvider(LLMProvider):
                         if delta:
                             yield delta
                     except Exception:
-                        # Ignore malformed chunks
                         continue
 
     async def chat(self, messages: List[Dict[str, str]], task_type: str = "general") -> tuple[str, Optional[Dict[str, Any]]]:
-        """
-        OpenAI API'ye mesaj gönder ve yanıt al.
-        
-        Returns:
-            tuple[str, Optional[Dict]]: (response_text, usage_info)
-            usage_info: {"prompt_tokens": int, "completion_tokens": int, "total_tokens": int, "cost_usd": float}
-        """
         import httpx
         import json
         import time
         import logging
-        from typing import Optional
 
         # Task-specific parameters
         if task_type == "bi_analysis":
-            # BI analizi için: daha tutarlı, fact-based, deterministik
             temperature = 0.3
             top_p = 0.85
-            frequency_penalty = 0.2
-            presence_penalty = 0.1
         else:
-            # Genel chat için: daha yaratıcı
             temperature = 0.8
             top_p = 0.9
-            frequency_penalty = 0.3
-            presence_penalty = 0.3
 
         payload = {
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
             "top_p": top_p,
-            "frequency_penalty": frequency_penalty,
-            "presence_penalty": presence_penalty,
         }
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -188,8 +170,6 @@ class OpenAIProvider(LLMProvider):
         }
         
         start_time = time.time()
-        usage_info = None
-        
         try:
             async with httpx.AsyncClient(timeout=60) as client:
                 resp = await client.post(
@@ -199,125 +179,242 @@ class OpenAIProvider(LLMProvider):
                 )
                 resp.raise_for_status()
                 data = resp.json()
-        except httpx.HTTPStatusError as http_err:
-            logging.error(f"[OpenAI] HTTP error {http_err.response.status_code}: {http_err.response.text[:500]}")
-            return f"OpenAI API hatası ({http_err.response.status_code}). Lütfen API anahtarınızı kontrol edin.", None
-        except httpx.ConnectError as conn_err:
-            logging.error(f"[OpenAI] Connection error: {conn_err}")
-            return "OpenAI API'ye bağlanılamadı. İnternet bağlantınızı kontrol edin.", None
-        except httpx.TimeoutException:
-            logging.error("[OpenAI] Request timed out after 60s")
-            return "OpenAI API zaman aşımına uğradı. Lütfen tekrar deneyin.", None
-        except Exception as e:
-            logging.error(f"[OpenAI] Unexpected error: {e}", exc_info=True)
-            return f"Beklenmeyen bir hata oluştu: {str(e)[:100]}", None
-        
-        response_time_ms = int((time.time() - start_time) * 1000)
-        
-        try:
+                
             response_text = data["choices"][0]["message"]["content"]
+            response_time_ms = int((time.time() - start_time) * 1000)
             
-            # Usage bilgisini çıkar
+            usage_info = None
             if "usage" in data:
                 usage = data["usage"]
-                prompt_tokens = usage.get("prompt_tokens", 0)
-                completion_tokens = usage.get("completion_tokens", 0)
-                total_tokens = usage.get("total_tokens", 0)
-                
-                # Model bazında maliyet hesapla (USD)
-                # gpt-4o-mini: $0.15 / 1M input tokens, $0.60 / 1M output tokens
-                # gpt-4o: $2.50 / 1M input tokens, $10.00 / 1M output tokens
                 cost_per_1m_input = 0.15 if "gpt-4o-mini" in self.model.lower() else 2.50
                 cost_per_1m_output = 0.60 if "gpt-4o-mini" in self.model.lower() else 10.00
-                cost_usd = (prompt_tokens / 1_000_000 * cost_per_1m_input) + (completion_tokens / 1_000_000 * cost_per_1m_output)
+                cost_usd = (usage.get("prompt_tokens", 0) / 1_000_000 * cost_per_1m_input) + (usage.get("completion_tokens", 0) / 1_000_000 * cost_per_1m_output)
                 
                 usage_info = {
-                    "prompt_tokens": prompt_tokens,
-                    "completion_tokens": completion_tokens,
-                    "total_tokens": total_tokens,
+                    "prompt_tokens": usage.get("prompt_tokens", 0),
+                    "completion_tokens": usage.get("completion_tokens", 0),
+                    "total_tokens": usage.get("total_tokens", 0),
                     "cost_usd": round(cost_usd, 6),
                     "response_time_ms": response_time_ms,
                 }
             
             return response_text, usage_info
         except Exception as e:
-            import logging
-            logging.error(f"OpenAI API error: {e}, response: {data if 'data' in locals() else 'no data'}")
-            return "", None
+            logging.error(f"[OpenAI] Error: {e}")
+            return f"OpenAI hatası: {str(e)[:100]}", None
+
+
+class GeminiProvider(LLMProvider):
+    def __init__(self, api_key: str, model: str):
+        self.api_key = api_key
+        self.model = model or "gemini-1.5-flash"
+
+    async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
+        import json
+        import httpx
+        
+        # Google AI Studio API uses a different structure
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:streamGenerateContent?key={self.api_key}"
+        
+        contents = []
+        if system:
+            # Gemini expects system instructions in a separate field in some versions, 
+            # but for simplicity/compatibility we put it in the messages or use system_instruction
+            pass
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": 0.7,
+                "topP": 0.95,
+                "topK": 40,
+                "maxOutputTokens": 2048,
+            }
+        }
+        
+        if system:
+            payload["system_instruction"] = {"parts": [{"text": system}]}
+
+        async with httpx.AsyncClient(timeout=30) as client:
+            async with client.stream("POST", url, json=payload) as r:
+                r.raise_for_status()
+                async for line in r.aiter_lines():
+                    if not line or not line.strip(): continue
+                    line = line.strip()
+                    # Gemini stream returns a JSON array of candidates
+                    if line.startswith('[') or line.startswith(','): line = line.lstrip('[, ')
+                    if line.endswith(']'): line = line.rstrip(']')
+                    
+                    try:
+                        obj = json.loads(line)
+                        chunk = obj["candidates"][0]["content"]["parts"][0].get("text")
+                        if chunk:
+                            yield chunk
+                    except Exception:
+                        continue
+
+    async def chat(self, messages: List[Dict[str, str]], task_type: str = "general") -> tuple[str, Optional[Dict[str, Any]]]:
+        import httpx
+        import json
+        import time
+        import logging
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        
+        # Convert OpenAI-style messages to Gemini format
+        gemini_history = []
+        system_instruction = None
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                system_instruction = msg["content"]
+            else:
+                role = "user" if msg["role"] == "user" else "model"
+                gemini_history.append({
+                    "role": role,
+                    "parts": [{"text": msg["content"]}]
+                })
+
+        payload = {
+            "contents": gemini_history,
+            "generationConfig": {
+                "temperature": 0.4 if task_type == "bi_analysis" else 0.8,
+                "topP": 0.95,
+                "maxOutputTokens": 4096,
+            }
+        }
+        
+        if system_instruction:
+            payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
+
+        start_time = time.time()
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.post(url, json=payload)
+                resp.raise_for_status()
+                data = resp.json()
+                
+                response_text = data["candidates"][0]["content"]["parts"][0]["text"]
+                response_time_ms = int((time.time() - start_time) * 1000)
+                
+                # Usage extraction (Gemini output is slightly different)
+                usage = data.get("usageMetadata", {})
+                prompt_tokens = usage.get("promptTokenCount", 0)
+                completion_tokens = usage.get("candidatesTokenCount", 0)
+                total_tokens = usage.get("totalTokenCount", 0)
+                
+                # Gemini 1.5 Flash Costs (Approximate: $0.075 / 1M input, $0.30 / 1M output)
+                cost_usd = (prompt_tokens / 1_000_000 * 0.075) + (completion_tokens / 1_000_000 * 0.30)
+                
+                usage_info = {
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens,
+                    "cost_usd": round(cost_usd, 7),
+                    "response_time_ms": response_time_ms,
+                }
+                
+                return response_text, usage_info
+        except Exception as e:
+            logging.error(f"[Gemini] Error: {e}")
+            return f"Gemini API hatası: {str(e)[:100]}", None
 
 
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
     """
     Tenant-specific veya global API key ile LLM provider döndürür.
+    Hem OpenAI hem de Gemini (Google) desteği sağlar.
     """
     import logging
     from ..db.database import db
     
     api_key = None
-    model = settings.OPENAI_MODEL or "gpt-4o-mini"
+    model = None
     key_source = "none"
+    provider_type = "openai" # default
     
     # 1. Tenant-specific key'i kontrol et
     if tenant_id:
         try:
-            api_key_col = "openai_api_key"
-            if assistant_type == "customer": api_key_col = "customer_assistant_openai_api_key"
-            elif assistant_type == "business": api_key_col = "business_assistant_openai_api_key"
+            # Önce asistan-spesifik kolonlara bak
+            cols = ["openai_api_key", "openai_model"]
+            if assistant_type == "customer":
+                cols = ["customer_assistant_openai_api_key", "customer_assistant_openai_model"]
+            elif assistant_type == "business":
+                cols = ["business_assistant_openai_api_key", "business_assistant_openai_model"]
             
-            # Asistan-specific key
-            cust = await db.fetch_one(
-                f"SELECT {api_key_col} as k FROM tenant_customizations WHERE isletme_id = :id", 
+            row = await db.fetch_one(
+                f"SELECT {cols[0]} as k, {cols[1]} as m FROM tenant_customizations WHERE isletme_id = :id", 
                 {"id": tenant_id}
             )
-            if cust and cust["k"]:
-                api_key = cust["k"].strip()
-                key_source = f"tenant_{assistant_type}"
             
-            # Genel tenant key (asistan specific yoksa)
-            if not api_key:
-                cust_gen = await db.fetch_one(
-                    "SELECT openai_api_key as k FROM tenant_customizations WHERE isletme_id = :id", 
+            if row and row["k"]:
+                api_key = row["k"].strip()
+                model = row["m"]
+                key_source = f"tenant_{assistant_type}"
+            else:
+                # Genel tenant key'ine bak
+                row_gen = await db.fetch_one(
+                    "SELECT openai_api_key as k, openai_model as m FROM tenant_customizations WHERE isletme_id = :id", 
                     {"id": tenant_id}
                 )
-                if cust_gen and cust_gen["k"]:
-                    api_key = cust_gen["k"].strip()
+                if row_gen and row_gen["k"]:
+                    api_key = row_gen["k"].strip()
+                    model = row_gen["m"]
                     key_source = "tenant_general"
         except Exception as e:
-            logging.warning(f"[LLM_PROVIDER] Tenant key lookup failed for {tenant_id}: {e}")
+            logging.warning(f"[LLM_PROVIDER] Tenant key lookup failed: {e}")
 
     # 2. Platform settings (DB) kontrol et
     if not api_key:
         try:
             ps_key = "openai_api_key"
-            if assistant_type == "customer": ps_key = "customer_assistant_openai_api_key"
-            elif assistant_type == "business": ps_key = "business_assistant_openai_api_key"
+            ps_model = "openai_model"
+            if assistant_type == "customer":
+                ps_key = "customer_assistant_openai_api_key"
+                ps_model = "customer_assistant_openai_model"
+            elif assistant_type == "business":
+                ps_key = "business_assistant_openai_api_key"
+                ps_model = "business_assistant_openai_model"
             
             row = await db.fetch_one("SELECT value FROM platform_settings WHERE key = :k", {"k": ps_key})
             if row and row["value"]:
                 api_key = row["value"].strip()
                 key_source = f"platform_{ps_key}"
+                # Modeli de al
+                m_row = await db.fetch_one("SELECT value FROM platform_settings WHERE key = :k", {"k": ps_model})
+                model = m_row["value"] if m_row else None
             else:
                 row_gen = await db.fetch_one("SELECT value FROM platform_settings WHERE key = 'openai_api_key'")
                 if row_gen and row_gen["value"]:
                     api_key = row_gen["value"].strip()
                     key_source = "platform_general"
+                    m_gen = await db.fetch_one("SELECT value FROM platform_settings WHERE key = 'openai_model'")
+                    model = m_gen["value"] if m_gen else None
         except Exception as e:
             logging.warning(f"[LLM_PROVIDER] Platform settings lookup failed: {e}")
 
-    # 3. Global Env (.env / environments) kontrol et
+    # 3. Global Env
     if not api_key:
-        api_key_env = settings.OPENAI_API_KEY
-        if api_key_env and api_key_env.strip():
-            api_key = api_key_env.strip()
+        if settings.OPENAI_API_KEY:
+            api_key = settings.OPENAI_API_KEY.strip()
+            model = settings.OPENAI_MODEL
             key_source = "global_env"
 
-    # Karar ve Provider oluşturma
-    is_llm_enabled = settings.ASSISTANT_ENABLE_LLM
-    
-    if is_llm_enabled and api_key:
-        logging.info(f"[LLM_PROVIDER] ✅ Using {key_source} key for {assistant_type}")
-        return OpenAIProvider(api_key, model)
-    
-    logging.warning(f"[LLM_PROVIDER] ⚠️ Fallback to RuleBasedProvider (Source: {key_source}, LLM_Enabled: {is_llm_enabled})")
+    # Karar: Hangi provider?
+    if api_key:
+        # Gemini Kontrolü: Key AIza ile başlıyorsa veya modelde gemini geçiyorsa
+        if api_key.startswith("AIza") or (model and "gemini" in model.lower()):
+            provider_type = "gemini"
+            if not model or "gpt" in model.lower(): # Model ismi hatalıysa düzelt
+                model = "gemini-1.5-flash"
+        
+        if provider_type == "gemini":
+            logging.info(f"[LLM_PROVIDER] ♊ Using Gemini ({model}) via {key_source}")
+            return GeminiProvider(api_key, model)
+        else:
+            logging.info(f"[LLM_PROVIDER] 🤖 Using OpenAI ({model or 'gpt-4o-mini'}) via {key_source}")
+            return OpenAIProvider(api_key, model or "gpt-4o-mini")
+
     return RuleBasedProvider(assistant_type=assistant_type or "general")
 

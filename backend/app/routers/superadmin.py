@@ -119,7 +119,8 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
             customization = await db.fetch_one(
                 """
                 SELECT domain, app_name, logo_url, primary_color, secondary_color,
-                       openai_api_key, openai_model
+                       openai_api_key, openai_model,
+                       customer_assistant_openai_api_key, business_assistant_openai_api_key
                 FROM tenant_customizations
                 WHERE isletme_id = :id
                 """,
@@ -139,17 +140,26 @@ async def tenant_detail(id: int, _: Dict[str, Any] = Depends(get_current_user)):
                 customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
                 customization_dict["openai_api_key"] = None
                 customization_dict["openai_model"] = None
+                customization_dict["customer_assistant_openai_api_key"] = None
+                customization_dict["business_assistant_openai_api_key"] = None
                 customization = customization_dict
         
-        # API key'i kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
+        # API key'leri kısalt (güvenlik için sadece ilk 8 ve son 4 karakteri göster)
         if customization:
             customization_dict = dict(customization) if hasattr(customization, 'keys') else customization
-            if customization_dict.get("openai_api_key"):
-                api_key = str(customization_dict["openai_api_key"])
-                if api_key and api_key != "None" and len(api_key) > 12:
-                    customization_dict["openai_api_key"] = f"{api_key[:8]}...{api_key[-4:]}"
-                elif api_key and api_key != "None":
-                    customization_dict["openai_api_key"] = "***"
+            
+            # Maskeleme fonksiyonu
+            def mask_key(key):
+                if key and key != "None" and len(key) > 12:
+                    return f"{key[:8]}...{key[-4:]}"
+                elif key and key != "None":
+                    return "***"
+                return None
+
+            customization_dict["openai_api_key"] = mask_key(customization_dict.get("openai_api_key"))
+            customization_dict["customer_assistant_openai_api_key"] = mask_key(customization_dict.get("customer_assistant_openai_api_key"))
+            customization_dict["business_assistant_openai_api_key"] = mask_key(customization_dict.get("business_assistant_openai_api_key"))
+            
             customization = customization_dict
         
         # 6. İstatistikler
@@ -932,7 +942,9 @@ class QuickSetupIn(BaseModel):
     logo_url: Optional[str] = None
     theme: Optional[str] = Field(default="green")  # green, blue, purple, rose
     odeme_turu: Optional[str] = Field(default="odeme_sistemi")  # odeme_sistemi, nakit, havale, kredi_karti
-    openai_api_key: Optional[str] = Field(None, description="OpenAI API anahtarı (işletme bazında)")
+    openai_api_key: Optional[str] = Field(None, description="OpenAI API anahtarı (işletme bazında - genel)")
+    customer_assistant_openai_api_key: Optional[str] = Field(None, description="Müşteri asistanı OpenAI API anahtarı")
+    business_assistant_openai_api_key: Optional[str] = Field(None, description="İşletme asistanı OpenAI API anahtarı")
     openai_model: Optional[str] = Field(default="gpt-4o-mini", description="OpenAI model")
 
 
@@ -1055,10 +1067,12 @@ async def quick_setup(
                     """
                     INSERT INTO tenant_customizations (
                         isletme_id, domain, app_name, logo_url, primary_color, secondary_color,
-                        openai_api_key, openai_model
+                        openai_api_key, customer_assistant_openai_api_key, business_assistant_openai_api_key,
+                        openai_model
                     )
                     VALUES (:isletme_id, :domain, :app_name, :logo_url, :primary_color, :secondary_color,
-                            :openai_api_key, :openai_model)
+                            :openai_api_key, :customer_assistant_openai_api_key, :business_assistant_openai_api_key,
+                            :openai_model)
                     ON CONFLICT (isletme_id) DO UPDATE
                        SET domain = EXCLUDED.domain,
                            app_name = EXCLUDED.app_name,
@@ -1066,6 +1080,8 @@ async def quick_setup(
                            primary_color = EXCLUDED.primary_color,
                            secondary_color = EXCLUDED.secondary_color,
                            openai_api_key = EXCLUDED.openai_api_key,
+                           customer_assistant_openai_api_key = EXCLUDED.customer_assistant_openai_api_key,
+                           business_assistant_openai_api_key = EXCLUDED.business_assistant_openai_api_key,
                            openai_model = EXCLUDED.openai_model,
                            updated_at = NOW()
                     """,
@@ -1077,6 +1093,8 @@ async def quick_setup(
                         "primary_color": theme_color["primary"],
                         "secondary_color": theme_color["secondary"],
                         "openai_api_key": payload.openai_api_key,
+                        "customer_assistant_openai_api_key": payload.customer_assistant_openai_api_key,
+                        "business_assistant_openai_api_key": payload.business_assistant_openai_api_key,
                         "openai_model": payload.openai_model or "gpt-4o-mini",
                     },
                 )
