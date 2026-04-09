@@ -1999,24 +1999,15 @@ async def chat_smart(payload: ChatRequest):
         )
     
         # Greeting ve diğer ön kontroller artık LLM'e (Gemini) bırakıldı
-        is_greeting_only = False
-        is_likely_order = True # Varsayılan olarak her şeyi analiz etmesi için LLM'e izin ver
-            logging.info(f"[GREETING] Detected as greeting in order check: '{text}' -> skipping parse")
+        # Varsayılan olarak her şeyi analiz etmesi için LLM'e izin ver
+        is_likely_order = True 
+        
+        if asks_math or asks_sore_throat or asks_recommendation or asks_question or asks_availability:
+            # Soru ve öneri durumlarında da LLM'e git ama önce parse denemesi yapma (performans için)
             is_likely_order = False
-        elif asks_math:
-            logging.info(f"[MATH] Detected as math question: '{text}' -> skipping parse")
-            is_likely_order = False
-        elif asks_sore_throat:
-            logging.info(f"[HEALTH] Detected health/sickness query: '{text}' -> skipping parse, will recommend herbal teas")
-            is_likely_order = False
-        elif asks_recommendation or asks_question or asks_availability:
-            logging.info(f"[QUESTION/RECOMMENDATION] Detected question/recommendation request: '{text}' -> skipping parse, LLM will handle")
-            is_likely_order = False
-        elif asks_dairy or asks_milky_coffee or asks_caffeine or asks_gluten or asks_cold or asks_hot or asks_sleepy or asks_energy or asks_ingredients:
-            logging.info(f"[FILTERING] Detected attribute filtering request: '{text}' -> skipping parse, LLM will handle")
+        elif asks_dairy or asks_milky_coffee or asks_caffeine or asks_gluten or asks_cold or asks_hot:
             is_likely_order = False
         else:
-            # Diğer durumlarda her zaman LLM'e (Gemini) sorması için açık kapı bırakıyoruz
             is_likely_order = True
         
             # ÖNEMLİ: Eğer conversation history'de varyasyon sorusu varsa ve kullanıcı muhtemelen varyasyon cevabı veriyorsa, parse yap
