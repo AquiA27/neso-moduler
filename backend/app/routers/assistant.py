@@ -1998,38 +1998,23 @@ async def chat_smart(payload: ChatRequest):
             asks_availability,
         )
     
-        # Greeting ve diğer ön kontroller artık LLM'e (Gemini) bırakıldı
-        # Varsayılan olarak her şeyi analiz etmesi için LLM'e izin ver
-        is_likely_order = True 
+        # AI Asistan Mantığı: Varsayılan olarak her mesajı analiz et
+        is_likely_order = True
         
+        # Eğer mesaj bir soru, öneri veya matematik işlemiyse, doğrudan LLM'e git (parse yapma)
         if asks_math or asks_sore_throat or asks_recommendation or asks_question or asks_availability:
-            # Soru ve öneri durumlarında da LLM'e git ama önce parse denemesi yapma (performans için)
             is_likely_order = False
         elif asks_dairy or asks_milky_coffee or asks_caffeine or asks_gluten or asks_cold or asks_hot:
             is_likely_order = False
-        else:
-            is_likely_order = True
         
-            # ÖNEMLİ: Eğer conversation history'de varyasyon sorusu varsa ve kullanıcı muhtemelen varyasyon cevabı veriyorsa, parse yap
-            if not is_likely_order and history_snapshot:
-                logging.info(f"[ORDER_CHECK] Checking history_snapshot: {len(history_snapshot)} messages")
-                # Son assistant mesajına bak (son 5 mesaja bak çünkü conversation uzun olabilir)
-                for msg in reversed(history_snapshot[:5]):
-                    if msg.get("role") == "assistant":
-                        assistant_text = msg.get("content", "")
-                        logging.info(f"[ORDER_CHECK] Checking assistant message: '{assistant_text[:100]}...'")
-                        # Varyasyon sorusu içeriyor mu kontrol et
-                        if ("hangi seçenek" in assistant_text.lower() or 
-                            "seçenek belirtmediniz" in assistant_text.lower() or 
-                            "tercihinizi belirtir" in assistant_text.lower() or
-                            "hangi secene" in assistant_text.lower() or
-                            "secenek belirtmediniz" in assistant_text.lower() or
-                            "tercihinizi belirt" in assistant_text.lower() or
-                            any(var in assistant_text.lower() for var in ["orta", "sade", "şekerli", "sekerli"])):
-                            # Bu varyasyon sorusu, kullanıcının cevabı muhtemelen varyasyon adı
-                            logging.info(f"[ORDER_CHECK] Detected potential variation response: '{text}'")
-                            is_likely_order = True
-                            break
+        # Geçmiş mesajlarda cevaplanmamış bir varyasyon sorusu varsa, parse yapmaya zorla
+        if not is_likely_order and history_snapshot:
+            for msg in reversed(history_snapshot[:5]):
+                if msg.get("role") == "assistant":
+                    assistant_text = (msg.get("content") or "").lower()
+                    if any(x in assistant_text for x in ["hangi seçenek", "seçenek belirt", "tercihiniz"]):
+                        is_likely_order = True
+                        break
         
             logging.info(f"[ORDER_CHECK] is_likely_order={is_likely_order}")
     
