@@ -266,7 +266,7 @@ class GeminiProvider(LLMProvider):
         }
         
         if system_instruction:
-            payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
+            payload["systemInstruction"] = {"role": "system", "parts": [{"text": system_instruction}]}
 
         async with httpx.AsyncClient(timeout=30) as client:
             async with client.stream("POST", url, json=payload) as r:
@@ -331,7 +331,7 @@ class GeminiProvider(LLMProvider):
         }
         
         if system_instruction:
-            payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
+            payload["systemInstruction"] = {"role": "system", "parts": [{"text": system_instruction}]}
 
         start_time = time.time()
         # Her model için hem v1beta hem v1 API versiyonunu dene
