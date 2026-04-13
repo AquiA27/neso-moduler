@@ -256,10 +256,11 @@ class GeminiProvider(LLMProvider):
                 "temperature": temperature,
                 "topP": 0.95,
                 "topK": 40,
+            }
         }
         
-        if system:
-            payload["system_instruction"] = {"parts": [{"text": system}]}
+        if system_instruction:
+            payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
 
         async with httpx.AsyncClient(timeout=30) as client:
             async with client.stream("POST", url, json=payload) as r:
