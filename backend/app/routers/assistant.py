@@ -2913,8 +2913,7 @@ async def chat_smart(payload: ChatRequest):
                 context_lines.append("Kullanıcı enerji/ayıltıcı içecek arıyor. Kafeinli kahveleri öner ve etkilerini açıkla.")
                 force_default_reply = True
             elif asks_recommendation:
-                rec_items = _pick_menu_samples(menu_items, 4)
-                suggestions = [item["ad"] for item in rec_items]
+                suggestions = _pick_menu_samples(menu_items, 4)
                 default_reply = (
                     f"Günün favorilerinden {', '.join(suggestions[:3])} çok beğeniliyor. "
                     "Hangisini istersin?"
