@@ -228,12 +228,12 @@ class OpenAIProvider(LLMProvider):
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
-        # Harita eski model isimlerini (artık 404 veren) yenilerine yönlendiriyor
+        # Harita eski model isimlerini yenilerine yönlendiriyor
         model_map = {
-            "gemini-1.5-pro": "gemini-1.5-pro-latest",
-            "gemini-1.5-flash": "gemini-2.0-flash"
+            "gemini-1.5-pro": "gemini-1.5-pro-latest"
         }
-        raw_model = model or "gemini-2.0-flash"
+        # GEMINI 2.0-flash bazı hesaplarda (404 no longer available) engelli olduğu için ana fallback 1.5-flash
+        raw_model = model or "gemini-1.5-flash"
         self.model = model_map.get(raw_model, raw_model)
 
     async def stream(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 2048) -> AsyncIterator[str]:
@@ -334,11 +334,10 @@ class GeminiProvider(LLMProvider):
             payload["systemInstruction"] = {"role": "system", "parts": [{"text": system_instruction}]}
 
         start_time = time.time()
-        # Her model için hem v1beta hem v1 API versiyonunu dene
+        # SADECE v1beta kullan, çünkü v1 systemInstruction desteklemiyor ve şematik olarak farklı
         candidates = []
-        for m in ([self.model] + (["gemini-2.0-flash"] if self.model != "gemini-2.0-flash" else [])):
+        for m in ([self.model] + (["gemini-1.5-flash"] if self.model != "gemini-1.5-flash" else [])):
             candidates.append((m, "v1beta"))
-            candidates.append((m, "v1"))
 
         last_error = None
         for attempt_model, api_ver in candidates:
@@ -543,7 +542,7 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
         elif provider_type == "gemini" or api_key_str.startswith("AIza") or (model and "gemini" in model.lower()):
             provider_type = "gemini"
             if not model or "gpt" in model.lower():  # Model ismi hatalıysa düzelt
-                model = "gemini-2.0-flash"
+                model = "gemini-1.5-flash"
         
         if provider_type == "gemini":
             logging.info(f"[LLM_PROVIDER] ♊ Using Gemini ({model}) via {key_source}")
