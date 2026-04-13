@@ -306,6 +306,13 @@ class GeminiProvider(LLMProvider):
                         "role": role,
                         "parts": [{"text": msg["content"]}]
                     })
+                    
+        # Gemini STRICT RULE: The history must start with a 'user' message
+        if gemini_history and gemini_history[0]["role"] == "model":
+            gemini_history.insert(0, {
+                "role": "user",
+                "parts": [{"text": "(Devam...)"}]
+            })
 
         payload = {
             "contents": gemini_history,
