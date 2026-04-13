@@ -228,7 +228,13 @@ class OpenAIProvider(LLMProvider):
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
-        self.model = model or "gemini-2.0-flash"
+        # Harita eski model isimlerini (artık 404 veren) yenilerine yönlendiriyor
+        model_map = {
+            "gemini-1.5-pro": "gemini-1.5-pro-latest",
+            "gemini-1.5-flash": "gemini-2.0-flash"
+        }
+        raw_model = model or "gemini-2.0-flash"
+        self.model = model_map.get(raw_model, raw_model)
 
     async def stream(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 2048) -> AsyncIterator[str]:
         import json
@@ -330,7 +336,7 @@ class GeminiProvider(LLMProvider):
         start_time = time.time()
         # Her model için hem v1beta hem v1 API versiyonunu dene
         candidates = []
-        for m in ([self.model] + (["gemini-1.5-flash"] if self.model != "gemini-1.5-flash" else [])):
+        for m in ([self.model] + (["gemini-2.0-flash"] if self.model != "gemini-2.0-flash" else [])):
             candidates.append((m, "v1beta"))
             candidates.append((m, "v1"))
 
