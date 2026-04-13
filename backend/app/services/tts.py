@@ -158,9 +158,10 @@ async def _get_assistant_settings(tenant_id: Optional[int] = None, assistant_typ
                     return default
             return default
 
-            voice_id = voice_id or _coerce_str(settings_dict.get("assistant_tts_voice_id"))
-            rate = rate if voice_id else _coerce_float(settings_dict.get("assistant_tts_speech_rate"), 1.0)
-            provider = (provider if voice_id or provider != "system" else _coerce_str(settings_dict.get("assistant_tts_provider"), "system") or "system").lower()
+        # Ayarları ayrıştır
+        voice_id = voice_id or _coerce_str(settings_dict.get("assistant_tts_voice_id"))
+        rate = rate if voice_id or rate != 1.0 else _coerce_float(settings_dict.get("assistant_tts_speech_rate"), 1.0)
+        provider = (provider if voice_id or provider != "system" else _coerce_str(settings_dict.get("assistant_tts_provider"), "system") or "system").lower()
 
         valid_providers = ["system", "google", "azure", "aws", "openai"]
         if provider not in valid_providers:

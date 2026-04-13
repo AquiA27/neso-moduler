@@ -98,9 +98,13 @@ class Settings(BaseSettings):
     DEFAULT_ADMIN_USERNAME: str = "admin"
     DEFAULT_ADMIN_PASSWORD: str = "admin123"  # SADECE ilk kurulum; prod'da değiştir
 
-    # ---------- Opsiyonel: OpenAI ----------
+    # ---------- Opsiyonel: LLM (OpenAI & Gemini) ----------
     OPENAI_MODEL: Optional[str] = "gpt-4o-mini"
     OPENAI_API_KEY: Optional[str] = None
+    
+    GOOGLE_API_KEY: Optional[str] = None
+    GEMINI_MODEL: Optional[str] = "gemini-2.0-flash"
+
     # Sesli asistan altyapısı için bayraklar
     ASSISTANT_ENABLE_LLM: bool = True
     ASSISTANT_ENABLE_TTS: bool = True   # Client-side tarayıcı SpeechSynthesis; sunucu TTS için ileride

@@ -230,27 +230,32 @@ class GeminiProvider(LLMProvider):
         self.api_key = api_key
         self.model = model or "gemini-2.0-flash"
 
-    async def stream(self, prompt: str, system: Optional[str] = None) -> AsyncIterator[str]:
+    async def stream(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 2048) -> AsyncIterator[str]:
         import json
         import httpx
         
-        # Google AI Studio API uses a different structure
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:streamGenerateContent?key={self.api_key}"
         
+        # System instruction extraction
+        system_instruction = None
+        for msg in messages:
+            if msg["role"] == "system":
+                system_instruction = msg["content"]
+                break
+
         contents = []
-        if system:
-            # Gemini expects system instructions in a separate field in some versions, 
-            # but for simplicity/compatibility we put it in the messages or use system_instruction
-            pass
+        for msg in messages:
+            if msg["role"] == "system":
+                continue
+            role = "user" if msg["role"] == "user" else "model"
+            contents.append({"role": role, "parts": [{"text": msg["content"]}]})
 
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}],
+            "contents": contents,
             "generationConfig": {
-                "temperature": 0.7,
+                "temperature": temperature,
                 "topP": 0.95,
                 "topK": 40,
-                "maxOutputTokens": 2048,
-            }
         }
         
         if system:
@@ -426,9 +431,10 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
         except Exception as e:
             logging.warning(f"[LLM_PROVIDER] Tenant key lookup failed: {e}")
 
-    # 2. Platform settings (DB) kontrol et
+    # 2. Global Ayarlar (DB) kontrol et - platform_settings ve app_settings tabloları
     if not api_key:
         try:
+            # Aranan anahtarlar
             ps_key = "openai_api_key"
             ps_model = "openai_model"
             if assistant_type == "customer":
@@ -437,35 +443,81 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
             elif assistant_type == "business":
                 ps_key = "business_assistant_openai_api_key"
                 ps_model = "business_assistant_openai_model"
+
+
+
+            # Önce platform_settings, sonra app_settings kontrol et
+            for table in ["platform_settings", "app_settings"]:
+                try:
+                    # Spesifik anahtarı ara
+                    row = await db.fetch_one(f"SELECT value FROM {table} WHERE key = :k", {"k": ps_key})
+                    if row and row["value"]:
+                        val = row["value"]
+                        # app_settings JSONB ise ve string olarak kaydedilmişse temizle
+                        if isinstance(val, str) and val.startswith('"') and val.endswith('"'):
+                            import json
+                            try: val = json.loads(val)
+                            except: pass
+                        
+                        api_key = str(val).strip()
+                        key_source = f"{table}_{ps_key}"
+                        
+                        # Modeli de al
+                        m_row = await db.fetch_one(f"SELECT value FROM {table} WHERE key = :k", {"k": ps_model})
+                        if m_row and m_row["value"]:
+                            m_val = m_row["value"]
+                            if isinstance(m_val, str) and m_val.startswith('"') and m_val.endswith('"'):
+                                try: m_val = json.loads(m_val)
+                                except: pass
+                            model = str(m_val)
+                        break
+                except Exception as table_err:
+                    logging.debug(f"[LLM_PROVIDER] Table {table} lookup error: {table_err}")
+                    continue
             
-            row = await db.fetch_one("SELECT value FROM platform_settings WHERE key = :k", {"k": ps_key})
-            if row and row["value"]:
-                api_key = row["value"].strip()
-                key_source = f"platform_{ps_key}"
-                # Modeli de al
-                m_row = await db.fetch_one("SELECT value FROM platform_settings WHERE key = :k", {"k": ps_model})
-                model = m_row["value"] if m_row else None
-            else:
-                row_gen = await db.fetch_one("SELECT value FROM platform_settings WHERE key = 'openai_api_key'")
-                if row_gen and row_gen["value"]:
-                    api_key = row_gen["value"].strip()
-                    key_source = "platform_general"
-                    m_gen = await db.fetch_one("SELECT value FROM platform_settings WHERE key = 'openai_model'")
-                    model = m_gen["value"] if m_gen else None
+            # Eğer hala bulunamadıysa genel 'openai_api_key' anahtarına bak
+            if not api_key:
+                for table in ["platform_settings", "app_settings"]:
+                    try:
+                        row_gen = await db.fetch_one(f"SELECT value FROM {table} WHERE key = 'openai_api_key'")
+                        if row_gen and row_gen["value"]:
+                            val = row_gen["value"]
+                            if isinstance(val, str) and val.startswith('"') and val.endswith('"'):
+                                try: val = json.loads(val)
+                                except: pass
+                            
+                            api_key = str(val).strip()
+                            key_source = f"{table}_general"
+                            
+                            m_gen = await db.fetch_one(f"SELECT value FROM {table} WHERE key = 'openai_model'")
+                            if m_gen and m_gen["value"]:
+                                m_val = m_gen["value"]
+                                if isinstance(m_val, str) and m_val.startswith('"') and m_val.endswith('"'):
+                                    try: m_val = json.loads(m_val)
+                                    except: pass
+                                model = str(m_val)
+                            break
+                    except: continue
+
         except Exception as e:
-            logging.warning(f"[LLM_PROVIDER] Platform settings lookup failed: {e}")
+            logging.warning(f"[LLM_PROVIDER] Settings DB lookup failed: {e}")
 
     # 3. Global Env
     if not api_key:
-        if settings.OPENAI_API_KEY:
+        if settings.GOOGLE_API_KEY:
+            api_key = settings.GOOGLE_API_KEY.strip()
+            model = settings.GEMINI_MODEL
+            key_source = "global_env_google"
+            provider_type = "gemini"
+        elif settings.OPENAI_API_KEY:
             api_key = settings.OPENAI_API_KEY.strip()
             model = settings.OPENAI_MODEL
-            key_source = "global_env"
+            key_source = "global_env_openai"
 
     # Karar: Hangi provider?
     if api_key:
         # Gemini Kontrolü: Key AIza ile başlıyorsa veya modelde gemini geçiyorsa
-        if api_key.startswith("AIza") or (model and "gemini" in model.lower()):
+        if provider_type == "gemini" or api_key.startswith("AIza") or (model and "gemini" in model.lower()):
             provider_type = "gemini"
             if not model or "gpt" in model.lower():  # Model ismi hatalıysa düzelt
                 model = "gemini-2.0-flash"
