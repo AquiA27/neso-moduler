@@ -2912,6 +2912,15 @@ async def chat_smart(payload: ChatRequest):
                     default_reply = "Enerji veren kahvelerimizden birini önerebilirim; istersen espresso bazlı hazırlayayım."
                 context_lines.append("Kullanıcı enerji/ayıltıcı içecek arıyor. Kafeinli kahveleri öner ve etkilerini açıkla.")
                 force_default_reply = True
+            elif asks_recommendation:
+                rec_items = _pick_menu_samples(menu_items, 4)
+                suggestions = [item["ad"] for item in rec_items]
+                default_reply = (
+                    f"Günün favorilerinden {', '.join(suggestions[:3])} çok beğeniliyor. "
+                    "Hangisini istersin?"
+                )
+                context_lines.append("Kullanıcı genel bir öneri istiyor. Menüden favori/popüler ürünleri öner.")
+                force_default_reply = True
             elif mentions_negative_mood:
                 comfort_items = _select_dessert_items(menu_items) or _select_temp_recommendations(menu_items, HOT_DRINK_KEYWORDS)
                 comfort_names = [item["ad"] for item in comfort_items[:4]] if comfort_items else _pick_menu_samples(menu_items, 4)
