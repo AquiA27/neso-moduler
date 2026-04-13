@@ -530,8 +530,15 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
 
     # Karar: Hangi provider?
     if api_key:
-        # Gemini Kontrolü: Key AIza ile başlıyorsa veya modelde gemini geçiyorsa
-        if provider_type == "gemini" or api_key.startswith("AIza") or (model and "gemini" in model.lower()):
+        api_key_str = str(api_key).strip()
+        
+        # 1. Eğer key açıkça OpenAI key'i ise (sk- ile başlar), modeli ez ve OpenAI kullan
+        if api_key_str.startswith("sk-") and not api_key_str.startswith("sk-ant"):
+            provider_type = "openai"
+            if not model or "gemini" in model.lower():
+                model = "gpt-4o-mini"
+        # 2. Eğer açıkça Gemini istenmişse
+        elif provider_type == "gemini" or api_key_str.startswith("AIza") or (model and "gemini" in model.lower()):
             provider_type = "gemini"
             if not model or "gpt" in model.lower():  # Model ismi hatalıysa düzelt
                 model = "gemini-2.0-flash"
