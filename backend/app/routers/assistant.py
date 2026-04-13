@@ -3188,8 +3188,8 @@ Cevap vermeden önce içinden şu adımları izle:
             logging.error(f"[LLM] Error calling LLM provider: {e}", exc_info=True)
             reply_text = ""
 
-            if not reply_text or len(reply_text.strip()) == 0:
-                reply_text = default_reply or "Size yardimci olmaya hazirim. Menuden bir sey onerebilirim!"
+        if not reply_text or len(reply_text.strip()) == 0:
+            reply_text = default_reply or "Size yardimci olmaya hazirim. Menuden bir sey onerebilirim!"
 
         # Eğer reply'de greeting varsa ve not_matched sadece greeting kelimeleri içeriyorsa, temizle
         reply_lower = reply_text.lower()

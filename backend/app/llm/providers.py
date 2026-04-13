@@ -266,7 +266,7 @@ class GeminiProvider(LLMProvider):
         }
         
         if system_instruction:
-            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+            payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
 
         async with httpx.AsyncClient(timeout=30) as client:
             async with client.stream("POST", url, json=payload) as r:
@@ -331,7 +331,7 @@ class GeminiProvider(LLMProvider):
         }
         
         if system_instruction:
-            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+            payload["system_instruction"] = {"parts": [{"text": system_instruction}]}
 
         start_time = time.time()
         # Her model için hem v1beta hem v1 API versiyonunu dene
@@ -396,14 +396,10 @@ class GeminiProvider(LLMProvider):
                 if not any(code in str(e) for code in ("404", "400")):
                     break  # Ağ/timeout hatası → retry etme
 
-        # Tüm denemeler başarısız — key'i logda GIZLE
+        # Tüm denemeler başarısız
         safe_err = str(last_error).replace(self.api_key, "***") if last_error else "bilinmeyen hata"
         logging.error(f"[Gemini] All attempts failed: {safe_err}")
-        return (
-            "Gemini API bağlantısı kurulamadı. Lütfen Google AI Studio'dan yeni bir API key alın "
-            "ve SuperAdmin panelinde güncelleyin. (aistudio.google.com/apikey)",
-            None,
-        )
+        raise ValueError("Gemini API connection failed")
 
 
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
