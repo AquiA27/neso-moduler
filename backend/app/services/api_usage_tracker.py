@@ -23,6 +23,7 @@ async def log_api_usage(
 ):
     """API kullanımını logla"""
     try:
+        import json
         await db.execute(
             """
             INSERT INTO api_usage_logs (
@@ -49,7 +50,7 @@ async def log_api_usage(
                 "response_time_ms": response_time_ms,
                 "status": status,
                 "error_message": error_message,
-                "metadata": metadata or {},
+                "metadata": json.dumps(metadata or {}),
             },
         )
     except Exception as e:
