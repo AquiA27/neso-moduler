@@ -296,10 +296,16 @@ class GeminiProvider(LLMProvider):
                 system_instruction = msg["content"]
             else:
                 role = "user" if msg["role"] == "user" else "model"
-                gemini_history.append({
-                    "role": role,
-                    "parts": [{"text": msg["content"]}]
-                })
+                
+                # Gemini STRICT RULE: Roles must alternate between 'user' and 'model'.
+                if gemini_history and gemini_history[-1]["role"] == role:
+                    # If consecutive same-role messages occur, merege them.
+                    gemini_history[-1]["parts"][0]["text"] += f"\n\n{msg['content']}"
+                else:
+                    gemini_history.append({
+                        "role": role,
+                        "parts": [{"text": msg["content"]}]
+                    })
 
         payload = {
             "contents": gemini_history,
