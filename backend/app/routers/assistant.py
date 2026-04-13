@@ -3161,32 +3161,32 @@ Cevap vermeden önce içinden şu adımları izle:
             else:
                 reply_text, usage_info = result, None
             
-                # API kullanımını logla (tenant_id varsa)
-                if usage_info and tenant_id:
-                    from ..services.api_usage_tracker import log_api_usage
-                    # Model bilgisini provider'dan al (get_llm_provider zaten doğru modeli seçti)
-                    actual_model = getattr(provider, 'model', 'gpt-4o-mini')
-                
-                    await log_api_usage(
-                        isletme_id=tenant_id,
-                        api_type="openai",
-                        model=actual_model,
-                        endpoint="/v1/chat/completions",
-                        prompt_tokens=usage_info.get("prompt_tokens", 0),
-                        completion_tokens=usage_info.get("completion_tokens", 0),
-                        total_tokens=usage_info.get("total_tokens", 0),
-                        cost_usd=usage_info.get("cost_usd", 0.0),
-                        response_time_ms=usage_info.get("response_time_ms"),
-                        status="success",
-                    )
+            # API kullanımını logla (tenant_id varsa)
+            if usage_info and tenant_id:
+                from ..services.api_usage_tracker import log_api_usage
+                # Model bilgisini provider'dan al (get_llm_provider zaten doğru modeli seçti)
+                actual_model = getattr(provider, 'model', 'gpt-4o-mini')
             
-                logging.info(f"[LLM] Received reply (length: {len(reply_text) if reply_text else 0})")
-            
-                if not reply_text or len(reply_text.strip()) == 0:
-                    logging.warning("[LLM] Empty reply from LLM, using default")
-            except Exception as e:
-                logging.error(f"[LLM] Error calling LLM provider: {e}", exc_info=True)
-                reply_text = ""
+                await log_api_usage(
+                    isletme_id=tenant_id,
+                    api_type="openai",
+                    model=actual_model,
+                    endpoint="/v1/chat/completions",
+                    prompt_tokens=usage_info.get("prompt_tokens", 0),
+                    completion_tokens=usage_info.get("completion_tokens", 0),
+                    total_tokens=usage_info.get("total_tokens", 0),
+                    cost_usd=usage_info.get("cost_usd", 0.0),
+                    response_time_ms=usage_info.get("response_time_ms"),
+                    status="success",
+                )
+        
+            logging.info(f"[LLM] Received reply (length: {len(reply_text) if reply_text else 0})")
+        
+            if not reply_text or len(reply_text.strip()) == 0:
+                logging.warning("[LLM] Empty reply from LLM, using default")
+        except Exception as e:
+            logging.error(f"[LLM] Error calling LLM provider: {e}", exc_info=True)
+            reply_text = ""
 
             if not reply_text or len(reply_text.strip()) == 0:
                 reply_text = default_reply or "Size yardimci olmaya hazirim. Menuden bir sey onerebilirim!"
