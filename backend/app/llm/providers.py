@@ -335,9 +335,24 @@ class GeminiProvider(LLMProvider):
 
         start_time = time.time()
         # SADECE v1beta kullan, çünkü v1 systemInstruction desteklemiyor ve şematik olarak farklı
+        # Google bazen ana isimleri (gemini-1.5-flash) v1beta'da 404 verebiliyor, bu yüzden -latest ekli versiyonları zorunlu deniyoruz.
         candidates = []
-        for m in ([self.model] + (["gemini-1.5-flash"] if self.model != "gemini-1.5-flash" else [])):
-            candidates.append((m, "v1beta"))
+        
+        fallback_models = [
+            self.model,
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-pro-latest",
+            "gemini-2.0-flash-exp",
+            "gemini-2.5-flash",
+            "gemini-1.5-flash",
+        ]
+        
+        # Sadece eşsiz (unique) modelleri aynı sırayla ekle
+        seen = set()
+        for m in fallback_models:
+            if m not in seen:
+                candidates.append((m, "v1beta"))
+                seen.add(m)
 
         last_error = None
         for attempt_model, api_ver in candidates:
