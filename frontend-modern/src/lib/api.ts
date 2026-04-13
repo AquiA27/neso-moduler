@@ -3,6 +3,17 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 // API URL'ini normalize et (protokol eksikse veya yanlışsa düzelt)
 export const normalizeApiUrl = (url: string | undefined): string => {
   if (!url) {
+    // Mobil veya uzak cihazlardan bağlandığımızda (Vercel dahil)
+    // Eğer tarayıcı varsa kendi ip adresini bulup API portunu (8000) hedefleyelim,
+    // Aksi halde localhost'a yönlendirip telefonda "Network Error" vermesini engelleyelim.
+    if (typeof window !== 'undefined') {
+      const hostname = window.location.hostname;
+      // Eğer vercel veya production'da isek backend genelde ayrı bir servistedir,
+      // ama geliştirme ortamında aynı IP'nin 8000 portundadır.
+      if (hostname !== 'localhost' && !hostname.includes('vercel.app')) {
+        return `${window.location.protocol}//${hostname}:8000`;
+      }
+    }
     return 'http://localhost:8000';
   }
 
