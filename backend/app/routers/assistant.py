@@ -3152,18 +3152,28 @@ Cevap vermeden önce içinden şu adımları izle:
 
         reply_text = ""
     
-        # ÖNEMLİ: AI DESTEĞİ
+        # AI DESTEĞİ
         # Eskiden parse başarılıysa LLM bypass ediliyordu, artık her durumda LLM'e soruyoruz.
         # Böylece sipariş alınsa bile LLM neşeli ve akıllı bir cevap verebiliyor.
         if force_default_reply and default_reply:
-            system_prompt += f"\n# ÖNERİLEN YANIT (Bunu temel al ama kendi cümlelerinle neşeli söyle):\n{default_reply}\n"
+            system_parts.append(f"# ÖNERİLEN YANIT (Bunu temel al ama kendi cümlelerinle neşeli söyle):\n{default_reply}")
         elif aggregated and default_reply:
-            system_prompt += f"\n# SİPARİŞ OLUŞTURULDU:\n{default_reply}\nLütfen bu siparişi onayla ve müşteriye neşeli bir şekilde afiyet olsun de.\n"
+            system_parts.append(f"# SİPARİŞ OLUŞTURULDU:\n{default_reply}\nLütfen bu siparişi onayla ve müşteriye neşeli bir şekilde afiyet olsun de.")
+        
+        # Ek bağlam bilgilerini (stok hatası, varyasyon eksikliği vb.) ekle
+        if context_lines:
+            system_parts.append("# EK TALİMATLAR VE BAĞLAM:")
+            for line in context_lines:
+                system_parts.append(f"- {line}")
 
         try:
             logging.info(f"[LLM] Calling LLM provider for text: '{text[:50]}...'")
             
             # OpenAIProvider tuple döndürür (text, usage_info), diğerleri string
+            messages_for_llm = [{"role": "system", "content": "\n\n".join(system_parts)}]
+            messages_for_llm.extend(history_snapshot)
+            messages_for_llm.append({"role": "user", "content": text})
+            
             result = await provider.chat(messages_for_llm)
             if isinstance(result, tuple):
                 reply_text, usage_info = result

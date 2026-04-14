@@ -335,7 +335,7 @@ export default function MenuPage() {
                 value={formData.ad}
                 onChange={(e) => setFormData({ ...formData, ad: e.target.value })}
                 required
-                className="w-full"
+                className="w-full bg-slate-800/40 border border-slate-700/50 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 outline-none transition-all"
                 placeholder="Örn: Latte"
               />
             </div>
@@ -567,7 +567,7 @@ export default function MenuPage() {
                 value={formData.fiyat}
                 onChange={(e) => setFormData({ ...formData, fiyat: e.target.value })}
                 required
-                className="w-full"
+                className="w-full bg-slate-800/40 border border-slate-700/50 rounded-lg px-4 py-2.5 text-white focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 outline-none transition-all"
                 placeholder="0.00"
               />
             </div>

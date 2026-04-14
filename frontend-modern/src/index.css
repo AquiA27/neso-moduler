@@ -90,6 +90,14 @@
   }
 }
 
+input, textarea {
+  @apply bg-slate-800/50 border border-slate-700/50 rounded-lg px-4 py-2.5 text-slate-100 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500/50 transition-all duration-300;
+}
+
+input:focus, textarea:focus {
+  @apply bg-slate-800/80;
+}
+
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
