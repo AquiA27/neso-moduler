@@ -183,16 +183,23 @@ def _extract_menu_quantities(text: str, price_keys: Iterable[str]) -> Dict[str, 
             continue
 
         match_key = None
-        # Önce birebir kelime sıralaması eşleşmelerini dene
+        # 1. Önce birebir token eşleşmesi (Tam karşılık) dene
         for key, key_token_list in sorted_keys:
-            # Tam eşleşme veya phrase_tokens, key_token_list'in bir alt kümesi/üst kümesi ise
-            if len(phrase_tokens) >= len(key_token_list) and all(tk in phrase_tokens for tk in key_token_list):
+            if len(phrase_tokens) == len(key_token_list) and all(tk in phrase_tokens for tk in key_token_list):
                 match_key = key
                 break
-            if len(key_token_list) > len(phrase_tokens) and all(tk in key_token_list for tk in phrase_tokens):
-                # Kullanıcı "çay" dedi, menüde "Siyah Çay" var
-                match_key = key
-                break
+        
+        # 2. Tam eşleşme yoksa, phrase_tokens key_token_list'in alt kümesi mi (Kısmi karşılık) bak
+        if not match_key:
+            for key, key_token_list in sorted_keys:
+                if len(phrase_tokens) < len(key_token_list) and all(tk in key_token_list for tk in phrase_tokens):
+                    # Kullanıcı "çay" dedi, menüde "Siyah Çay" var ve başka tam "çay" yok
+                    match_key = key
+                    break
+                if len(phrase_tokens) > len(key_token_list) and all(tk in phrase_tokens for tk in key_token_list):
+                    # Kullanıcı "büyük boy çay" dedi, menüde "Çay" var
+                    match_key = key
+                    break
 
         if not match_key:
             phrase = " ".join(phrase_tokens)
@@ -231,8 +238,14 @@ def _find_best_menu_match(key: str, candidates: Iterable[str]) -> Optional[str]:
         return None
     
     # 2. Substring or token-based matches
-    # We sort candidates by length to prefer shorter (more specific) matches first if possible
-    # but exact token overlap is the main criteria here
+    # FIRST: Try to find a match where the token count is the same (Exact word set match)
+    for mk in candidates:
+        if not mk: continue
+        mk_tokens = [t for t in mk.split() if t]
+        if len(key_tokens) == len(mk_tokens) and all(t in mk_tokens for t in key_tokens):
+            return mk
+
+    # SECOND: If no exact token match, try partial/substring matches
     for mk in candidates:
         if not mk: continue
         mk_tokens = [t for t in mk.split() if t]
@@ -240,14 +253,11 @@ def _find_best_menu_match(key: str, candidates: Iterable[str]) -> Optional[str]:
         # If one name is a substring of the other
         if key in mk or mk in key:
             # SAFETY: If token counts are different, verify that the shorter item is a full token in the longer one
-            # This prevents "su" (water) from matching "sucuklu yumurta"
             if len(key_tokens) != len(mk_tokens):
                 shorter_tokens, longer_tokens = (key_tokens, mk_tokens) if len(key_tokens) < len(mk_tokens) else (mk_tokens, key_tokens)
                 if all(t in longer_tokens for t in shorter_tokens):
                     return mk
             else:
-                # Same token count but string-level partial match (e.g. "tostu" vs "tost")
-                # Usually normalize_name handles this, but extra safety:
                 return mk
     
     # 3. Fuzzy match (Difflib)
