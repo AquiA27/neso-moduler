@@ -99,7 +99,9 @@ def _extract_candidates(text: str) -> list:
         "hosgeldin", "hos", "geldin", "günaydın", "gunaydin",
         "iyi", "günler", "gunler", "akşamlar", "aksamlar",
         "teşekkürler", "tesekkurler", "sağol", "sagol", "teşekkür", "tesekkur", 
-        "lutfen", "please"
+        "lutfen", "please", "alayim", "istiyorum", "alabilir", "miyiz", "misin",
+        "ver", "verebilir", "getir", "olsun", "istiyoruz", "ederiz", "rica",
+        "bitir", "tamamla", "tamam"
     }
     filtered = [tok for tok in tokens if tok not in skip_words]
     pairs = []
@@ -183,7 +185,12 @@ def _extract_menu_quantities(text: str, price_keys: Iterable[str]) -> Dict[str, 
         match_key = None
         # Önce birebir kelime sıralaması eşleşmelerini dene
         for key, key_token_list in sorted_keys:
-            if len(phrase_tokens) >= len(key_token_list) and phrase_tokens[:len(key_token_list)] == key_token_list:
+            # Tam eşleşme veya phrase_tokens, key_token_list'in bir alt kümesi/üst kümesi ise
+            if len(phrase_tokens) >= len(key_token_list) and all(tk in phrase_tokens for tk in key_token_list):
+                match_key = key
+                break
+            if len(key_token_list) > len(phrase_tokens) and all(tk in key_token_list for tk in phrase_tokens):
+                # Kullanıcı "çay" dedi, menüde "Siyah Çay" var
                 match_key = key
                 break
 
@@ -205,6 +212,60 @@ def _extract_menu_quantities(text: str, price_keys: Iterable[str]) -> Dict[str, 
             i += 1
 
     return results
+
+
+def _find_best_menu_match(key: str, candidates: Iterable[str]) -> Optional[str]:
+    """
+    Finds the most relevant menu item key for a given normalized search term.
+    Handles exact matches, token-based matching, and fuzzy matching.
+    """
+    if not key or not candidates:
+        return None
+    
+    # 1. Exact match (highest priority)
+    if key in candidates:
+        return key
+    
+    key_tokens = [t for t in key.split() if t]
+    if not key_tokens:
+        return None
+    
+    # 2. Substring or token-based matches
+    # We sort candidates by length to prefer shorter (more specific) matches first if possible
+    # but exact token overlap is the main criteria here
+    for mk in candidates:
+        if not mk: continue
+        mk_tokens = [t for t in mk.split() if t]
+        
+        # If one name is a substring of the other
+        if key in mk or mk in key:
+            # SAFETY: If token counts are different, verify that the shorter item is a full token in the longer one
+            # This prevents "su" (water) from matching "sucuklu yumurta"
+            if len(key_tokens) != len(mk_tokens):
+                shorter_tokens, longer_tokens = (key_tokens, mk_tokens) if len(key_tokens) < len(mk_tokens) else (mk_tokens, key_tokens)
+                if all(t in longer_tokens for t in shorter_tokens):
+                    return mk
+            else:
+                # Same token count but string-level partial match (e.g. "tostu" vs "tost")
+                # Usually normalize_name handles this, but extra safety:
+                return mk
+    
+    # 3. Fuzzy match (Difflib)
+    # Higher threshold for single words to avoid accidental typos matching wrong products
+    cutoff = 0.92 if len(key_tokens) == 1 else 0.82
+    close_matches = difflib.get_close_matches(key, candidates, n=1, cutoff=cutoff)
+    if close_matches:
+        match = close_matches[0]
+        # For single token user input, ensure it's at least a token or very similar to one
+        if len(key_tokens) == 1:
+            match_tokens = match.split()
+            if len(match_tokens) > 1 and key not in match_tokens:
+                # Only allow if it's very close to one of the tokens
+                if not any(difflib.SequenceMatcher(None, key, mt).ratio() > 0.9 for mt in match_tokens):
+                    return None
+        return match
+        
+    return None
 
 
 @router.post("/parse", response_model=ParseOut)
@@ -231,22 +292,7 @@ async def parse_order(
     not_matched_with_count: List[Tuple[str, int]] = []
     for name, adet in pairs:
         key = normalize_name(name)
-        # en iyi anahtar: tam anahtar veya kontrollü eşleşme
-        match = None
-        if key in price_map:
-            match = key
-        else:
-            key_tokens = [tok for tok in key.split() if tok]
-            if len(key_tokens) >= 2:
-                for mk in price_map.keys():
-                    mk_tokens = mk.split()
-                    if set(key_tokens).issubset(set(mk_tokens)):
-                        match = mk
-                        break
-            if not match and key:
-                close_matches = difflib.get_close_matches(key, price_map.keys(), n=1, cutoff=0.92)
-                if close_matches:
-                    match = close_matches[0]
+        match = _find_best_menu_match(key, price_map.keys())
         if match:
             aggregated[match] = aggregated.get(match, 0) + max(1, int(adet))
         else:
@@ -307,14 +353,7 @@ async def create_order_from_text(
         not_matched: List[str] = []
         for name, adet in pairs:
             key = normalize_name(name)
-            match = None
-            if key in price_map:
-                match = key
-            else:
-                for mk in price_map.keys():
-                    if key and (key in mk or mk in key):
-                        match = mk
-                        break
+            match = _find_best_menu_match(key, price_map.keys())
             if match:
                 aggregated[match] = aggregated.get(match, 0) + max(1, int(adet))
             else:
@@ -469,14 +508,7 @@ async def public_create_order(payload: PublicCreateIn):
     not_matched: List[str] = []
     for name, adet in pairs:
         key = normalize_name(name)
-        match = None
-        if key in price_map:
-            match = key
-        else:
-            for mk in price_map.keys():
-                if key and (key in mk or mk in key):
-                    match = mk
-                    break
+        match = _find_best_menu_match(key, price_map.keys())
         if match:
             aggregated[match] = aggregated.get(match, 0) + max(1, int(adet))
         else:
@@ -2062,48 +2094,7 @@ async def chat_smart(payload: ChatRequest):
                     logging.info(f"[PARSE] Skipping '{name}' - already part of parsed product name")
                     continue
             
-                match = None
-                if key in price_map:
-                    match = key
-                    logging.info(f"[PARSE] Direct match found: {key}")
-                else:
-                    key_tokens = key.split() if key else []
-                    for mk in price_map.keys():
-                        if not key:
-                            continue
-                        mk_tokens = mk.split()
-                        if key == mk:
-                            match = mk
-                            logging.info(f"[PARSE] Exact match via loop: {key}")
-                            break
-                        if key and (key in mk or mk in key):
-                            # Tek kelime ile çok kelimeli ürün eşleşmesini engelle
-                            if len(key_tokens) == 1 and len(mk_tokens) > 1:
-                                continue
-                            if len(key_tokens) > 1 and len(mk_tokens) == 1:
-                                continue
-                            if len(key) <= 3 and len(mk_tokens) > 1:
-                                continue
-                            match = mk
-                            logging.info(f"[PARSE] Partial match accepted: {key} -> {mk}")
-                            break
-                    if not match:
-                        # Fuzzy match için Levenshtein benzeri bir oran kullan (difflib)
-                        candidates = list(price_map.keys())
-                        if key and candidates:
-                            cutoff = 0.92 if len(key_tokens) == 1 else 0.85
-                            close_matches = difflib.get_close_matches(key, candidates, n=1, cutoff=cutoff)
-                            if close_matches:
-                                match_candidate = close_matches[0]
-                                candidate_tokens = match_candidate.split()
-                                if len(key_tokens) == 1 and len(candidate_tokens) > 1:
-                                    logging.info(f"[PARSE] Fuzzy match rejected (single word vs multi word): {key} -> {match_candidate}")
-                                else:
-                                    similarity = difflib.SequenceMatcher(None, key, match_candidate).ratio()
-                                    logging.info(
-                                        f"[PARSE] Fuzzy match found: {key} -> {match_candidate} (similarity={similarity:.2f})"
-                                    )
-                                    match = match_candidate
+                match = _find_best_menu_match(key, price_map.keys())
                 if match:
                     old_count = aggregated.get(match, 0)
                     aggregated[match] = old_count + max(1, int(adet))
