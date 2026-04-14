@@ -32,7 +32,8 @@ export default function PublicMenuPage() {
   const [subeId, setSubeId] = useState<number | undefined>(
     initialSubeId ? Number.parseInt(initialSubeId, 10) : undefined
   );
-  const [isReserved, setIsReserved] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [tableStatus, setTableStatus] = useState<string | null>(null);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -64,9 +65,10 @@ export default function PublicMenuPage() {
           setCustomization(data.customization);
         }
         
-        // Rezervasyon durumu kontrolü
-        if (data.durum === 'rezerve') {
-          setIsReserved(true);
+        // Masa durumu kontrolü (rezerve, dolu, temizlik durumlarında uyarı ver)
+        if (['rezerve', 'dolu', 'temizlik'].includes(data.durum)) {
+          setIsBlocked(true);
+          setTableStatus(data.durum);
         }
       } catch (err) {
         console.error('QR Masa Yükleme Hatası:', err);
@@ -192,7 +194,7 @@ export default function PublicMenuPage() {
               </div>
             </div>
 
-            {!isReserved && (
+            {!isBlocked && (
               <button
                 onClick={handleOrderViaChat}
                 className="glow-button px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-3 shadow-2xl transition-all hover:scale-[1.02] active:scale-95"
@@ -255,14 +257,20 @@ export default function PublicMenuPage() {
       {/* Menu Content */}
       <div className="px-4 py-8">
         <div className="max-w-6xl mx-auto space-y-12">
-          {isReserved ? (
+          {isBlocked ? (
             <div className="flex flex-col items-center justify-center py-20 px-4 text-center space-y-6">
               <div className="w-24 h-24 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/40 shadow-[0_0_30px_rgba(245,158,11,0.3)]">
                 <span className="text-amber-400 font-extrabold text-5xl">!</span>
               </div>
-              <h2 className="text-3xl font-bold text-white tracking-tight">Masa Rezerve Edilmiştir</h2>
+              <h2 className="text-3xl font-bold text-white tracking-tight">
+                {tableStatus === 'rezerve' && "Masa Rezerve Edilmiştir"}
+                {tableStatus === 'dolu' && "Masa Doludur"}
+                {tableStatus === 'temizlik' && "Masa Hazırlanıyor"}
+              </h2>
               <p className="text-white/60 text-lg max-w-md">
-                Bu masa rezervasyonlu olarak işaretlenmiştir. Lütfen farklı boş bir masaya geçebilir veya ilgili görevliye danışarak durum hakkında bilgi alabilirsiniz.
+                {tableStatus === 'rezerve' && "Bu masa rezervasyonlu olarak işaretlenmiştir. Lütfen farklı boş bir masaya geçebilir veya ilgili görevliye danışarak durum hakkında bilgi alabilirsiniz."}
+                {tableStatus === 'dolu' && "Bu masa şu anda başka bir müşterimiz tarafından kullanılmaktadır. Eğer masada oturuyorsanız ve bir hata olduğunu düşünüyorsanız lütfen kasanın yanındaki görevliye başvurunuz."}
+                {tableStatus === 'temizlik' && "Bu masa şu anda temizlik ve hazırlık aşamasındadır. Sizlere en hijyenik hizmeti sunabilmek için kısa süre sonra kullanıma açılacaktır. Lütfen bekleyiniz veya başka bir masaya geçiniz."}
               </p>
             </div>
           ) : loading ? (
@@ -342,7 +350,7 @@ export default function PublicMenuPage() {
       </div>
 
       {/* Floating CTA */}
-      {!isReserved && (
+      {!isBlocked && (
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-30 md:hidden pb-safe">
            <button
             onClick={handleOrderViaChat}

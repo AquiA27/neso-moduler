@@ -15,6 +15,8 @@ export default function CustomerLandingPage() {
   const [subeId, setSubeId] = useState(initialSubeId);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [tableStatus, setTableStatus] = useState<string | null>(null);
+  const [isBlocked, setIsBlocked] = useState(false);
 
   useEffect(() => {
     const loadMasaFromQR = async () => {
@@ -34,6 +36,12 @@ export default function CustomerLandingPage() {
         setMasa(data.masa_adi || initialMasa);
         if (data.sube_id) {
           setSubeId(String(data.sube_id));
+        }
+
+        // Masa durumu kontrolü
+        if (['rezerve', 'dolu', 'temizlik'].includes(data.durum)) {
+          setTableStatus(data.durum);
+          setIsBlocked(true);
         }
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -115,39 +123,62 @@ export default function CustomerLandingPage() {
             )}
           </div>
 
-          {/* Premium Actions */}
+          {/* Premium Actions or Warning */}
           <div className="space-y-4 relative">
-            <button
-              onClick={handleAsistan}
-              disabled={loading}
-              className="glow-button w-full group flex items-center justify-between px-8 py-5 rounded-[1.5rem] text-white font-bold text-lg transition-all duration-500 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:grayscale"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
-                  <MessageCircle className="w-6 h-6 text-emerald-300" />
+            {isBlocked ? (
+              <div className="p-6 rounded-[1.5rem] bg-amber-500/10 border border-amber-500/20 text-center space-y-4">
+                <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center mx-auto border border-amber-500/40">
+                  <span className="text-amber-400 font-black text-xl">!</span>
                 </div>
-                <span>{loading ? 'Hazırlanıyor...' : 'Asistanı Başlat'}</span>
+                <h3 className="text-xl font-bold text-white">
+                  {tableStatus === 'rezerve' && "Masa Rezerve Edilmiştir"}
+                  {tableStatus === 'dolu' && "Masa Doludur"}
+                  {tableStatus === 'temizlik' && "Masa Hazırlanıyor"}
+                </h3>
+                <p className="text-slate-400 text-sm font-medium">
+                  {tableStatus === 'rezerve' && "Bu masa rezervasyonlu olarak işaretlenmiştir. Lütfen farklı boş bir masaya geçebilir veya görevliye danışarak bilgi alabilirsiniz."}
+                  {tableStatus === 'dolu' && "Bu masa şu anda başka bir müşterimiz tarafından kullanılmaktadır. Lütfen boş bir masaya geçmeyi deneyiniz."}
+                  {tableStatus === 'temizlik' && "Bu masa şu anda temizlik ve hazırlık aşamasındadır. Lütfen bekleyiniz veya başka bir masaya geçiniz."}
+                </p>
+                <div className="pt-2">
+                   <p className="text-[10px] text-amber-500/50 uppercase font-black tracking-widest">Durum Kodu: {tableStatus?.toUpperCase()}</p>
+                </div>
               </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                →
-              </div>
-            </button>
+            ) : (
+              <>
+                <button
+                  onClick={handleAsistan}
+                  disabled={loading}
+                  className="glow-button w-full group flex items-center justify-between px-8 py-5 rounded-[1.5rem] text-white font-bold text-lg transition-all duration-500 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:grayscale"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">
+                      <MessageCircle className="w-6 h-6 text-emerald-300" />
+                    </div>
+                    <span>{loading ? 'Hazırlanıyor...' : 'Asistanı Başlat'}</span>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                    →
+                  </div>
+                </button>
 
-            <button
-              onClick={handleMenu}
-              disabled={loading}
-              className="w-full group flex items-center justify-between px-8 py-5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 rounded-[1.5rem] text-slate-200 font-bold text-lg transition-all duration-500 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
-            >
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
-                  <MenuIcon className="w-6 h-6 text-slate-400" />
-                </div>
-                <span>Menüyü Keşfet</span>
-              </div>
-              <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
-                →
-              </div>
-            </button>
+                <button
+                  onClick={handleMenu}
+                  disabled={loading}
+                  className="w-full group flex items-center justify-between px-8 py-5 bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 rounded-[1.5rem] text-slate-200 font-bold text-lg transition-all duration-500 hover:scale-[1.02] active:scale-95 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center group-hover:bg-white/10 transition-colors">
+                      <MenuIcon className="w-6 h-6 text-slate-400" />
+                    </div>
+                    <span>Menüyü Keşfet</span>
+                  </div>
+                  <div className="opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-x-2 group-hover:translate-x-0">
+                    →
+                  </div>
+                </button>
+              </>
+            )}
           </div>
 
           {/* Visual Trust Indicator */}

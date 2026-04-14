@@ -16,6 +16,8 @@ export default function CustomerChatPage() {
   const navigate = useNavigate();
   const [masa, setMasa] = useState(searchParams.get('masa') || '');
   const [masaLoading, setMasaLoading] = useState(false);
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [tableStatus, setTableStatus] = useState<string | null>(null);
   void masaLoading; // used to track QR loading state
   const [subeId, setSubeId] = useState<number>(parseInt(searchParams.get('sube_id') || '1', 10));
   const qrCode = searchParams.get('qr');
@@ -142,6 +144,12 @@ export default function CustomerChatPage() {
             if (data.sube_id) {
               setSubeId(parseInt(data.sube_id, 10));
               console.log('[QR] sube_id güncellendi:', data.sube_id);
+            }
+            
+            // Masa durumu kontrolü
+            if (['rezerve', 'dolu', 'temizlik'].includes(data.durum)) {
+              setIsBlocked(true);
+              setTableStatus(data.durum);
             }
           } else {
             const errorData = await response.json().catch(() => ({ detail: 'Masa bulunamadı' }));
@@ -534,118 +542,146 @@ export default function CustomerChatPage() {
         </div>
       </div>
 
-      {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-8 relative">
-        <div className="max-w-4xl mx-auto space-y-8">
-          {messages.map((msg, idx) => (
-            <div
-              key={idx}
-              className={`flex items-end gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              {msg.type === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20 text-[10px] font-black">N</div>
-              )}
-              <div
-                className={`max-w-[85%] relative ${
-                  msg.type === 'user'
-                    ? 'bg-emerald-600 text-white rounded-3xl rounded-br-none px-6 py-4 shadow-xl shadow-emerald-900/20 shadow-inner border border-emerald-400/20'
-                    : 'glass-panel text-slate-200 rounded-3xl rounded-bl-none px-6 py-4 border border-white/5'
-                }`}
-              >
-                <div className="whitespace-pre-wrap text-[15px] leading-relaxed font-medium">
-                  {msg.text}
-                </div>
-                
-                {msg.type === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && (
-                  <div className="mt-6 flex flex-wrap gap-2">
-                    {msg.suggestions.map((suggestion, i) => (
-                      <button
-                        key={i}
-                        onClick={() => handleSuggestionClick(suggestion)}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs font-bold text-emerald-400 transition-all hover:scale-105"
-                      >
-                        {suggestion}
-                      </button>
-                    ))}
+      {/* Header and Chat Content */}
+      {isBlocked ? (
+        <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8 relative z-10">
+          <div className="w-24 h-24 rounded-full bg-amber-500/20 flex items-center justify-center border border-amber-500/40 shadow-2xl">
+            <span className="text-amber-400 font-black text-5xl">!</span>
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-3xl font-bold text-white">
+              {tableStatus === 'rezerve' && "Masa Rezerve Edilmiştir"}
+              {tableStatus === 'dolu' && "Masa Doludur"}
+              {tableStatus === 'temizlik' && "Masa Hazırlanıyor"}
+            </h2>
+            <p className="text-slate-400 text-lg max-w-md mx-auto">
+              {tableStatus === 'rezerve' && "Bu masa rezervasyonlu olarak işaretlenmiştir. Sipariş verebilmek için lütfen başka bir masaya geçiniz."}
+              {tableStatus === 'dolu' && "Bu masa şu anda başka bir müşterimiz tarafından kullanılmaktadır. Lütfen yeni bir sipariş için boş bir masayı tercih ediniz."}
+              {tableStatus === 'temizlik' && "Bu masa şu anda temizlik aşamasındadır. Sizlere daha iyi hizmet verebilmek için kısa süre sonra açılacaktır."}
+            </p>
+          </div>
+          <button
+            onClick={handleBack}
+            className="px-8 py-3 bg-white/10 border border-white/10 rounded-2xl font-bold hover:bg-white/20 transition-all"
+          >
+            Geri Dön
+          </button>
+        </div>
+      ) : (
+        <>
+          <div className="flex-1 overflow-y-auto px-6 py-8 relative">
+            <div className="max-w-4xl mx-auto space-y-8">
+              {messages.map((msg, idx) => (
+                <div
+                  key={idx}
+                  className={`flex items-end gap-3 ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
+                >
+                  {msg.type === 'assistant' && (
+                    <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20 text-[10px] font-black">N</div>
+                  )}
+                  <div
+                    className={`max-w-[85%] relative ${
+                      msg.type === 'user'
+                        ? 'bg-emerald-600 text-white rounded-3xl rounded-br-none px-6 py-4 shadow-xl shadow-emerald-900/20 shadow-inner border border-emerald-400/20'
+                        : 'glass-panel text-slate-200 rounded-3xl rounded-bl-none px-6 py-4 border border-white/5'
+                    }`}
+                  >
+                    <div className="whitespace-pre-wrap text-[15px] leading-relaxed font-medium">
+                      {msg.text}
+                    </div>
+                    
+                    {msg.type === 'assistant' && msg.suggestions && msg.suggestions.length > 0 && (
+                      <div className="mt-6 flex flex-wrap gap-2">
+                        {msg.suggestions.map((suggestion, i) => (
+                          <button
+                            key={i}
+                            onClick={() => handleSuggestionClick(suggestion)}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-full text-xs font-bold text-emerald-400 transition-all hover:scale-105"
+                          >
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    
+                    <div className={`text-[10px] font-bold mt-3 uppercase tracking-widest opacity-30 ${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
+                      {msg.timestamp.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
                   </div>
-                )}
-                
-                <div className={`text-[10px] font-bold mt-3 uppercase tracking-widest opacity-30 ${msg.type === 'user' ? 'text-right' : 'text-left'}`}>
-                  {msg.timestamp.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
                 </div>
+              ))}
+              
+              {loading && (
+                <div className="flex justify-start items-center gap-3">
+                   <div className="w-8 h-8 rounded-full bg-slate-800 animate-pulse shrink-0" />
+                   <div className="glass-panel px-6 py-4 rounded-3xl rounded-bl-none border border-white/5">
+                      <div className="flex gap-2">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                      </div>
+                   </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
+          </div>
+
+          {/* Input Area */}
+          <div className="relative z-10 p-6 bg-white/[0.02] backdrop-blur-2xl border-t border-white/5">
+            <div className="max-w-4xl mx-auto flex flex-col gap-4">
+              {isListening && (
+                <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-widest animate-pulse">
+                  <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
+                  Sizi Dinliyorum...
+                </div>
+              )}
+              
+              <div className="flex items-center gap-3">
+                <div className="flex-1 relative group">
+                  <textarea
+                    ref={inputRef}
+                    value={inputText}
+                    onChange={(e) => setInputText(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Neso'yla konuşun..."
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-[1.5rem] px-6 py-4 pr-14 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all resize-none min-h-[60px] max-h-[150px]"
+                    rows={1}
+                    disabled={loading || isListening}
+                  />
+                  <button
+                    onClick={isListening ? stopListening : startListening}
+                    disabled={loading}
+                    className={`absolute right-3 bottom- side-y-1/2 -translate-y-1/2 md:translate-y-0 md:static p-3 rounded-2xl transition-all ${
+                      isListening
+                        ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20 scale-110'
+                        : 'text-slate-500 hover:text-white hover:bg-white/5'
+                    }`}
+                    aria-label="Sesli Komut"
+                  >
+                    <div className="relative">
+                      {isListening && <div className="absolute inset-0 bg-white rounded-full animate-ping opacity-20" />}
+                      <Mic className={`w-6 h-6 ${isListening ? 'animate-pulse' : ''}`} />
+                    </div>
+                  </button>
+                </div>
+
+                <button
+                  onClick={handleSend}
+                  disabled={!inputText.trim() || loading || isListening}
+                  className="glow-button w-14 h-14 rounded-[1.5rem] flex items-center justify-center shrink-0 disabled:opacity-50 disabled:grayscale transition-all hover:scale-105 active:scale-90"
+                >
+                  <Send className="w-6 h-6 text-white" />
+                </button>
+              </div>
+              
+              <div className="flex justify-center md:hidden">
+                 <div className="w-12 h-1 bg-white/10 rounded-full" />
               </div>
             </div>
-          ))}
-          
-          {loading && (
-            <div className="flex justify-start items-center gap-3">
-               <div className="w-8 h-8 rounded-full bg-slate-800 animate-pulse shrink-0" />
-               <div className="glass-panel px-6 py-4 rounded-3xl rounded-bl-none border border-white/5">
-                  <div className="flex gap-2">
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
-                  </div>
-               </div>
-            </div>
-          )}
-          <div ref={chatEndRef} />
-        </div>
-      </div>
-
-      {/* Input Area */}
-      <div className="relative z-10 p-6 bg-white/[0.02] backdrop-blur-2xl border-t border-white/5">
-        <div className="max-w-4xl mx-auto flex flex-col gap-4">
-          {isListening && (
-            <div className="flex items-center gap-3 px-4 py-2 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs font-bold uppercase tracking-widest animate-pulse">
-              <div className="w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-              Sizi Dinliyorum...
-            </div>
-          )}
-          
-          <div className="flex items-center gap-3">
-            <div className="flex-1 relative group">
-              <textarea
-                ref={inputRef}
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Neso'yla konuşun..."
-                className="w-full bg-white/[0.03] border border-white/10 rounded-[1.5rem] px-6 py-4 pr-14 text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/50 focus:bg-white/[0.05] transition-all resize-none min-h-[60px] max-h-[150px]"
-                rows={1}
-                disabled={loading || isListening}
-              />
-              <button
-                onClick={isListening ? stopListening : startListening}
-                disabled={loading}
-                className={`absolute right-3 bottom- side-y-1/2 -translate-y-1/2 md:translate-y-0 md:static p-3 rounded-2xl transition-all ${
-                  isListening
-                    ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20 scale-110'
-                    : 'text-slate-500 hover:text-white hover:bg-white/5'
-                }`}
-                aria-label="Sesli Komut"
-              >
-                <div className="relative">
-                  {isListening && <div className="absolute inset-0 bg-white rounded-full animate-ping opacity-20" />}
-                  <Mic className={`w-6 h-6 ${isListening ? 'animate-pulse' : ''}`} />
-                </div>
-              </button>
-            </div>
-
-            <button
-              onClick={handleSend}
-              disabled={!inputText.trim() || loading || isListening}
-              className="glow-button w-14 h-14 rounded-[1.5rem] flex items-center justify-center shrink-0 disabled:opacity-50 disabled:grayscale transition-all hover:scale-105 active:scale-90"
-            >
-              <Send className="w-6 h-6 text-white" />
-            </button>
           </div>
-          
-          <div className="flex justify-center md:hidden">
-             <div className="w-12 h-1 bg-white/10 rounded-full" />
-          </div>
-        </div>
-      </div>
+        </>
+      )}
     </div>
   );
 }
