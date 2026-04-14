@@ -2140,12 +2140,17 @@ async def chat_smart(payload: ChatRequest):
 
         logging.info(f"[PARSE] Final aggregated: {aggregated}, not_matched: {not_matched}")
     
-        if pending_variation_options and not not_matched_with_count:
+        # Varyasyonları metinden çıkar (özellikle bekleyen varyasyonlar varsa)
+        if pending_variation_options:
             variation_mentions = _extract_variation_mentions(text, pending_variation_options)
             if variation_mentions:
+                logging.info(f"[VARIATION_PARSE] Found variation mentions: {variation_mentions}")
                 for variation_name, count in variation_mentions.items():
-                    not_matched.append(variation_name)
-                    not_matched_with_count.append((variation_name, count))
+                    # Eğer bu varyasyon zaten bir şekilde eklendiyse (not_matched içinde), mükerrer ekleme
+                    var_norm = normalize_name(variation_name)
+                    if not any(normalize_name(nm) == var_norm for nm, _ in not_matched_with_count):
+                        not_matched.append(variation_name)
+                        not_matched_with_count.append((variation_name, count))
 
         if not aggregated and pending_variation_options:
             confirmation_text = re.sub(r"[^a-zçğıöşü0-9\s]", " ", text_clean)
@@ -2277,15 +2282,27 @@ async def chat_smart(payload: ChatRequest):
             variation_matches = []
             for nm, adet in not_matched_with_count:
                 nm_norm = normalize_name(nm)
+                
+                # 1. Tam eşleşme (örn: "sade")
                 if nm_norm in all_variations:
-                    # Bu bir varyasyon ismi, products eşleştir
                     for var_info in all_variations[nm_norm]:
-                        # Eğer context_products varsa, sadece o ürünler için eşleştirme yap
                         if context_products and var_info["product_key"] not in context_products:
-                            logging.info(f"[VARIATION_PARSE] Skipping variation '{nm}' for product '{var_info['product_key']}' (not in context)")
                             continue
                         variation_matches.append((var_info["product_key"], var_info["variation_name"], adet))
-                        logging.info(f"[VARIATION_PARSE] Found variation '{nm}' (x{adet}) -> product '{var_info['product_key']}' with variation '{var_info['variation_name']}'")
+                        logging.info(f"[VARIATION_PARSE] Found variation match: '{nm}' -> product '{var_info['product_key']}'")
+                else:
+                    # 2. Parçalı eşleşme (örn: "sade şekerli" -> "sade" ve "şekerli")
+                    # Parser bazen "ve" kelimesini atlasa da kelimeleri birleştiriyor
+                    tokens = nm_norm.split()
+                    if len(tokens) > 1:
+                        for tok in tokens:
+                            if tok in all_variations:
+                                for var_info in all_variations[tok]:
+                                    if context_products and var_info["product_key"] not in context_products:
+                                        continue
+                                    # Her bir parça için adet 1 kabul edilir (genellikle "sade şekerli" 1'er adet demektir)
+                                    variation_matches.append((var_info["product_key"], var_info["variation_name"], 1))
+                                    logging.info(f"[VARIATION_PARSE] Split and found variation: '{tok}' -> product '{var_info['product_key']}'")
         
             # Eğer varyasyon eşleşmeleri varsa, aggregated'i düzenle
             if variation_matches and aggregated:
@@ -2329,8 +2346,8 @@ async def chat_smart(payload: ChatRequest):
                         product_key = var_match[0]
                         unique_key = f"{product_key}|{var_match[1]}"
                         count = var_match[2]  # Variation count from tuple
-                        new_aggregated[unique_key] = count
-                        logging.info(f"[VARIATION_PARSE] Created separate item: {unique_key} x {count}")
+                        new_aggregated[unique_key] = new_aggregated.get(unique_key, 0) + count
+                        logging.info(f"[VARIATION_PARSE] Created/Updated separate item: {unique_key} x {new_aggregated[unique_key]}")
 
                     # Varyasyonlu ürünlerin orijinal key'lerini sil
                     for product_key in products_with_variation:
