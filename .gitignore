@@ -7,10 +7,12 @@ Thumbs.db
 *.tmp
 *.swp
 *.swo
+*.bak
 .idea/
 .vscode/
 .history/
 .claude/
+.gemini/
 nul
 
 ############################
@@ -31,14 +33,12 @@ coverage.xml
 .env.*
 !.env.example
 backend/.env
-backend/env.docker
 backend/.env.*
 !backend/.env.example
 
 # Runtime/generated
 media/
 backups/
-backend/exports/
 
 ############################
 # Node / Frontend
@@ -64,29 +64,25 @@ build/
 *.zip
 
 ############################
-# Database dumps (keep out of git)
+# Database dumps
 ############################
 *.sql
 *.sql.gz
 *.dump
 
 ############################
-# Docs - ignore Markdown (keep root README and render.yaml)
+# Docs - ignore Markdown (keep root README)
 ############################
 *.md
 !README.md
-!render.yaml
-!DEPLOYMENT_CHECKLIST.md
-!DEPLOYMENT_RECOMMENDATIONS.md
 
 ############################
-# Test & Script Files
+# Scratch / Debug / One-off scripts
 ############################
-# Backend test files
+backend/scratch/
 backend/test_*.py
 backend/*_test.py
 backend/tests/
-backend/scripts/
 backend/check_*.py
 backend/create_*.py
 backend/fix_*.py
@@ -94,17 +90,12 @@ backend/add_*.py
 backend/generate_*.py
 backend/migrate_*.py
 backend/init_*.py
-backend/create_views.py
+backend/update_*.py
+backend/=1.0.0
 
-# Super admin panel (if separate)
+# Old super admin panels (replaced by frontend-modern/SuperAdminPanel.tsx)
+super-admin-panel/
 backend/super-admin-panel/
-backend/super-admin-panel/node_modules/
-backend/super-admin-panel/dist/
-super-admin-panel/node_modules/
-super-admin-panel/dist/
-super-admin-panel/.env
-super-admin-panel/.env.*
-!super-admin-panel/.env.example
 
 ############################
 # Media & Exports
@@ -122,23 +113,9 @@ backend/backups/
 *.wav
 
 ############################
-# Misc Files
+# One-off batch scripts
 ############################
-backend/=1.0.0
-backend/install.log
-backend/uvicorn.log
-*.tmp
-*.bak
-nul
-
-# Python
-__pycache__/
-*.pyc
-.venv/
-
-# Env/Secrets
-.env
-
-# Misc
-.DS_Store
-*.log
+push*.bat
+git_*.bat
+dump_*.bat
+cleanup.py
