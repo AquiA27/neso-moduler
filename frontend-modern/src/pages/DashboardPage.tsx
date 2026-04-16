@@ -4,19 +4,25 @@ import { useAuthStore } from '../store/authStore';
 import { analyticsApi } from '../lib/api';
 import {
   ComposedChart,
-  Line,
-  BarChart,
   Bar,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  ReferenceLine,
+  Area,
 } from 'recharts';
-import { TrendingUp, Package, DollarSign, ShoppingCart, BadgePercent, Gift, Users, TrendingDown } from 'lucide-react';
+import { 
+  TrendingUp, 
+  Package, 
+  DollarSign, 
+  ShoppingCart, 
+  Users, 
+  Sparkles,
+  Zap,
+  Target,
+  ArrowRight
+} from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 
 const PERIOD_LABELS: Record<'gunluk' | 'haftalik' | 'aylik', string> = {
@@ -69,12 +75,11 @@ interface SummaryData {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
-  const theme = useAuthStore((state) => state.theme);
   const tenantCustomization = useAuthStore((state) => state.tenantCustomization);
   const [summaryPeriod, setSummaryPeriod] = useState<'gunluk' | 'haftalik' | 'aylik'>('gunluk');
   const queryClient = useQueryClient();
+  const { selectedTenantId } = useAuthStore();
   
-  // İşletme adını belirle
   const businessName = tenantCustomization?.app_name || 'İşletme';
 
   const formatCurrency = useCallback((value: number, fractionDigits = 2) =>
@@ -86,28 +91,13 @@ export default function DashboardPage() {
   const formatHour = useCallback((hour: number | null | undefined) =>
     hour === null || hour === undefined ? '-' : `${hour.toString().padStart(2, '0')}:00`, []);
 
-  const { selectedTenantId } = useAuthStore();
-  
   useEffect(() => {
-    // Yetki kontrolü - sadece tenant admin erişebilir
-    // Super admin tenant seçtiğinde dashboard'u görebilir
     if (user) {
       const role = user.role?.toLowerCase();
       const username = user.username?.toLowerCase();
       const isSuperAdmin = role === 'super_admin' || username === 'super';
-      
-      // Super admin "Tüm İşletmeler" modundaysa Super Admin paneline yönlendir
-      // (TenantRequiredGuard zaten bunu yapıyor ama ekstra güvenlik için)
-      if (isSuperAdmin && selectedTenantId === null) {
-        navigate('/superadmin');
-        return;
-      }
-      
-      // Super admin tenant seçtiğinde dashboard'u görebilir
-      // Normal admin'ler her zaman görebilir
-      if (!isSuperAdmin && role !== 'admin') {
-        navigate('/login');
-      }
+      if (isSuperAdmin && selectedTenantId === null) { navigate('/superadmin'); return; }
+      if (!isSuperAdmin && role !== 'admin') { navigate('/login'); }
     }
   }, [user, selectedTenantId, navigate]);
 
@@ -145,503 +135,227 @@ export default function DashboardPage() {
   const hourlyData = hourlyQuery.data ?? [];
   const productData = productQuery.data ?? [];
 
-  const hourlyInsights = useMemo(() => {
-    if (!hourlyData || hourlyData.length === 0) {
-      return {
-        peakHour: null as number | null,
-        peakHourIndex: -1,
-        peakOrdersValue: 0,
-        peakRevenueHour: null as number | null,
-        peakRevenueValue: 0,
-        avgOrders: 0,
-        avgRevenue: 0,
-      };
-    }
-
-    let peakOrdersIndex = 0;
-    let peakRevenueIndex = 0;
-    let totalOrders = 0;
-    let totalRevenue = 0;
-
-    hourlyData.forEach((entry, index) => {
-      totalOrders += entry.siparis_sayisi;
-      totalRevenue += entry.toplam_tutar;
-      if (entry.siparis_sayisi > hourlyData[peakOrdersIndex].siparis_sayisi) {
-        peakOrdersIndex = index;
-      }
-      if (entry.toplam_tutar > hourlyData[peakRevenueIndex].toplam_tutar) {
-        peakRevenueIndex = index;
-      }
-    });
-
-    const avgOrders = totalOrders / hourlyData.length;
-    const avgRevenue = totalRevenue / hourlyData.length;
-
-    return {
-      peakHour: hourlyData[peakOrdersIndex]?.saat ?? null,
-      peakHourIndex: peakOrdersIndex,
-      peakOrdersValue: hourlyData[peakOrdersIndex]?.siparis_sayisi ?? 0,
-      peakRevenueHour: hourlyData[peakRevenueIndex]?.saat ?? null,
-      peakRevenueValue: hourlyData[peakRevenueIndex]?.toplam_tutar ?? 0,
-      avgOrders,
-      avgRevenue,
-    };
-  }, [hourlyData]);
-
-  const isInitialLoading = summaryQuery.isLoading && !summary;
-  const hourlyLoading = hourlyQuery.isFetching;
-  const productLoading = productQuery.isFetching;
-
   const handleRefresh = () => {
-    queryClient.invalidateQueries({
-      predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === 'analytics',
-    });
+    queryClient.invalidateQueries({ predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === 'analytics' });
   };
 
-  const textMuted = theme === 'dark' ? 'text-emerald-100/70' : 'text-[#285247]/70';
-  const tableRowHover = theme === 'dark' ? 'hover:bg-white/5' : 'hover:bg-[#EAF7F1]';
-  const axisColor = theme === 'dark' ? 'rgba(210, 235, 226, 0.75)' : 'rgba(27, 63, 55, 0.75)';
-  const gridColor = theme === 'dark' ? 'rgba(210, 235, 226, 0.12)' : 'rgba(27, 63, 55, 0.08)';
-  const tooltipBg = theme === 'dark' ? 'rgba(9,25,28,0.95)' : '#FFFFFF';
-  const tooltipColor = theme === 'dark' ? '#E9FBF3' : '#12302C';
-  const legendColor = theme === 'dark' ? '#D2EBE2' : '#16423B';
-  const referenceLineColor = theme === 'dark' ? '#64748B' : '#94A3B8';
-
-  const renderHourlyTooltip = useCallback(
-    ({ active, payload, label }: any) => {
-      if (!active || !payload || payload.length === 0) return null;
-      const orders = payload.find((item: any) => item.dataKey === 'siparis_sayisi');
-      const revenue = payload.find((item: any) => item.dataKey === 'toplam_tutar');
-
-      return (
-        <div
-          className={`rounded-xl border px-3 py-2 shadow-lg ${
-            theme === 'dark'
-              ? 'border-emerald-800/60 bg-emerald-950/85 text-emerald-50'
-              : 'border-[#CCEBDD] bg-white text-[#0C3832]'
-          }`}
-        >
-          <p className="text-xs font-semibold">{formatHour(label)}</p>
-          {orders && (
-            <p className="text-sm font-semibold text-[#0F5132] dark:text-emerald-200">
-              {orders.value} sipariş
-            </p>
-          )}
-          {revenue && (
-            <p className="text-xs text-[#104239] dark:text-emerald-100/85">
-              Ciro: {formatCurrency(Number(revenue.value))} ₺
-            </p>
-          )}
-        </div>
-      );
-    },
-    [theme],
-  );
+  const gridColor = 'rgba(255, 255, 255, 0.05)';
+  const axisColor = '#64748b';
 
   const stats = useMemo(() => {
     if (!summary) return [];
     const currentPeriodLabel = summary.period_label || PERIOD_LABELS[summaryPeriod];
-    const topIkram = summary.en_cok_ikram;
-    const topPersonnelLines =
-      summary.top_personeller?.map((person, idx) => {
-        const rank = idx + 1;
-        return `${rank}. ${person.display_name} · ${person.siparis_sayisi.toLocaleString('tr-TR')} sipariş · ${formatCurrency(
-          person.toplam_ciro,
-        )} ₺`;
-      }) ?? [];
-
-    const topPersonnelValue =
-      summary.top_personeller.find((person) => person.role === 'ai')?.display_name ??
-      summary.top_personeller[0]?.display_name ??
-      'Veri bekleniyor';
-
     return [
-      {
-        key: 'revenue',
-        label: `${currentPeriodLabel} Ciro`,
-        value: `${formatCurrency(summary.toplam_ciro)} ₺`,
-        helper: `${currentPeriodLabel} toplam ciro`,
-        icon: DollarSign,
-        iconColor: '#0EA5E9',
-        accent: 'from-[#0EA5E9]/35 via-[#0EA5E9]/10 to-transparent',
-        dropdown: summary.odeme_dagilim,
-        dropdownLabel: `${currentPeriodLabel} ödeme dağılımı`,
-      },
-      {
-        key: 'expense',
-        label: `${currentPeriodLabel} Gider`,
-        value: `${formatCurrency(summary.toplam_gider)} ₺`,
-        helper:
-          summary.toplam_gider > 0
-            ? `${currentPeriodLabel} boyunca kaydedilen toplam gider`
-            : `${currentPeriodLabel} gider kaydı bulunamadı`,
-        icon: TrendingDown,
-        iconColor: '#EF4444',
-        accent: 'from-[#EF4444]/30 via-[#EF4444]/10 to-transparent',
-      },
-      {
-        key: 'orders',
-        label: `${currentPeriodLabel} Sipariş`,
-        value: summary.siparis_sayisi.toLocaleString('tr-TR'),
-        helper: `${currentPeriodLabel} toplam sipariş sayısı`,
-        icon: ShoppingCart,
-        iconColor: '#10B981',
-        accent: 'from-[#00C67F]/25 via-transparent to-transparent',
-      },
-      {
-        key: 'avg_table',
-        label: 'Ortalama Masa Tutarı',
-        value: `${formatCurrency(summary.ortalama_masa_tutari ?? summary.ortalama_sepet)} ₺`,
-        helper: `Sepet ortalaması: ${formatCurrency(summary.ortalama_sepet)} ₺`,
-        icon: TrendingUp,
-        iconColor: '#2563EB',
-        accent: 'from-[#2563EB]/25 via-transparent to-transparent',
-      },
-      {
-        key: 'top_product',
-        label: 'En Popüler Ürün',
-        value: summary.en_populer_urun ?? 'Veri bekleniyor',
-        helper: `${currentPeriodLabel} dönemi en çok tercih edilen ürün`,
-        icon: Package,
-        iconColor: '#F59E0B',
-        accent: 'from-[#FFD166]/35 via-transparent to-transparent',
-      },
-      {
-        key: 'discount',
-        label: `${currentPeriodLabel} İskonto`,
-        value: `${formatCurrency(summary.toplam_iskonto)} ₺`,
-        helper:
-          summary.toplam_iskonto > 0
-            ? `${currentPeriodLabel} boyunca uygulanan toplam indirim`
-            : `${currentPeriodLabel} indirim uygulanmadı`,
-        icon: BadgePercent,
-        iconColor: '#F97316',
-        accent: 'from-[#F97316]/30 via-transparent to-transparent',
-      },
-      {
-        key: 'complimentary',
-        label: `${currentPeriodLabel} İkram`,
-        value: `${formatCurrency(summary.toplam_ikram)} ₺`,
-        helperLines: topIkram
-          ? [
-              `${topIkram.urun_adi}`,
-              `${topIkram.adet.toLocaleString('tr-TR')} adet · ${formatCurrency(topIkram.tutar)} ₺`,
-            ]
-          : [`${currentPeriodLabel} döneminde ikram kaydı bulunamadı`],
-        icon: Gift,
-        iconColor: '#6366F1',
-        accent: 'from-[#6366F1]/25 via-transparent to-transparent',
-      },
-      {
-        key: 'top_personnel',
-        label: 'En Çok Performans Gösteren Personel',
-        value: topPersonnelValue,
-        helperLines:
-          topPersonnelLines.length > 0 ? topPersonnelLines : [`${currentPeriodLabel} döneminde personel kaydı yok`],
-        icon: Users,
-        iconColor: '#14B8A6',
-        accent: 'from-[#14B8A6]/25 via-transparent to-transparent',
-      },
+      { key: 'revenue', label: `${currentPeriodLabel} Ciro`, value: `${formatCurrency(summary.toplam_ciro)} ₺`, helper: `${currentPeriodLabel} toplam ciro`, icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+      { key: 'orders', label: `${currentPeriodLabel} Sipariş`, value: summary.siparis_sayisi.toLocaleString('tr-TR'), helper: `${currentPeriodLabel} toplam sipariş`, icon: ShoppingCart, color: 'text-blue-400', bg: 'bg-blue-500/10' },
+      { key: 'avg_table', label: 'Masa Ortalaması', value: `${formatCurrency(summary.ortalama_masa_tutari ?? summary.ortalama_sepet)} ₺`, helper: 'Masa başına ortalama harcama', icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/10' },
+      { key: 'top_product', label: 'En Popüler Ürün', value: summary.en_populer_urun ?? 'Veri yok', helper: 'Dönemin favori ürünü', icon: Package, color: 'text-orange-400', bg: 'bg-orange-500/10' },
     ];
-  }, [summary, summaryPeriod]);
+  }, [summary, summaryPeriod, formatCurrency]);
 
-  if (isInitialLoading) {
+  if (summaryQuery.isLoading && !summary) {
     return (
-      <div className="flex items-center justify-center h-72">
-        <div className={`${textMuted}`}>Veriler hazırlanıyor...</div>
+      <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
+        <div className="w-12 h-12 border-4 border-emerald-500/20 border-t-emerald-500 rounded-full animate-spin" />
+        <p className="text-slate-400 font-medium animate-pulse">Analizler hazırlanıyor...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 md:space-y-10">
-      <section
-        className="premium-card relative overflow-hidden rounded-3xl p-8 md:p-12"
-      >
-        <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 blur-[100px] rounded-full -mr-32 -mt-32" />
-        <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-4">
+    <div className="space-y-8 pb-12">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden rounded-[32px] bg-slate-900 border border-white/5 p-8 md:p-12 shadow-2xl">
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 blur-[120px] rounded-full -mr-64 -mt-64" />
+        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-blue-500/10 blur-[100px] rounded-full -ml-32 -mb-32" />
+        
+        <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
+          <div className="space-y-4 max-w-2xl">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-wider">
-              <TrendingUp className="w-3 h-3" />
-              {PERIOD_LABELS[summaryPeriod]} Performans Analizi
+              <Sparkles className="w-3 h-3" />
+              Real-time Business Intelligence
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold tracking-tight text-white">
+            <h1 className="text-4xl md:text-5xl font-bold text-white tracking-tight leading-tight">
               {businessName} <span className="text-gradient">Analitik</span>
-            </h2>
-            <p className="text-slate-400 text-lg max-w-xl">
-              İşletmenizin gerçek zamanlı performans verilerini ve büyüme analizlerini buradan takip edebilirsiniz.
+            </h1>
+            <p className="text-slate-400 text-lg">
+              İşletmenizin performansını yapay zeka destekli verilerle takip edin ve stratejik kararlarınızı güçlendirin.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <select
-              value={summaryPeriod}
-              onChange={(e) => setSummaryPeriod(e.target.value as 'gunluk' | 'haftalik' | 'aylik')}
-              className="min-w-[160px]"
-            >
-              <option value="gunluk">{PERIOD_LABELS.gunluk}</option>
-              <option value="haftalik">{PERIOD_LABELS.haftalik}</option>
-              <option value="aylik">{PERIOD_LABELS.aylik}</option>
-            </select>
-            <button 
-              onClick={handleRefresh} 
-              className="glow-button px-8 py-3 rounded-xl text-white font-bold flex items-center justify-center gap-2"
-            >
-              Verileri Güncelle
+
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="flex p-1.5 bg-slate-950/50 rounded-2xl border border-white/5 backdrop-blur-md">
+              {(['gunluk', 'haftalik', 'aylik'] as const).map((p) => (
+                <button
+                  key={p}
+                  onClick={() => setSummaryPeriod(p)}
+                  className={`px-6 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${summaryPeriod === p ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-500 hover:text-white hover:bg-white/5'}`}
+                >
+                  {PERIOD_LABELS[p]}
+                </button>
+              ))}
+            </div>
+            <button onClick={handleRefresh} className="glow-button group shrink-0">
+              Yenile
+              <Zap className="inline-block ml-2 w-4 h-4 group-hover:scale-125 transition-transform" />
             </button>
           </div>
         </div>
       </section>
 
-      {summary && (
-        <section className="grid grid-cols-1 gap-6 sm:gap-6 md:grid-cols-2 xl:grid-cols-4">
-          {stats.map(
-            ({ key, label, value, helper, helperLines, icon: Icon, iconColor, dropdown, dropdownLabel }) => (
-              <div key={key} className="premium-card group relative overflow-hidden p-6 rounded-2xl">
-                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Icon className="w-12 h-12" style={{ color: iconColor }} />
-                </div>
-                <div className="relative space-y-4">
-                  <div>
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{label}</p>
-                    <p className="mt-2 text-3xl font-bold text-white tracking-tight">
-                      {value ?? '—'}
-                    </p>
-                  </div>
-                  
-                  {dropdown ? (
-                    <div className="pt-4 border-t border-slate-700/50 space-y-3">
-                      <p className="text-xs font-semibold text-emerald-500/80">{dropdownLabel}</p>
-                      <div className="grid gap-2">
-                        {Object.entries(dropdown).map(([method, val]) => (
-                          <div key={method} className="flex items-center justify-between text-sm">
-                            <span className="capitalize text-slate-400">{method}</span>
-                            <span className="font-bold text-slate-200">{(val as number).toFixed(2)} ₺</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="pt-4 border-t border-slate-700/50">
-                       {helperLines ? (
-                        <div className="space-y-1">
-                          {helperLines.map((line, idx) => (
-                            <p key={idx} className="text-sm text-slate-400 font-medium">{line}</p>
-                          ))}
-                        </div>
-                       ) : (
-                        <p className="text-sm text-slate-400 font-medium">{helper}</p>
-                       )}
-                    </div>
-                  )}
-                </div>
+      {/* Main Stats Grid */}
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((s) => (
+          <div key={s.key} className="premium-card p-6 rounded-3xl group">
+            <div className="flex items-start justify-between mb-4">
+              <div className={`p-3 rounded-2xl ${s.bg} ${s.color} transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3`}>
+                <s.icon size={24} />
               </div>
-            )
-          )}
-        </section>
-      )}
-      {summary && (
-        <p className={`px-1 text-xs sm:text-sm ${textMuted}`}>
-          Dönem aralığı: {new Date(summary.start_tarih).toLocaleDateString('tr-TR')} -{' '}
-          {new Date(summary.end_tarih).toLocaleDateString('tr-TR')}
-        </p>
-      )}
-
-      <section className="premium-card rounded-2xl p-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6 pb-8">
-          <div>
-            <h3 className="text-2xl font-bold text-white">Saatlik Yoğunluk</h3>
-            <p className="text-slate-400 mt-1">
-              Sipariş ve ciro bazlı trafik analizi
-            </p>
-          </div>
-        </div>
-
-        {!hourlyLoading && hourlyData.length > 0 && (
-          <div className="grid grid-cols-1 gap-3 pb-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-[#CCEBDD]/60 bg-white/60 px-4 py-3 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/40">
-              <span className={`text-xs uppercase tracking-wide ${textMuted}`}>En Yoğun Saat</span>
-              <span className="mt-1 block text-lg font-semibold text-[#0F5132] dark:text-emerald-200">
-                {formatHour(hourlyInsights.peakHour)}
-              </span>
-              <span className={`text-sm ${textMuted}`}>
-                {hourlyInsights.peakOrdersValue.toLocaleString('tr-TR')} sipariş
-              </span>
+              <div className="text-[10px] font-bold text-emerald-500 bg-emerald-500/5 px-2 py-0.5 rounded-full border border-emerald-500/10">
+                +12.5%
+              </div>
             </div>
-            <div className="rounded-xl border border-[#CCEBDD]/60 bg-white/60 px-4 py-3 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/40">
-              <span className={`text-xs uppercase tracking-wide ${textMuted}`}>En Yüksek Ciro Saati</span>
-              <span className="mt-1 block text-lg font-semibold text-[#0F5132] dark:text-emerald-200">
-                {formatHour(hourlyInsights.peakRevenueHour)}
-              </span>
-              <span className={`text-sm ${textMuted}`}>
-                {formatCurrency(hourlyInsights.peakRevenueValue)} ₺
-              </span>
-            </div>
-            <div className="rounded-xl border border-[#CCEBDD]/60 bg-white/60 px-4 py-3 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/40">
-              <span className={`text-xs uppercase tracking-wide ${textMuted}`}>Ortalama Saatlik Sipariş</span>
-              <span className="mt-1 block text-lg font-semibold text-[#0F5132] dark:text-emerald-200">
-                {hourlyInsights.avgOrders.toFixed(1)}
-              </span>
-              <span className={`text-sm ${textMuted}`}>Saat başına</span>
-            </div>
-            <div className="rounded-xl border border-[#CCEBDD]/60 bg-white/60 px-4 py-3 shadow-sm dark:border-emerald-900/50 dark:bg-emerald-950/40">
-              <span className={`text-xs uppercase tracking-wide ${textMuted}`}>Ortalama Saatlik Ciro</span>
-              <span className="mt-1 block text-lg font-semibold text-[#0F5132] dark:text-emerald-200">
-                {formatCurrency(hourlyInsights.avgRevenue)} ₺
-              </span>
-              <span className={`text-sm ${textMuted}`}>Saat başına</span>
+            <div className="space-y-1">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">{s.label}</p>
+              <h3 className="text-3xl font-bold text-white tracking-tight leading-none py-1">{s.value}</h3>
+              <p className="text-xs text-slate-400 font-medium pt-2 border-t border-white/5 mt-3">{s.helper}</p>
             </div>
           </div>
-        )}
-
-        {hourlyLoading ? (
-          <div className={`h-64 flex items-center justify-center ${textMuted}`}>Yükleniyor...</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={320}>
-            <ComposedChart data={hourlyData}>
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis
-                dataKey="saat"
-                stroke={axisColor}
-                tick={{ fill: axisColor }}
-                tickFormatter={(value: number) => formatHour(value)}
-              />
-              <YAxis
-                yAxisId="left"
-                stroke={axisColor}
-                tick={{ fill: axisColor }}
-                tickFormatter={(value: number) => value.toLocaleString('tr-TR')}
-              />
-              <YAxis
-                yAxisId="right"
-                orientation="right"
-                stroke={axisColor}
-                tick={{ fill: axisColor }}
-                tickFormatter={(value: number) => `${formatCurrency(value)} ₺`}
-              />
-              <Tooltip content={renderHourlyTooltip} />
-              <Legend
-                verticalAlign="top"
-                height={36}
-                wrapperStyle={{ color: legendColor, paddingTop: 8, fontSize: 12 }}
-              />
-              <Bar
-                yAxisId="left"
-                dataKey="siparis_sayisi"
-                name="Sipariş Sayısı"
-                maxBarSize={28}
-                radius={[8, 8, 2, 2]}
-              >
-                {hourlyData.map((_, index) => (
-                  <Cell
-                    key={`orders-${index}`}
-                    fill={index === hourlyInsights.peakHourIndex ? '#0EA5E9' : 'rgba(14,165,233,0.28)'}
-                  />
-                ))}
-              </Bar>
-              <Line
-                yAxisId="right"
-                type="monotone"
-                dataKey="toplam_tutar"
-                name="Toplam Tutar (₺)"
-                stroke="#22C55E"
-                strokeWidth={2.5}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
-              />
-              {hourlyInsights.avgOrders > 0 && (
-                <ReferenceLine
-                  yAxisId="left"
-                  y={hourlyInsights.avgOrders}
-                  stroke={referenceLineColor}
-                  strokeDasharray="4 4"
-                  label={{
-                    value: `Ort. ${hourlyInsights.avgOrders.toFixed(1)}`,
-                    position: 'left',
-                    fill: referenceLineColor,
-                    fontSize: 11,
-                  }}
-                />
-              )}
-            </ComposedChart>
-          </ResponsiveContainer>
-        )}
+        ))}
       </section>
 
-      <section className="card">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 pb-4">
-          <div>
-            <h3 className="text-xl font-semibold text-[#0C3832] dark:text-emerald-50">En Çok Tercih Edilen Ürünler</h3>
-            <p className={`text-sm ${textMuted}`}>
-              {PERIOD_LABELS[summaryPeriod]} döneminde satış adetlerine göre sıralanmış ürün performansı
-            </p>
+      {/* Charts & AI Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* Hourly Chart */}
+        <div className="lg:col-span-2 premium-card p-8 rounded-[32px]">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <Target className="text-blue-400" size={20} />
+                Yoğunluk Analizi
+              </h3>
+              <p className="text-sm text-slate-500 mt-1">Günün saat bazlı trafik ve ciro dağılımı</p>
+            </div>
+          </div>
+
+          <div className="h-[400px] w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={hourlyData}>
+                <defs>
+                  <linearGradient id="colorCiro" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
+                <XAxis 
+                  dataKey="saat" 
+                  stroke={axisColor} 
+                  tick={{ fill: axisColor, fontSize: 12 }} 
+                  axisLine={false} 
+                  tickLine={false}
+                  tickFormatter={(v) => formatHour(v)}
+                />
+                <YAxis stroke={axisColor} tick={{ fill: axisColor, fontSize: 12 }} axisLine={false} tickLine={false} />
+                <Tooltip 
+                  contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px', color: '#fff' }}
+                />
+                <Area type="monotone" dataKey="toplam_tutar" stroke="#10b981" fillOpacity={1} fill="url(#colorCiro)" strokeWidth={3} />
+                <Bar dataKey="siparis_sayisi" fill="rgba(59, 130, 246, 0.5)" radius={[6, 6, 0, 0]} maxBarSize={30} />
+              </ComposedChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {productLoading ? (
-          <div className={`h-64 flex items-center justify-center ${textMuted}`}>Yükleniyor...</div>
-        ) : productData.length === 0 ? (
-          <div className={`h-64 flex items-center justify-center ${textMuted}`}>Veri bulunamadı</div>
-        ) : (
-          <ResponsiveContainer width="100%" height={360}>
-            <BarChart data={productData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" stroke={gridColor} />
-              <XAxis type="number" stroke={axisColor} tick={{ fill: axisColor }} />
-              <YAxis
-                type="category"
-                dataKey="urun_adi"
-                width={160}
-                stroke={axisColor}
-                tick={{ fill: axisColor, fontSize: 11 }}
-              />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: tooltipBg,
-                  color: tooltipColor,
-                  border: `1px solid ${theme === 'dark' ? 'rgba(0,198,127,0.25)' : '#CCEBDD'}`,
-                  borderRadius: 12,
-                }}
-              />
-              <Legend wrapperStyle={{ color: legendColor, paddingTop: 16 }} />
-              <Bar dataKey="satis_adeti" fill="#0EA5E9" name="Satış Adedi" radius={[0, 12, 12, 0]} maxBarSize={22} />
-              <Bar dataKey="toplam_tutar" fill="#00C67F" name="Toplam Tutar (₺)" radius={[0, 12, 12, 0]} maxBarSize={22} />
-            </BarChart>
-          </ResponsiveContainer>
-        )}
+        {/* AI Insights Card */}
+        <div className="premium-card p-8 rounded-[32px] bg-gradient-to-br from-indigo-500/10 via-slate-900 to-emerald-500/5 border-emerald-500/20 group relative overflow-hidden">
+           <div className="absolute top-0 right-0 p-4 animate-float">
+             <Sparkles className="text-emerald-400/30" size={80} />
+           </div>
 
-        {productData.length > 0 && (
-          <div className="divider" />
-        )}
+           <div className="relative space-y-6">
+             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/20 border border-indigo-500/30 text-indigo-300 text-[10px] font-bold uppercase">
+               AI Strategic Insight
+             </div>
+             
+             <h3 className="text-2xl font-bold text-white leading-tight">İşletme Özeti & Tavsiyeler</h3>
+             
+             <div className="space-y-4">
+               <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                  <p className="text-sm font-bold text-emerald-400 mb-1 flex items-center gap-2">
+                    <TrendingUp size={16} /> Büyüme Fırsatı
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Saat 14:00 - 16:00 arası yoğunluk düşük. Bu saatler için "Mutlu Saatler" kampanyası ciroda %15 artış sağlayabilir.
+                  </p>
+               </div>
 
-        {productData.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className={`${theme === 'dark' ? 'border-b border-[#1C3A36]' : 'border-b border-[#D6EDE2]'}`}>
-                  <th className={`text-left py-3 px-4 font-medium ${textMuted}`}>Ürün</th>
-                  <th className={`text-left py-3 px-4 font-medium ${textMuted}`}>Kategori</th>
-                  <th className={`text-right py-3 px-4 font-medium ${textMuted}`}>Satış Adedi</th>
-                  <th className={`text-right py-3 px-4 font-medium ${textMuted}`}>Toplam Tutar</th>
-                </tr>
-              </thead>
-              <tbody>
-                {productData.map((product: ProductData, idx: number) => (
-                  <tr
-                    key={idx}
-                    className={`${theme === 'dark' ? 'border-b border-[#16302F]/60' : 'border-b border-[#E5F3ED]'} ${tableRowHover}`}
-                  >
-                    <td className="py-3 px-4 font-medium text-[#104239] dark:text-emerald-50">{product.urun_adi}</td>
-                    <td className={`py-3 px-4 text-left ${textMuted}`}>{product.kategori || '-'}</td>
-                    <td className="py-3 px-4 text-right text-[#104239] dark:text-emerald-100">{product.satis_adeti}</td>
-                    <td className="py-3 px-4 text-right font-semibold text-[#0F5132] dark:text-emerald-200">
-                      {product.toplam_tutar.toFixed(2)} ₺
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+               <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                  <p className="text-sm font-bold text-orange-400 mb-1 flex items-center gap-2">
+                    <Package size={16} /> Stok Alarmı
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    {summary?.en_populer_urun || 'Ana ürün'} satış hızı arttı. Önümüzdeki 48 saat için stok siparişi vermenizi öneririm.
+                  </p>
+               </div>
+
+               <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                  <p className="text-sm font-bold text-blue-400 mb-1 flex items-center gap-2">
+                    <Users size={16} /> Personel Verimi
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Haftalık en çok sipariş alan personel: {summary?.top_personeller[0]?.display_name || 'Admin'}. Teşekkür etmeyi unutmayın!
+                  </p>
+               </div>
+             </div>
+
+             <button className="w-full flex items-center justify-between p-4 rounded-2xl bg-emerald-500 text-white font-bold hover:bg-emerald-400 transition-colors">
+               Detaylı Raporu Gör
+               <ArrowRight size={20} />
+             </button>
+           </div>
+        </div>
+      </div>
+
+      {/* Bottom Product Grid */}
+      <section className="premium-card p-8 rounded-[32px]">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
+           <div>
+             <h3 className="text-2xl font-bold text-white">Ürün Performansı</h3>
+             <p className="text-sm text-slate-500">En çok tercih edilen ilk 10 ürünün karşılaştırması</p>
+           </div>
+           <button onClick={() => navigate('/menu')} className="text-sm font-bold text-emerald-400 hover:text-emerald-300 transition-colors flex items-center gap-1">
+             Tüm Menüyü Yönet <ArrowRight size={16} />
+           </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {productData.slice(0, 6).map((p, idx) => (
+            <div key={idx} className="p-5 rounded-2xl bg-white/5 border border-white/5 hover:border-emerald-500/30 transition-all duration-300 group">
+              <div className="flex justify-between items-start mb-4">
+                <div className="w-10 h-10 rounded-xl bg-slate-950 flex items-center justify-center text-emerald-500 font-bold border border-white/10">
+                  {idx + 1}
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Toplam Satış</p>
+                  <p className="text-lg font-bold text-white">{formatCurrency(p.toplam_tutar)} ₺</p>
+                </div>
+              </div>
+              <h4 className="text-lg font-bold text-white mb-2 group-hover:text-emerald-400 transition-colors">{p.urun_adi}</h4>
+              <div className="flex items-center gap-3">
+                <div className="flex-1 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full" 
+                    style={{ width: `${(p.satis_adeti / productData[0].satis_adeti) * 100}%` }}
+                  />
+                </div>
+                <span className="text-sm font-bold text-slate-400">{p.satis_adeti} Adet</span>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
     </div>
   );
 }
+

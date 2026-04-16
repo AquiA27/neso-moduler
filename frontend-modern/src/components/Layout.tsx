@@ -1,28 +1,34 @@
 import { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import { Outlet, NavLink, useNavigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { customizationApi, subscriptionApi, normalizeApiUrl } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
-import { Menu, Settings, LogOut, AlertTriangle, X } from 'lucide-react';
+import { Settings, AlertTriangle, X, Menu, Bell } from 'lucide-react';
 import logo from '../assets/neso-logo.svg';
 import TenantSwitcher from './TenantSwitcher';
-
+import Sidebar from './Sidebar';
 
 function Layout() {
   const { user, logout, tenantId, tenantCustomization, setTenantCustomization, selectedTenantId } = useAuthStore();
   const navigate = useNavigate();
-  const [navOpen, setNavOpen] = useState(false);
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [showSubscriptionAlert, setShowSubscriptionAlert] = useState(true);
+
+  // Close sidebar by default on mobile
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, []);
 
   // Tenant customization'ı yükle (tenant_id veya subdomain'den)
   useEffect(() => {
     const loadCustomization = async () => {
-      // Super admin tenant değiştirdiğinde selectedTenantId'yi kullan
       const effectiveTenantId = selectedTenantId || tenantId;
-
-      // Önce subdomain'den dene (domain-based routing)
       const subdomain = getCurrentSubdomain();
+      
       if (subdomain) {
         try {
           const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
@@ -41,9 +47,7 @@ function Layout() {
         }
       }
 
-      // Subdomain yoksa veya bulunamadıysa tenant_id'den yükle
       if (!effectiveTenantId) {
-        // Super admin ise null bırak, normal kullanıcı için fallback
         if (user?.role !== 'super_admin') {
           setTenantCustomization(null);
         }
@@ -61,29 +65,21 @@ function Layout() {
         });
       } catch (error) {
         console.warn('Tenant customization yüklenemedi:', error);
-        // Hata durumunda null set etme, fallback kullanılsın
       }
     };
 
-    // Sadece user varsa yükle (login olduktan sonra)
     if (user) {
       loadCustomization();
     }
   }, [tenantId, selectedTenantId, user, setTenantCustomization]);
 
-  // Subscription durumunu kontrol et (super admin hariç)
   useEffect(() => {
     const checkSubscription = async () => {
-      // Super admin ise kontrol etme
-      if (user?.role === 'super_admin') {
-        return;
-      }
-
+      if (user?.role === 'super_admin') return;
       try {
         const response = await subscriptionApi.getMyStatus();
         setSubscriptionStatus(response.data);
       } catch (error: any) {
-        // 404 ise subscription yok demektir, uyarı gösterme
         if (error.response?.status !== 404) {
           console.warn('Subscription durumu kontrol edilemedi:', error);
         }
@@ -95,53 +91,27 @@ function Layout() {
     }
   }, [user, tenantId]);
 
-  // Logo ve app name'i belirle (memoize edilmiş)
   const displayLogo = useMemo(() => tenantCustomization?.logo_url || logo, [tenantCustomization?.logo_url]);
   const displayName = useMemo(() => {
     if (tenantCustomization?.app_name) {
-      return user?.role === 'super_admin' ? 'Neso Modüler' : `${tenantCustomization.app_name} Yönetim Paneli`;
+      return user?.role === 'super_admin' ? 'Neso Modüler' : tenantCustomization.app_name;
     }
-    return user?.role === 'super_admin' ? 'Neso Modüler' : 'Yönetim Paneli';
+    return user?.role === 'super_admin' ? 'Neso Modüler' : 'Neso Panel';
   }, [tenantCustomization?.app_name, user?.role]);
-
-  // Header styling
-  const headerBackground = 'rgba(15, 23, 42, 0.8)';
-  const headerShadow = '0 8px 32px 0 rgba(0, 0, 0, 0.36)';
 
   const handleLogout = useCallback(() => {
     logout();
-    // Tüm storage'ı temizle ve login sayfasına yönlendir
     window.location.href = '/login';
   }, [logout]);
-
-  const toggleNav = useCallback(() => setNavOpen((prev) => !prev), []);
-
 
   const resolvePanel = (username: string, role: string): string[] => {
     const u = username.toLowerCase();
     const r = role.toLowerCase();
     const panels: string[] = [];
-
-    // Mutfak kullanıcıları ve barista mutfak ekranını görebilir
-    if (u === 'mutfak' || r === 'mutfak' || r === 'barista') {
-      return ['mutfak']; // Sadece mutfak, başka hiçbir panele erişim yok
-    }
-
-    // Garson terminal kullanabilir
-    if (r === 'garson') {
-      return ['terminal'];
-    }
-
-    // Admin yetkileri
-    if (r === 'super_admin' || r === 'admin' || u === 'admin' || u === 'super') {
-      panels.push('admin');
-    }
-
-    // Kasa/Operator yetkileri
-    if (r === 'operator' || u === 'kasiyer') {
-      panels.push('kasa');
-    }
-
+    if (u === 'mutfak' || r === 'mutfak' || r === 'barista') return ['mutfak'];
+    if (r === 'garson') return ['terminal'];
+    if (r === 'super_admin' || r === 'admin' || u === 'admin' || u === 'super') panels.push('admin');
+    if (r === 'operator' || u === 'kasiyer') panels.push('kasa');
     return panels.length > 0 ? panels : ['admin'];
   };
 
@@ -151,237 +121,138 @@ function Layout() {
   const showMutfak = allowedPanels.includes('mutfak');
   const showTerminal = allowedPanels.includes('terminal');
 
-  // Personeller sekmesi: super_admin ve admin görebilir
   const userRole = user?.role?.toLowerCase() || '';
   const username = user?.username?.toLowerCase() || '';
-  const showPersoneller = user && (
-    userRole === 'super_admin' ||
-    username === 'super' ||
-    userRole === 'admin'
-  );
-
-  // Debug için console.log (production'da kaldırılabilir)
-  if (user && userRole === 'admin') {
-    console.log('[Layout] Admin user detected:', { username, role: userRole, showPersoneller });
-  }
-
+  const showPersoneller = user && (userRole === 'super_admin' || username === 'super' || userRole === 'admin');
   const showSuperAdmin = user && (userRole === 'super_admin' || username === 'super');
-
-  // Super admin "Tüm İşletmeler" modundayken sadece Super Admin paneli gösterilmeli
-  // Diğer veri sayfaları (raporlar, menü, stok, vb.) sadece tenant seçildiğinde gösterilmeli
   const isSuperAdminInAllTenantsMode = showSuperAdmin && selectedTenantId === null;
-  const showTenantDataPages = !isSuperAdminInAllTenantsMode; // Tenant seçilmediyse veri sayfalarını gizle
+  const showTenantDataPages = !isSuperAdminInAllTenantsMode;
 
-  const getNavClass = (isActive: boolean, variant: 'desktop' | 'mobile') => {
-    if (variant === 'mobile') {
-      return `flex items-center gap-2 rounded-xl px-4 py-3 text-sm transition-all duration-300 ${isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'text-slate-400 hover:bg-white/5 hover:text-white'}`;
-    }
-    return `px-4 py-2 rounded-xl transition-all duration-300 font-medium ${isActive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.1)]' : 'hover:bg-white/5 text-slate-400 hover:text-white'}`;
-  };
-
-  const renderLink = (to: string, label: string, variant: 'desktop' | 'mobile') => (
-    <NavLink
-      key={`${variant}-${to}`}
-      to={to}
-      className={({ isActive }) => getNavClass(isActive, variant)}
-      onClick={variant === 'mobile' ? () => setNavOpen(false) : undefined}
-    >
-      {label}
-    </NavLink>
-  );
-
-  const renderNavLinks = (variant: 'desktop' | 'mobile') => (
-    <>
-      {/* Veri sayfaları sadece tenant seçildiğinde gösterilmeli */}
-      {showAdmin && showTenantDataPages && (
-        <>
-          {renderLink('/dashboard', 'Ana Sayfa', variant)}
-          {renderLink('/raporlar', 'Raporlar', variant)}
-          {renderLink('/menu', 'Menü', variant)}
-          {renderLink('/stok', 'Stok', variant)}
-          {renderLink('/giderler', 'Giderler', variant)}
-          {renderLink('/masalar', 'Masalar', variant)}
-          {renderLink('/recete', 'Reçete', variant)}
-          {renderLink('/asistan', 'Müşteri Asistanı', variant)}
-          {renderLink('/isletme-asistani', 'İşletme Asistanı', variant)}
-        </>
-      )}
-      {/* Personeller sadece tenant seçildiğinde gösterilmeli */}
-      {showPersoneller && showTenantDataPages && renderLink('/personeller', 'Personeller', variant)}
-      {/* Super Admin paneli her zaman gösterilmeli */}
-      {showSuperAdmin && renderLink('/superadmin', 'Super Admin', variant)}
-      {/* Kasa, Mutfak, Terminal sadece tenant seçildiğinde gösterilmeli */}
-      {showKasa && showTenantDataPages && renderLink('/kasa', 'Kasa', variant)}
-      {showMutfak && showTenantDataPages && renderLink('/mutfak', 'Mutfak', variant)}
-      {showTerminal && showTenantDataPages && renderLink('/terminal', 'El Terminali', variant)}
-    </>
-  );
-
-  // Subscription uyarısı mesajı
   const subscriptionAlertMessage = useMemo(() => {
     if (!subscriptionStatus || !showSubscriptionAlert) return null;
-
-    const status = subscriptionStatus.status;
-    const daysUntilExpiry = subscriptionStatus.days_until_expiry;
-    const expiresSoon = subscriptionStatus.expires_soon;
-
-    if (status === 'suspended') {
-      return {
-        type: 'error',
-        message: 'Aboneliğiniz askıya alınmıştır. Lütfen yöneticinizle iletişime geçin.',
-      };
-    }
-
-    if (status === 'cancelled') {
-      return {
-        type: 'error',
-        message: 'Aboneliğiniz sonlandırılmıştır. Lütfen yöneticinizle iletişime geçin.',
-      };
-    }
-
-    if (expiresSoon && daysUntilExpiry !== undefined) {
-      return {
-        type: 'warning',
-        message: `Aboneliğiniz ${daysUntilExpiry} gün içinde sona erecek. Lütfen yöneticinizle iletişime geçin.`,
-      };
-    }
-
+    const { status, days_until_expiry, expires_soon } = subscriptionStatus;
+    if (status === 'suspended') return { type: 'error', message: 'Aboneliğiniz askıya alınmıştır.' };
+    if (status === 'cancelled') return { type: 'error', message: 'Aboneliğiniz sonlandırılmıştır.' };
+    if (expires_soon && days_until_expiry !== undefined) return { type: 'warning', message: `Aboneliğiniz ${days_until_expiry} gün içinde sona erecek.` };
     return null;
   }, [subscriptionStatus, showSubscriptionAlert]);
 
-  return (
-    <div className="min-h-screen flex flex-col">
-      {/* Subscription Uyarısı */}
-      {subscriptionAlertMessage && (
-        <div className={`${subscriptionAlertMessage.type === 'error'
-            ? 'bg-red-600 text-white'
-            : 'bg-yellow-500 text-white'
-          } px-4 py-3 flex items-center justify-between`}>
-          <div className="flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            <span>{subscriptionAlertMessage.message}</span>
-          </div>
-          <button
-            onClick={() => setShowSubscriptionAlert(false)}
-            className="hover:bg-white/20 rounded p-1"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      )}
+  // Current page title based on path
+  const pageTitle = useMemo(() => {
+    const path = location.pathname;
+    if (path.includes('dashboard')) return 'Dashboard';
+    if (path.includes('raporlar')) return 'Raporlar';
+    if (path.includes('menu')) return 'Menü Yönetimi';
+    if (path.includes('stok')) return 'Stok Takibi';
+    if (path.includes('giderler')) return 'Giderler';
+    if (path.includes('masalar')) return 'Masa Düzeni';
+    if (path.includes('recete')) return 'Reçeteler';
+    if (path.includes('asistan')) return 'Yapay Zeka Asistanı';
+    if (path.includes('personeller')) return 'Personel Yönetimi';
+    if (path.includes('kasa')) return 'Kasa Paneli';
+    if (path.includes('superadmin')) return 'Sistem Yönetimi';
+    return 'Neso Modüler';
+  }, [location]);
 
-      {/* Header */}
-      <header
-        className="relative sticky top-0 z-50 border-b border-emerald-500/20 backdrop-blur-xl"
-        style={{
-          background: headerBackground,
-          boxShadow: headerShadow,
-        }}
-      >
-        <div className="absolute inset-0 bg-gradient-to-b from-emerald-500/5 to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom,_rgba(163,230,53,0.12),_transparent_65%)]" aria-hidden="true" />
-        <div className="relative container mx-auto px-3 py-2 md:px-4 md:py-4">
-          <div className="flex flex-wrap items-center gap-2 md:gap-6">
-            <div className="flex flex-1 flex-col items-center gap-2 md:gap-3 text-center min-w-[180px] md:min-w-[260px]">
-              <img
-                src={displayLogo}
-                alt={displayName}
-                className="h-12 w-12 md:h-24 md:w-24 object-contain drop-shadow-[0_18px_28px_rgba(45,212,191,0.35)]"
-                onError={(e) => {
-                  // Logo yüklenemezse varsayılan logo'yu göster
-                  if (e.currentTarget.src !== logo) {
-                    e.currentTarget.src = logo;
-                  }
-                }}
-              />
-              <div className="space-y-0.5 md:space-y-1">
-                <h1 className="text-xl md:text-3xl font-bold tracking-tight text-gradient">
-                  {displayName}
-                </h1>
-                <p className="text-xs md:text-sm text-slate-400 hidden md:block font-medium">
-                  Professional Business Management
-                </p>
+  return (
+    <div className="min-h-screen flex flex-row">
+      {/* Sidebar Component */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        setIsOpen={setSidebarOpen}
+        user={user}
+        displayLogo={displayLogo}
+        onLogout={handleLogout}
+        showAdmin={showAdmin}
+        showKasa={showKasa}
+        showMutfak={showMutfak}
+        showTerminal={showTerminal}
+        showPersoneller={!!showPersoneller}
+        showSuperAdmin={!!showSuperAdmin}
+        showTenantDataPages={!!showTenantDataPages}
+      />
+
+      {/* Content Wrapper */}
+      <div className={`flex-1 flex flex-col transition-all duration-500 min-w-0 ${sidebarOpen ? 'md:pl-72' : 'md:pl-20'}`}>
+        
+        {/* Top Header */}
+        <header className="sticky top-0 z-30 h-16 md:h-20 flex items-center justify-between px-4 md:px-8 border-b border-white/5 bg-slate-950/20 backdrop-blur-3xl">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="p-2 -ml-2 text-slate-400 hover:text-white md:hidden"
+            >
+              <Menu size={24} />
+            </button>
+            <div className="flex flex-col">
+              <h2 className="text-xl md:text-2xl font-bold text-white tracking-tight">{pageTitle}</h2>
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
+                <span className="text-[10px] md:text-xs text-slate-500 font-medium tracking-wide uppercase">{displayName}</span>
               </div>
             </div>
+          </div>
 
-            <div className="ml-auto flex items-center gap-2 md:hidden">
-              <button
-                onClick={() => navigate('/system')}
-                className="rounded-lg border border-white/20 bg-white/5 p-1.5 text-white/80 transition hover:bg-white/10"
-                aria-label="Sistem ayarları"
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-              <button
-                onClick={toggleNav}
-                className="rounded-lg border border-white/20 bg-white/5 p-1.5 text-white/80 transition hover:bg-white/10"
-                aria-label="Menüyü aç"
-              >
-                <Menu className="h-4 w-4" />
-              </button>
+          <div className="flex items-center gap-2 md:gap-4">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-slate-400">
+              <Bell size={16} />
+              <div className="w-[1px] h-3 bg-white/10 mx-1" />
+              <span className="text-xs font-medium">0 Bildirim</span>
             </div>
-
-            <div className="hidden md:flex items-center gap-4">
-              <nav className="flex flex-wrap items-center gap-2">
-                {renderNavLinks('desktop')}
-              </nav>
-              {showSuperAdmin && <TenantSwitcher />}
-              <button
-                onClick={() => navigate('/system')}
-                className="p-2 rounded-xl border border-slate-700 hover:border-emerald-500/50 hover:bg-emerald-500/10 text-slate-400 hover:text-emerald-400 transition-all duration-300"
-              >
-                <Settings className="w-5 h-5" />
-              </button>
-              <button
-                onClick={handleLogout}
-                className="glow-button px-5 py-2 rounded-xl text-white font-semibold flex items-center gap-2 text-sm"
-              >
-                <LogOut className="w-4 h-4" /> Çıkış
-              </button>
-            </div>
-
-            {navOpen && (
-              <div className="mt-4 w-full space-y-3 rounded-2xl border border-white/15 bg-white/5 p-4 shadow-lg shadow-primary-950/30 md:hidden">
-                <nav className="flex flex-col gap-2">
-                  {renderNavLinks('mobile')}
-                </nav>
-                <div className="flex flex-col gap-2 border-t border-white/10 pt-3">
-                  <button
-                    onClick={() => navigate('/system')}
-                    className="flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/5 px-4 py-3 text-sm text-white/80 transition hover:bg-white/10"
-                  >
-                    <Settings className="h-4 w-4" /> Sistem Ayarları
-                  </button>
-                  <button
-                    onClick={handleLogout}
-                    className="flex items-center justify-center gap-2 rounded-lg bg-gradient-to-r from-tertiary-500 via-tertiary-400 to-tertiary-500 px-4 py-3 text-sm font-semibold text-white shadow shadow-tertiary-900/40 transition hover:opacity-90"
-                  >
-                    <LogOut className="h-4 w-4" /> Çıkış Yap
-                  </button>
-                </div>
+            
+            {showSuperAdmin && (
+              <div className="scale-90 md:scale-100">
+                <TenantSwitcher />
               </div>
             )}
+            
+            <button
+              onClick={() => navigate('/system')}
+              className="p-2.5 rounded-xl border border-white/5 bg-white/5 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-300"
+              title="Sistem Ayarları"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="flex-1 container mx-auto px-4 py-6">
-        <Outlet />
-      </main>
-
-      {/* Footer */}
-      <footer className="mt-auto border-t border-slate-800 bg-slate-950/50 backdrop-blur-md py-6">
-        <div className="container mx-auto px-4 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
-          <p>© 2024 Neso Modüler. All rights reserved.</p>
-          <div className="flex items-center gap-6">
-            <span className="text-emerald-500 font-medium">v0.2.1-premium</span>
+        {/* Subscription Alert */}
+        {subscriptionAlertMessage && (
+          <div className={`${subscriptionAlertMessage.type === 'error' ? 'bg-red-500/20 text-red-400 border-red-500/20' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20'} border-b px-8 py-3 flex items-center justify-between animate-in fade-in slide-in-from-top duration-500`}>
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="w-5 h-5" />
+              <span className="text-sm font-medium">{subscriptionAlertMessage.message}</span>
+            </div>
+            <button onClick={() => setShowSubscriptionAlert(false)} className="hover:bg-white/10 rounded-lg p-1 transition-colors">
+              <X className="w-4 h-4" />
+            </button>
           </div>
-        </div>
-      </footer>
+        )}
+
+        {/* Main Content Area */}
+        <main className="flex-1 p-4 md:p-8 relative">
+          <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom duration-700">
+            <Outlet />
+          </div>
+        </main>
+
+        {/* Minimal Footer */}
+        <footer className="px-8 py-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-500">
+          <p>© 2024 Neso Modüler Dashboard. Premium Edition.</p>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-1.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <span>Sistem Aktif</span>
+            </div>
+            <span className="text-slate-700">|</span>
+            <span className="text-emerald-500/60 uppercase tracking-widest">v0.3.0</span>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
 
 export default memo(Layout);
+
 
