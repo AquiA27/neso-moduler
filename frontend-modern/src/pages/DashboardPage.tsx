@@ -341,7 +341,10 @@ export default function DashboardPage() {
                  </div>
                </div>
 
-               <button className="glow-button w-full">
+               <button 
+                  onClick={() => navigate('/isletme-asistani')}
+                  className="glow-button w-full"
+                >
                   DETAYLI ANALİZ RAPORU
                   <ArrowRight size={20} strokeWidth={3} />
                </button>
