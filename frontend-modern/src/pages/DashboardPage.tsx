@@ -20,7 +20,6 @@ import {
   BadgePercent,
   Gift,
   Users, 
-  TrendingDown,
   Sparkles,
   Zap,
   Target,
