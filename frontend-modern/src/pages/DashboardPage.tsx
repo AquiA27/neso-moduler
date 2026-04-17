@@ -22,7 +22,6 @@ import {
   Users, 
   Sparkles,
   Zap,
-  Target,
   ArrowRight
 } from 'lucide-react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';

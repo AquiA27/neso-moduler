@@ -123,12 +123,16 @@ function Sidebar({
               `}
               onClick={() => window.innerWidth < 768 && setIsOpen(false)}
             >
-              <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 ${isActive ? 'text-emerald-400' : ''}`} />
-              {isOpen && <span className={`font-semibold text-sm tracking-tight ${isActive ? 'text-white' : ''}`}>{item.label}</span>}
-              {!isOpen && (
-                <div className="absolute left-full ml-4 px-3 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[100] whitespace-nowrap shadow-2xl border border-white/10 translate-x-2 group-hover:translate-x-0">
-                  {item.label}
-                </div>
+              {({ isActive }) => (
+                <>
+                  <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} className={`shrink-0 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 ${isActive ? 'text-emerald-400' : ''}`} />
+                  {isOpen && <span className={`font-semibold text-sm tracking-tight ${isActive ? 'text-white' : ''}`}>{item.label}</span>}
+                  {!isOpen && (
+                    <div className="absolute left-full ml-4 px-3 py-2 bg-slate-900 text-white text-xs font-bold rounded-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-300 z-[100] whitespace-nowrap shadow-2xl border border-white/10 translate-x-2 group-hover:translate-x-0">
+                      {item.label}
+                    </div>
+                  )}
+                </>
               )}
             </NavLink>
           ))}
