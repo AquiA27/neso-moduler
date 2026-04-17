@@ -17,7 +17,10 @@ import {
   Package, 
   DollarSign, 
   ShoppingCart, 
+  BadgePercent,
+  Gift,
   Users, 
+  TrendingDown,
   Sparkles,
   Zap,
   Target,
@@ -145,11 +148,17 @@ export default function DashboardPage() {
   const stats = useMemo(() => {
     if (!summary) return [];
     const currentPeriodLabel = summary.period_label || PERIOD_LABELS[summaryPeriod];
+    
+    const topPersonnel = summary.top_personeller?.[0]?.display_name || 'Veri yok';
+
     return [
       { key: 'revenue', label: `${currentPeriodLabel} Ciro`, value: `${formatCurrency(summary.toplam_ciro)} ₺`, helper: `${currentPeriodLabel} toplam ciro`, icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
       { key: 'orders', label: `${currentPeriodLabel} Sipariş`, value: summary.siparis_sayisi.toLocaleString('tr-TR'), helper: `${currentPeriodLabel} toplam sipariş`, icon: ShoppingCart, color: 'text-blue-400', bg: 'bg-blue-500/10' },
       { key: 'avg_table', label: 'Masa Ortalaması', value: `${formatCurrency(summary.ortalama_masa_tutari ?? summary.ortalama_sepet)} ₺`, helper: 'Masa başına ortalama harcama', icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/10' },
-      { key: 'top_product', label: 'En Popüler Ürün', value: summary.en_populer_urun ?? 'Veri yok', helper: 'Dönemin favori ürünü', icon: Package, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+      { key: 'discount', label: 'Toplam İskonto', value: `${formatCurrency(summary.toplam_iskonto)} ₺`, helper: `${currentPeriodLabel} uygulanan indirim`, icon: BadgePercent, color: 'text-orange-400', bg: 'bg-orange-500/10' },
+      { key: 'complimentary', label: 'Toplam İkram', value: `${formatCurrency(summary.toplam_ikram)} ₺`, helper: `${currentPeriodLabel} ikram tutarı`, icon: Gift, color: 'text-pink-400', bg: 'bg-pink-500/10' },
+      { key: 'top_product', label: 'En Popüler Ürün', value: summary.en_populer_urun ?? 'Veri yok', helper: 'Dönemin favori ürünü', icon: Package, color: 'text-amber-400', bg: 'bg-amber-500/10' },
+      { key: 'top_staff', label: 'En İyi Performans', value: topPersonnel, helper: 'En çok sipariş alan personel', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-500/10' },
     ];
   }, [summary, summaryPeriod, formatCurrency]);
 
@@ -204,7 +213,7 @@ export default function DashboardPage() {
       </section>
 
       {/* Main Stats Grid */}
-      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
         {stats.map((s) => (
           <div key={s.key} className="premium-card p-6 rounded-3xl group">
             <div className="flex items-start justify-between mb-4">
@@ -283,28 +292,28 @@ export default function DashboardPage() {
              <div className="space-y-4">
                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
                   <p className="text-sm font-bold text-emerald-400 mb-1 flex items-center gap-2">
-                    <TrendingUp size={16} /> Büyüme Fırsatı
+                    <TrendingUp size={16} /> Verimlilik Analizi
                   </p>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Saat 14:00 - 16:00 arası yoğunluk düşük. Bu saatler için "Mutlu Saatler" kampanyası ciroda %15 artış sağlayabilir.
+                    Dönem içindeki sipariş sayısı {summary?.siparis_sayisi}. Ortalama sepet tutarı {formatCurrency(summary?.ortalama_sepet || 0)} ₺ olarak gerçekleşti.
                   </p>
                </div>
 
                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
                   <p className="text-sm font-bold text-orange-400 mb-1 flex items-center gap-2">
-                    <Package size={16} /> Stok Alarmı
+                    <Package size={16} /> Popüler Ürün
                   </p>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    {summary?.en_populer_urun || 'Ana ürün'} satış hızı arttı. Önümüzdeki 48 saat için stok siparişi vermenizi öneririm.
+                    {summary?.en_populer_urun || 'Veri yok'} şu an en çok satanlar listesinde. Stoklarınızı bu ürüne göre optimize edebilirsiniz.
                   </p>
                </div>
 
                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
                   <p className="text-sm font-bold text-blue-400 mb-1 flex items-center gap-2">
-                    <Users size={16} /> Personel Verimi
+                    <Users size={16} /> Personel Lideri
                   </p>
                   <p className="text-xs text-slate-300 leading-relaxed">
-                    Haftalık en çok sipariş alan personel: {summary?.top_personeller[0]?.display_name || 'Admin'}. Teşekkür etmeyi unutmayın!
+                    Dönemin en çalışkan personeli: {summary?.top_personeller?.[0]?.display_name || 'Admin'}. Toplam {summary?.top_personeller?.[0]?.siparis_sayisi || 0} sipariş yönetti.
                   </p>
                </div>
              </div>
