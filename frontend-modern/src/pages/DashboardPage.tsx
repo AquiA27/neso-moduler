@@ -12,14 +12,14 @@ import {
   ResponsiveContainer,
   Area,
 } from 'recharts';
-import { 
-  TrendingUp, 
-  Package, 
-  DollarSign, 
-  ShoppingCart, 
+import {
+  TrendingUp,
+  Package,
+  DollarSign,
+  ShoppingCart,
   BadgePercent,
   Gift,
-  Users, 
+  Users,
   Sparkles,
   Zap,
   ArrowRight
@@ -80,7 +80,7 @@ export default function DashboardPage() {
   const [summaryPeriod, setSummaryPeriod] = useState<'gunluk' | 'haftalik' | 'aylik'>('gunluk');
   const queryClient = useQueryClient();
   const { selectedTenantId } = useAuthStore();
-  
+
   const businessName = tenantCustomization?.app_name || 'İşletme';
 
   const formatCurrency = useCallback((value: number, fractionDigits = 2) =>
@@ -184,7 +184,7 @@ export default function DashboardPage() {
       <section className="relative overflow-hidden rounded-[40px] glass-panel p-10 md:p-14 group">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-emerald-500/10 blur-[150px] rounded-full -mr-64 -mt-64 group-hover:bg-emerald-500/15 transition-all duration-700" />
         <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-cyan-500/10 blur-[120px] rounded-full -ml-32 -mb-32 group-hover:bg-cyan-500/15 transition-all duration-700" />
-        
+
         <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-10">
           <div className="space-y-6">
             <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-[0.2em] shadow-inner">
@@ -225,8 +225,8 @@ export default function DashboardPage() {
       <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
         {stats.map((s, idx) => (
           <div key={s.key} className="premium-card p-8 group">
-             <div className="card-number-glow">0{idx + 1}</div>
-             <div className="flex items-start justify-between mb-8">
+            <div className="card-number-glow">0{idx + 1}</div>
+            <div className="flex items-start justify-between mb-8">
               <div className={`p-4 rounded-[20px] ${s.bg} ${s.color} transition-all duration-700 group-hover:scale-110 group-active:scale-95 shadow-xl`}>
                 <s.icon size={26} strokeWidth={2.5} />
               </div>
@@ -262,14 +262,14 @@ export default function DashboardPage() {
               <p className="text-slate-500 font-medium mt-1">Saatlik sipariş dağılımı ve gelir performansı</p>
             </div>
             <div className="flex gap-4">
-               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/40 border border-white/5">
-                 <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gelir</span>
-               </div>
-               <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/40 border border-white/5">
-                 <div className="w-2 h-2 rounded-full bg-blue-500" />
-                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sipariş</span>
-               </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/40 border border-white/5">
+                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Gelir</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-950/40 border border-white/5">
+                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Sipariş</span>
+              </div>
             </div>
           </div>
 
@@ -278,21 +278,21 @@ export default function DashboardPage() {
               <ComposedChart data={hourlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="chartGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2}/>
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.02)" vertical={false} />
-                <XAxis 
-                  dataKey="saat" 
-                  stroke={axisColor} 
-                  tick={{ fill: axisColor, fontSize: 11, fontWeight: 700 }} 
-                  axisLine={false} 
+                <XAxis
+                  dataKey="saat"
+                  stroke={axisColor}
+                  tick={{ fill: axisColor, fontSize: 11, fontWeight: 700 }}
+                  axisLine={false}
                   tickLine={false}
                   tickFormatter={(v) => formatHour(v)}
                 />
                 <YAxis hide />
-                <Tooltip 
+                <Tooltip
                   cursor={{ stroke: 'rgba(16,185,129,0.2)', strokeWidth: 2 }}
                   contentStyle={{ backgroundColor: '#0f172a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '24px', padding: '16px' }}
                   itemStyle={{ fontWeight: 800, fontSize: '12px', textTransform: 'uppercase' }}
@@ -306,69 +306,69 @@ export default function DashboardPage() {
 
         {/* AI Insight Advisory Panel */}
         <div className="xl:col-span-4 flex flex-col gap-8">
-           <div className="premium-card p-10 rounded-[40px] bg-gradient-to-br from-emerald-500/10 via-slate-900 to-indigo-500/10 border-emerald-500/20 group relative overflow-hidden flex-1">
-             <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 rotate-12 group-hover:scale-175 transition-transform duration-1000">
-               <Sparkles className="text-emerald-400" size={120} />
-             </div>
+          <div className="premium-card p-10 rounded-[40px] bg-gradient-to-br from-emerald-500/10 via-slate-900 to-indigo-500/10 border-emerald-500/20 group relative overflow-hidden flex-1">
+            <div className="absolute top-0 right-0 p-8 opacity-10 scale-150 rotate-12 group-hover:scale-175 transition-transform duration-1000">
+              <Sparkles className="text-emerald-400" size={120} />
+            </div>
 
-             <div className="relative space-y-8 h-full flex flex-col">
-               <div className="space-y-4">
-                 <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/10 border border-white/5 text-white text-[10px] font-black uppercase tracking-[0.2em]">
-                   AI ADVISORY ENGINE
-                 </div>
-                 <h3 className="text-3xl font-extrabold text-white leading-[1.1]">Stratejik <br />Danışmanlık.</h3>
-               </div>
-               
-               <div className="space-y-6 flex-1">
-                 <div className="p-6 rounded-[24px] bg-slate-950/60 border border-white/[0.05] hover:border-emerald-500/30 transition-all duration-500">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-black italic">!</div>
-                      <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Verimlilik Analizi</p>
-                    </div>
-                    <p className="text-sm text-slate-300 font-medium leading-relaxed">
-                      Dönem içindeki sipariş sayısı <span className="text-white font-bold">{summary?.siparis_sayisi}</span>. Ortalama sepet tutarı <span className="text-white font-bold">{formatCurrency(summary?.ortalama_sepet || 0)} ₺</span> olarak gerçekleşti.
-                    </p>
-                 </div>
+            <div className="relative space-y-8 h-full flex flex-col">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-3 px-4 py-1.5 rounded-full bg-white/10 border border-white/5 text-white text-[10px] font-black uppercase tracking-[0.2em]">
+                  AI ADVISORY ENGINE
+                </div>
+                <h3 className="text-3xl font-extrabold text-white leading-[1.1]">Stratejik <br />Danışmanlık.</h3>
+              </div>
 
-                 <div className="p-6 rounded-[24px] bg-slate-950/60 border border-white/[0.05] hover:border-amber-500/30 transition-all duration-500">
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black italic">!</div>
-                      <p className="text-xs font-black text-amber-500 uppercase tracking-widest">Trend Ürün</p>
-                    </div>
-                    <p className="text-sm text-slate-300 font-medium leading-relaxed">
-                      <span className="text-white font-bold">{summary?.en_populer_urun || 'Veri yok'}</span> şu an en çok satanlar listesinde. Talebi karşılamak için stokları güncelleyin.
-                    </p>
-                 </div>
-               </div>
+              <div className="space-y-6 flex-1">
+                <div className="p-6 rounded-[24px] bg-slate-950/60 border border-white/[0.05] hover:border-emerald-500/30 transition-all duration-500">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-500 text-slate-950 flex items-center justify-center font-black italic">!</div>
+                    <p className="text-xs font-black text-emerald-400 uppercase tracking-widest">Verimlilik Analizi</p>
+                  </div>
+                  <p className="text-sm text-slate-300 font-medium leading-relaxed">
+                    Dönem içindeki sipariş sayısı <span className="text-white font-bold">{summary?.siparis_sayisi}</span>. Ortalama sepet tutarı <span className="text-white font-bold">{formatCurrency(summary?.ortalama_sepet || 0)} ₺</span> olarak gerçekleşti.
+                  </p>
+                </div>
 
-               <button 
-                  onClick={() => navigate('/isletme-asistani')}
-                  className="glow-button w-full"
-                >
-                  DETAYLI ANALİZ RAPORU
-                  <ArrowRight size={20} strokeWidth={3} />
-               </button>
-             </div>
-           </div>
+                <div className="p-6 rounded-[24px] bg-slate-950/60 border border-white/[0.05] hover:border-amber-500/30 transition-all duration-500">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-black italic">!</div>
+                    <p className="text-xs font-black text-amber-500 uppercase tracking-widest">Trend Ürün</p>
+                  </div>
+                  <p className="text-sm text-slate-300 font-medium leading-relaxed">
+                    <span className="text-white font-bold">{summary?.en_populer_urun || 'Veri yok'}</span> şu an en çok satanlar listesinde. Talebi karşılamak için stokları güncelleyin.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => navigate('/isletme-asistani')}
+                className="glow-button w-full"
+              >
+                DETAYLI ANALİZ RAPORU
+                <ArrowRight size={20} strokeWidth={3} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
       {/* Product Intelligence Matrix */}
       <section className="premium-card p-10 rounded-[40px]">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-8 mb-12">
-           <div className="space-y-2">
-             <h3 className="text-3xl font-bold text-white tracking-tight">Ürün Performans Matrisi</h3>
-             <p className="text-slate-500 font-medium uppercase text-xs tracking-[0.2em]">En Değerli Ürünlerin Karşılaştırmalı Analizi</p>
-           </div>
-           <button onClick={() => navigate('/menu')} className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 text-slate-400 font-bold hover:text-emerald-400 hover:border-emerald-500/30 transition-all">
-             KATALOG YÖNETİMİ
-           </button>
+          <div className="space-y-2">
+            <h3 className="text-3xl font-bold text-white tracking-tight">Ürün Performans Matrisi</h3>
+            <p className="text-slate-500 font-medium uppercase text-xs tracking-[0.2em]">En Değerli Ürünlerin Karşılaştırmalı Analizi</p>
+          </div>
+          <button onClick={() => navigate('/menu')} className="px-6 py-3 rounded-2xl bg-white/5 border border-white/5 text-slate-400 font-bold hover:text-emerald-400 hover:border-emerald-500/30 transition-all">
+            KATALOG YÖNETİMİ
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {productData.slice(0, 6).map((p, idx) => (
             <div key={idx} className="p-8 rounded-[32px] bg-slate-950/40 border border-white/5 hover:border-emerald-500/30 hover:bg-slate-900/40 transition-all duration-700 group cursor-pointer relative overflow-hidden">
-               <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+              <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-10 transition-opacity">
                 <Package size={80} strokeWidth={1} />
               </div>
               <div className="flex justify-between items-start mb-6">
@@ -387,8 +387,8 @@ export default function DashboardPage() {
                   <span>{p.satis_adeti} ADET</span>
                 </div>
                 <div className="h-2 bg-slate-900 rounded-full overflow-hidden border border-white/[0.03]">
-                  <div 
-                    className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-cyan-500 rounded-full transition-all duration-1000" 
+                  <div
+                    className="h-full bg-gradient-to-r from-emerald-500 via-emerald-400 to-cyan-500 rounded-full transition-all duration-1000"
                     style={{ width: `${(p.satis_adeti / productData[0].satis_adeti) * 100}%` }}
                   />
                 </div>

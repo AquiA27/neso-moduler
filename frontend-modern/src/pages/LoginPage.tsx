@@ -2,7 +2,7 @@ import { useState, FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { authApi } from '../lib/api';
-import logo from '../assets/neso-logo.svg';
+import logo from '../assets/neso-logo.jpg';
 import { Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
 
 export default function LoginPage() {
@@ -55,8 +55,8 @@ export default function LoginPage() {
     <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden bg-slate-950">
       {/* Background with Image and Gradients */}
       <div className="absolute inset-0 z-0">
-        <img 
-          src="https://images.unsplash.com/photo-1620121692029-d088224ddc74?q=80&w=2064&auto=format&fit=crop" 
+        <img
+          src="https://images.unsplash.com/photo-1620121692029-d088224ddc74?q=80&w=2064&auto=format&fit=crop"
           className="w-full h-full object-cover opacity-20 scale-110"
           alt="Background"
         />
@@ -66,13 +66,13 @@ export default function LoginPage() {
 
       {/* Main Container */}
       <div className="relative z-10 w-full max-w-[1000px] grid md:grid-cols-2 glass-panel rounded-[32px] overflow-hidden shadow-2xl border border-white/10 animate-in fade-in zoom-in duration-700">
-        
+
         {/* Left Side: Illustration / Brand */}
         <div className="hidden md:flex flex-col justify-between p-12 bg-emerald-500/5 relative overflow-hidden text-white">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(16,185,129,0.1),_transparent_70%)]" />
-          
+
           <div className="space-y-6">
-            <img src={logo} className="h-16 w-16 drop-shadow-[0_0_15px_rgba(16,185,129,0.5)]" alt="Neso Logo" />
+            <img src={logo} className="h-20 w-20 rounded-2xl object-cover drop-shadow-[0_0_15px_rgba(16,185,129,0.5)] border border-white/10" alt="Neso Logo" />
             <h1 className="text-5xl font-bold tracking-tight leading-tight">
               Yönetimi <br />
               <span className="text-gradient">Akıllandırın.</span>
@@ -94,8 +94,8 @@ export default function LoginPage() {
         {/* Right Side: Login Form */}
         <div className="p-8 md:p-12 flex flex-col justify-center">
           <div className="mb-10 block md:hidden">
-             <img src={logo} className="h-12 w-12 mx-auto mb-4" alt="Neso Logo" />
-             <h2 className="text-2xl font-bold text-center text-white">Neso Modüler</h2>
+            <img src={logo} className="h-16 w-16 mx-auto mb-4 rounded-xl object-cover border border-white/10" alt="Neso Logo" />
+            <h2 className="text-2xl font-bold text-center text-white">Neso Modüler</h2>
           </div>
 
           <div className="space-y-1 mb-8">

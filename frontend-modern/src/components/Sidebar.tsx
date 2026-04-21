@@ -1,13 +1,13 @@
 import { NavLink } from 'react-router-dom';
-import { 
-  BarChart2, 
-  Menu as MenuIcon, 
-  Package, 
-  CreditCard, 
-  Users, 
-  Settings, 
-  LogOut, 
-  ChevronLeft, 
+import {
+  BarChart2,
+  Menu as MenuIcon,
+  Package,
+  CreditCard,
+  Users,
+  Settings,
+  LogOut,
+  ChevronLeft,
   ChevronRight,
   TrendingDown,
   LayoutDashboard,
@@ -16,7 +16,7 @@ import {
   Bot
 } from 'lucide-react';
 import { memo } from 'react';
-import logo from '../assets/neso-logo.svg';
+import logo from '../assets/neso-logo.jpg';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -33,11 +33,11 @@ interface SidebarProps {
   showTenantDataPages: boolean;
 }
 
-function Sidebar({ 
-  isOpen, 
-  setIsOpen, 
-  user, 
-  displayLogo, 
+function Sidebar({
+  isOpen,
+  setIsOpen,
+  user,
+  displayLogo,
   onLogout,
   showAdmin,
   showKasa,
@@ -47,7 +47,7 @@ function Sidebar({
   showSuperAdmin,
   showTenantDataPages
 }: SidebarProps) {
-  
+
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: showAdmin && showTenantDataPages },
     { to: '/raporlar', label: 'Raporlar', icon: BarChart2, show: showAdmin && showTenantDataPages },
@@ -68,18 +68,18 @@ function Sidebar({
   return (
     <>
       {/* Mobile Overlay */}
-      <div 
+      <div
         className={`fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 transition-opacity duration-500 md:hidden ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
         onClick={() => setIsOpen(false)}
       />
 
       {/* Sidebar */}
-      <aside 
+      <aside
         className={`fixed left-0 top-0 h-full glass-sidebar z-50 transition-all duration-500 ease-in-out flex flex-col
           ${isOpen ? 'w-72' : 'w-20 -left-20 md:left-0'}`}
       >
         {/* Toggle Button (Desktop) */}
-        <button 
+        <button
           onClick={() => setIsOpen(!isOpen)}
           className="absolute -right-3.5 top-20 bg-emerald-500 text-slate-950 p-1.5 rounded-full shadow-[0_0_20px_rgba(16,185,129,0.4)] hidden md:flex items-center justify-center hover:scale-110 active:scale-90 transition-all duration-300 z-50"
         >
@@ -90,10 +90,10 @@ function Sidebar({
         <div className={`p-8 flex items-center gap-4 ${!isOpen && 'justify-center'}`}>
           <div className="relative group cursor-pointer">
             <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <img 
-              src={displayLogo} 
-              alt="Logo" 
-              className={`relative transition-all duration-500 object-contain ${isOpen ? 'w-12 h-12' : 'w-10 h-10'} drop-shadow-[0_0_15px_rgba(16,185,129,0.4)]`}
+            <img
+              src={displayLogo}
+              alt="Logo"
+              className={`relative transition-all duration-500 object-cover rounded-xl border border-white/5 ${isOpen ? 'w-14 h-14' : 'w-10 h-10'} drop-shadow-[0_0_15px_rgba(16,185,129,0.4)]`}
               onError={(e) => {
                 if (e.currentTarget.src !== logo) e.currentTarget.src = logo;
               }}
@@ -109,7 +109,7 @@ function Sidebar({
 
         {/* Navigation */}
         <div className="px-4 mb-4">
-           {isOpen && <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2">Main Navigation</p>}
+          {isOpen && <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2">Main Navigation</p>}
         </div>
         <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto custom-scrollbar">
           {navItems.filter(item => item.show).map((item) => (

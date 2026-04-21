@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { publicMenuApi, normalizeApiUrl } from '../lib/api';
+import logo from '../assets/neso-logo.jpg';
 
 interface Varyasyon {
   id: number;
@@ -180,11 +181,11 @@ export default function PublicMenuPage() {
               </button>
               
               <div className="space-y-1">
-                 {customization?.logo_url && (
+                 {(customization?.logo_url || logo) && (
                     <img
-                      src={resolveImageUrl(customization.logo_url)}
-                      alt={customization.app_name || 'Logo'}
-                      className="h-12 w-auto object-contain mb-4"
+                      src={customization?.logo_url ? resolveImageUrl(customization.logo_url) : logo}
+                      alt={customization?.app_name || 'Logo'}
+                      className="h-16 w-16 object-cover rounded-xl border border-white/10 mb-4"
                     />
                   )}
                  <h1 className="text-4xl md:text-5xl font-black text-white tracking-tighter">

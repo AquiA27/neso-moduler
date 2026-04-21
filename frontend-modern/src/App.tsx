@@ -29,11 +29,11 @@ const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
 // Protected Route component
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
-  
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
-  
+
   return <>{children}</>;
 }
 
@@ -43,12 +43,12 @@ function IndexRedirect() {
   const userRole = user?.role?.toLowerCase();
   const username = user?.username?.toLowerCase();
   const isSuperAdmin = user && (userRole === 'super_admin' || username === 'super');
-  
+
   // Super admin "Tüm İşletmeler" modundaysa Super Admin paneline yönlendir
   if (isSuperAdmin && selectedTenantId === null) {
     return <Navigate to="/superadmin" replace />;
   }
-  
+
   // Diğer durumlarda dashboard'a yönlendir
   return <Navigate to="/dashboard" replace />;
 }
@@ -56,7 +56,7 @@ function IndexRedirect() {
 // Subdomain detection component - uygulama başlangıcında subdomain'i algılar
 function SubdomainDetector() {
   const { setTenantId } = useAuthStore();
-  
+
   useEffect(() => {
     const subdomain = getCurrentSubdomain();
     if (subdomain) {
@@ -66,7 +66,7 @@ function SubdomainDetector() {
       console.log('Subdomain detected:', subdomain);
     }
   }, [setTenantId]);
-  
+
   return null;
 }
 
@@ -86,10 +86,10 @@ function App() {
           <Route path="/musteri" element={<CustomerLandingPage />} />
           <Route path="/musteri/chat" element={<CustomerChatPage />} />
           <Route path="/musteri/menu" element={<PublicMenuPage />} />
-          
+
           {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />
-          
+
           {/* Protected routes */}
           <Route
             path="/"
@@ -118,7 +118,7 @@ function App() {
             <Route path="system" element={<SystemSettingsPage />} />
             <Route path="superadmin" element={<SuperAdminPanel />} />
           </Route>
-          
+
           <Route path="*" element={<IndexRedirect />} />
         </Routes>
       </Suspense>

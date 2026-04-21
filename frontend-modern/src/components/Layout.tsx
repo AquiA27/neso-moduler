@@ -4,7 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { customizationApi, subscriptionApi, normalizeApiUrl } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
 import { Settings, AlertTriangle, X, Menu, Bell } from 'lucide-react';
-import logo from '../assets/neso-logo.svg';
+import logo from '../assets/neso-logo.jpg';
 import TenantSwitcher from './TenantSwitcher';
 import Sidebar from './Sidebar';
 
@@ -28,7 +28,7 @@ function Layout() {
     const loadCustomization = async () => {
       const effectiveTenantId = selectedTenantId || tenantId;
       const subdomain = getCurrentSubdomain();
-      
+
       if (subdomain) {
         try {
           const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
@@ -174,11 +174,11 @@ function Layout() {
 
       {/* Content Wrapper */}
       <div className={`flex-1 flex flex-col transition-all duration-500 min-w-0 ${sidebarOpen ? 'md:pl-72' : 'md:pl-20'}`}>
-        
+
         {/* Top Header */}
         <header className="sticky top-0 z-30 h-16 md:h-20 flex items-center justify-between px-4 md:px-8 border-b border-white/5 bg-slate-950/20 backdrop-blur-3xl">
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 -ml-2 text-slate-400 hover:text-white md:hidden"
             >
@@ -199,13 +199,13 @@ function Layout() {
               <div className="w-[1px] h-3 bg-white/10 mx-1" />
               <span className="text-xs font-medium">0 Bildirim</span>
             </div>
-            
+
             {showSuperAdmin && (
               <div className="scale-90 md:scale-100">
                 <TenantSwitcher />
               </div>
             )}
-            
+
             <button
               onClick={() => navigate('/system')}
               className="p-2.5 rounded-xl border border-white/5 bg-white/5 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 transition-all duration-300"
