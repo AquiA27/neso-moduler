@@ -109,6 +109,8 @@ backend/backups/
 *.gif
 *.svg
 !frontend-modern/src/assets/*.svg
+!frontend-modern/src/assets/*.jpg
+!frontend-modern/src/assets/*.png
 *.mp3
 *.wav
 
