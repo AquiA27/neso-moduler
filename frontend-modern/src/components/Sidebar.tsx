@@ -102,7 +102,6 @@ function Sidebar({
           {isOpen && (
             <div className="flex flex-col min-w-0">
               <span className="font-extrabold text-2xl text-white tracking-tighter leading-none italic">NESO</span>
-              <span className="text-[10px] text-emerald-400 font-black tracking-[0.2em] uppercase mt-1">Intelligent Systems</span>
             </div>
           )}
         </div>
@@ -151,7 +150,6 @@ function Sidebar({
                   <p className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{user?.username || 'Kullanıcı'}</p>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{user?.role || 'Üye'}</p>
                   </div>
                 </div>
               </div>

@@ -187,14 +187,10 @@ export default function DashboardPage() {
 
         <div className="relative flex flex-col lg:flex-row lg:items-end justify-between gap-10">
           <div className="space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-black uppercase tracking-[0.2em] shadow-inner">
-              <Sparkles className="w-3 h-3 animate-pulse" />
-              Neso AI Intelligence Center
-            </div>
+            {/* Badge removed */}
             <h1 className="leading-[1.1]">
               <span className="text-slate-500 font-light block mb-2 text-2xl md:text-3xl">Hoş Geldiniz,</span>
-              <span className="text-white font-extrabold">{businessName}</span>
-              <span className="text-gradient ml-4">Analitik.</span>
+              <span className="text-white font-extrabold">{businessName}.</span>
             </h1>
             <p className="text-slate-400 text-lg md:text-xl max-w-2xl font-medium leading-relaxed">
               İşletmenizin geleceğini gerçek zamanlı verilerle şekillendirin. Stratejik büyüme ve operasyonel verimlilik tek panelde.
