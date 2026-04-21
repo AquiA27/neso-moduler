@@ -237,15 +237,21 @@ function Layout() {
         </main>
 
         {/* Minimal Footer */}
-        <footer className="px-8 py-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-medium text-slate-500">
-          <p>© 2024 Neso Modüler Dashboard. Premium Edition.</p>
+        <footer className="px-8 py-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-600">
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+            <p className="text-slate-500 normal-case font-medium tracking-normal">© 2026 Neso Modüler Dashboard. Premium Edition.</p>
+            <div className="hidden md:block w-px h-3 bg-white/5" />
+            <a href="/legal?type=kvkk" className="hover:text-emerald-400 transition-colors">KVKK Aydınlatma</a>
+            <a href="/legal?type=terms" className="hover:text-emerald-400 transition-colors">Kullanım Koşulları</a>
+            <a href="/legal?type=privacy" className="hover:text-emerald-400 transition-colors">Gizlilik & Çerez</a>
+          </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              <span>Sistem Aktif</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+              <span className="text-emerald-500/80">Sistem Aktif</span>
             </div>
-            <span className="text-slate-700">|</span>
-            <span className="text-emerald-500/60 uppercase tracking-widest">v0.3.0</span>
+            <span className="text-slate-800">|</span>
+            <span className="text-slate-700 tracking-widest">v0.3.5</span>
           </div>
         </footer>
       </div>

@@ -159,8 +159,15 @@ export default function LoginPage() {
             </button>
           </form>
 
-          <div className="mt-12 text-center text-[10px] font-bold uppercase tracking-widest text-slate-600">
-            Powered by Neso Intelligent Systems &copy; 2026
+          <div className="mt-12 flex flex-col items-center gap-4">
+            <div className="flex items-center gap-6 text-[10px] font-bold uppercase tracking-[0.2em] text-slate-600">
+              <a href="/legal?type=kvkk" className="hover:text-emerald-500 transition-colors">KVKK</a>
+              <a href="/legal?type=terms" className="hover:text-emerald-500 transition-colors">Şartlar</a>
+              <a href="/legal?type=privacy" className="hover:text-emerald-500 transition-colors">Gizlilik</a>
+            </div>
+            <div className="text-[10px] font-bold uppercase tracking-widest text-slate-800">
+              Powered by Neso Intelligent Systems &copy; 2026
+            </div>
           </div>
         </div>
       </div>

@@ -25,6 +25,7 @@ const CustomerChatPage = lazy(() => import('./pages/CustomerChatPage'));
 const PublicMenuPage = lazy(() => import('./pages/PublicMenuPage'));
 const SuperAdminPanel = lazy(() => import('./pages/SuperAdminPanel'));
 const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
+const LegalPage = lazy(() => import('./pages/LegalPage'));
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -86,6 +87,7 @@ function App() {
           <Route path="/musteri" element={<CustomerLandingPage />} />
           <Route path="/musteri/chat" element={<CustomerChatPage />} />
           <Route path="/musteri/menu" element={<PublicMenuPage />} />
+          <Route path="/legal" element={<LegalPage />} />
 
           {/* Auth routes */}
           <Route path="/login" element={<LoginPage />} />
