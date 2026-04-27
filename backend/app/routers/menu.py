@@ -3,6 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, 
 from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any, Mapping
 import csv, io, unicodedata, secrets
+from PIL import Image
 from pathlib import Path
 
 from ..core.config import settings
@@ -480,16 +481,26 @@ async def menu_gorsel_yukle(
     if not existing:
         raise HTTPException(status_code=404, detail="Menü ürünü bulunamadı")
 
-    media_dir = Path(settings.MEDIA_ROOT) / "menu"
-    media_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"menu_{menu_id}_{secrets.token_hex(8)}{extension}"
-    file_path = (media_dir / filename).resolve()
-
+    # Görseli kaydet (PNG'ye dönüştürerek)
     try:
-        with open(file_path, "wb") as out_file:
-            out_file.write(content)
+        media_dir = Path(settings.MEDIA_ROOT) / "menu"
+        media_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Pillow ile görseli aç
+        img = Image.open(io.BytesIO(content))
+        
+        # Şeffaflığı korumak için PNG olarak kaydet
+        filename = f"menu_{menu_id}_{secrets.token_hex(8)}.png"
+        file_path = (media_dir / filename).resolve()
+        
+        img.save(file_path, "PNG")
+        
+        import logging
+        logging.info(f"[MENU_GORSEL_YUKLE] Görsel PNG olarak kaydedildi: {file_path}")
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Görsel kaydedilemedi: {exc}") from exc
+        import logging
+        logging.error(f"[MENU_GORSEL_YUKLE] Kayıt hatası: {exc}")
+        raise HTTPException(status_code=500, detail=f"Görsel kaydedilemedi (PNG dönüşüm hatası): {exc}") from exc
 
     # Eski görseli sil
     old_path = resolve_media_path(existing["gorsel_url"])
