@@ -231,7 +231,8 @@ app.include_router(audit_router)       # /audit/*
 app.include_router(backup_router)      # /system/backup/*
 app.include_router(analytics_advanced_router)  # /analytics/advanced/*
 app.include_router(cache_router)       # /cache/*
-app.include_router(seed_demo_router)   # /seed/* (DEMO - sonra kaldırılacak)
+if settings.ENV != "prod":
+    app.include_router(seed_demo_router)   # /seed/* (DEMO - sadece geliştirme aşamasında)
 
 # ---- Observability & Varsayılan Şube ----
 app.add_middleware(RequestIdAndRateLimitMiddleware)

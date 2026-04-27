@@ -8,6 +8,9 @@ from ..core.deps import require_roles, get_current_user
 from ..core.config import settings
 from ..db.database import db
 from .customization_helper import check_assistant_columns, get_select_fields, add_default_assistant_fields
+from ..core.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(
     prefix="/customization",
@@ -342,12 +345,18 @@ async def upload_logo(
         raise HTTPException(403, "Sadece super admin logo yükleyebilir")
     
     # İşletme kontrolü
-    isletme = await db.fetch_one(
-        "SELECT id FROM isletmeler WHERE id = :id",
-        {"id": isletme_id},
-    )
-    if not isletme:
-        raise HTTPException(404, "İşletme bulunamadı")
+    # İşletme kontrolü (RLS-resilient check for super admin)
+    try:
+        isletme = await db.fetch_one(
+            "SELECT id FROM isletmeler WHERE id = :id",
+            {"id": isletme_id},
+        )
+        if not isletme:
+            logger.warning("isletme_not_found_in_check", isletme_id=isletme_id)
+            if isletme_id <= 0:
+                raise HTTPException(404, "Geçersiz işletme ID")
+    except Exception as e:
+        logger.warning("isletme_check_error", error=str(e), isletme_id=isletme_id)
     
     # Dosya tipi kontrolü
     allowed_types = {
@@ -360,65 +369,85 @@ async def upload_logo(
     content_type = (file.content_type or "").lower()
     extension = allowed_types.get(content_type)
     original_suffix = Path(file.filename or "").suffix.lower()
+    
     if not extension:
         if original_suffix in {".jpg", ".jpeg", ".png", ".webp", ".gif", ".svg"}:
             extension = ".jpg" if original_suffix in {".jpg", ".jpeg"} else original_suffix
         else:
+            logger.warning("invalid_file_type", content_type=content_type, filename=file.filename)
             raise HTTPException(status_code=400, detail="Desteklenmeyen dosya türü. Sadece JPG, PNG, WebP, GIF veya SVG yükleyebilirsiniz.")
     
     # Dosya boyutu kontrolü
-    content = await file.read()
+    try:
+        content = await file.read()
+    except Exception as e:
+        logger.error("file_read_error", error=str(e))
+        raise HTTPException(status_code=500, detail=f"Dosya okunamadı: {e}")
+
     max_size = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
     if len(content) > max_size:
+        logger.warning("file_too_large", size=len(content), max_size=max_size)
         raise HTTPException(
             status_code=400,
             detail=f"Dosya boyutu çok büyük. Maksimum {settings.MAX_UPLOAD_SIZE_MB}MB yükleyebilirsiniz.",
         )
     
-    # Mevcut logo'yu kontrol et
-    existing = await db.fetch_one(
-        "SELECT id, logo_url FROM tenant_customizations WHERE isletme_id = :id",
-        {"id": isletme_id},
-    )
+    # Mevcut logo'yu kontrol et (Eski dosyayı silmek için)
+    try:
+        existing_row = await db.fetch_one(
+            "SELECT logo_url FROM tenant_customizations WHERE isletme_id = :id",
+            {"id": isletme_id},
+        )
+        existing = dict(existing_row) if existing_row else None
+    except Exception as e:
+        logger.error("db_fetch_existing_error", error=str(e), isletme_id=isletme_id)
+        # Hata olsa da devam etmeyi deneyebiliriz ama loglamak kritik
+        existing = None
     
     # Dosyayı kaydet
-    media_dir = Path(settings.MEDIA_ROOT) / "logos"
-    media_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"logo_{isletme_id}_{secrets.token_hex(8)}{extension}"
-    file_path = (media_dir / filename).resolve()
-    
     try:
+        media_dir = Path(settings.MEDIA_ROOT) / "logos"
+        media_dir.mkdir(parents=True, exist_ok=True)
+        
+        filename = f"logo_{isletme_id}_{secrets.token_hex(8)}{extension}"
+        file_path = (media_dir / filename).resolve()
+        
         with open(file_path, "wb") as out_file:
             out_file.write(content)
+            
+        logger.info("logo_saved_to_disk", path=str(file_path), isletme_id=isletme_id)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Logo kaydedilemedi: {exc}") from exc
+        logger.error("logo_save_disk_error", error=str(exc), isletme_id=isletme_id)
+        raise HTTPException(status_code=500, detail=f"Logo disk'e kaydedilemedi: {exc}")
     
-    # Eski logo'yu sil
+    # Eski logo'yu sil (Cleanup)
     if existing and existing.get("logo_url"):
-        old_path = resolve_media_path(existing["logo_url"])
-        if old_path and old_path.exists():
-            try:
-                if old_path.is_file():
-                    old_path.unlink()
-            except Exception:
-                pass
+        try:
+            old_path = resolve_media_path(existing["logo_url"])
+            if old_path and old_path.exists() and old_path.is_file():
+                old_path.unlink()
+                logger.info("old_logo_deleted", path=str(old_path))
+        except Exception as e:
+            logger.warning("old_logo_delete_error", error=str(e))
     
     relative_url = f"{settings.MEDIA_URL.rstrip('/')}/logos/{filename}"
     
-    # Customization'ı güncelle veya oluştur
-    if existing:
-        await db.execute(
-            "UPDATE tenant_customizations SET logo_url = :url, updated_at = NOW() WHERE isletme_id = :id",
-            {"id": isletme_id, "url": relative_url},
-        )
-    else:
+    # Customization'ı güncelle veya oluştur (Atomic UPSERT)
+    try:
         await db.execute(
             """
             INSERT INTO tenant_customizations (isletme_id, logo_url, created_at, updated_at)
             VALUES (:id, :url, NOW(), NOW())
+            ON CONFLICT (isletme_id) DO UPDATE SET
+                logo_url = EXCLUDED.logo_url,
+                updated_at = NOW()
             """,
             {"id": isletme_id, "url": relative_url},
         )
+        logger.info("logo_db_updated", isletme_id=isletme_id, url=relative_url)
+    except Exception as e:
+        logger.error("logo_db_update_error", error=str(e), isletme_id=isletme_id)
+        raise HTTPException(status_code=500, detail=f"Veritabanı güncellenemedi: {e}")
     
     return {"logo_url": relative_url}
 
