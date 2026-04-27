@@ -34,6 +34,8 @@ export default function PublicMenuPage() {
     initialSubeId ? Number.parseInt(initialSubeId, 10) : undefined
   );
   const [isBlocked, setIsBlocked] = useState(false);
+  const [subeAdi, setSubeAdi] = useState<string | null>(null);
+  const [subeSayisi, setSubeSayisi] = useState<number>(0);
   const [tableStatus, setTableStatus] = useState<string | null>(null);
 
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -61,6 +63,8 @@ export default function PublicMenuPage() {
         console.log('[QR] Masa bilgisi yüklendi:', data);
         setMasa(data.masa_adi || initialMasa);
         setSubeId(data.sube_id ? Number(data.sube_id) : 1);
+        setSubeAdi(data.sube_adi);
+        setSubeSayisi(data.sube_sayisi || 0);
         // Customization bilgisini de kaydet
         if (data.customization) {
           setCustomization(data.customization);
@@ -213,9 +217,9 @@ export default function PublicMenuPage() {
                   MASA: {masa}
                 </div>
               )}
-              {subeId && (
-                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-400 font-bold text-xs">
-                   ŞUBE #{subeId}
+              {subeSayisi > 1 && subeAdi && (
+                <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-400 font-bold text-xs uppercase tracking-wider">
+                   ŞUBE: {subeAdi}
                 </div>
               )}
           </div>

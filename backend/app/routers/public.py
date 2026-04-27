@@ -387,8 +387,9 @@ async def get_masa_by_qr(qr_code: str):
         logging.info(f"[PUBLIC_API] Looking up masa with QR code: {qr_code[:20]}...")
         row = await db.fetch_one(
             """
-            SELECT m.id, m.masa_adi, m.qr_code, m.durum, m.kapasite, m.sube_id,
-                   s.isletme_id, s.aktif as sube_aktif, i.aktif as isletme_aktif
+            SELECT m.id, m.masa_adi, m.qr_code, m.durum, m.kapasite, m.sube_id, s.ad as sube_adi,
+                   s.isletme_id, s.aktif as sube_aktif, i.aktif as isletme_aktif,
+                   (SELECT COUNT(*) FROM subeler WHERE isletme_id = s.isletme_id AND aktif = TRUE) as sube_sayisi
             FROM masalar m
             JOIN subeler s ON m.sube_id = s.id
             JOIN isletmeler i ON s.isletme_id = i.id
@@ -435,6 +436,8 @@ async def get_masa_by_qr(qr_code: str):
             "durum": row_dict["durum"],
             "kapasite": row_dict["kapasite"],
             "sube_id": row_dict["sube_id"],
+            "sube_adi": row_dict.get("sube_adi"),
+            "sube_sayisi": row_dict.get("sube_sayisi", 1),
             "isletme_id": row_dict.get("isletme_id"),  # Frontend için isletme_id de döndür
             "customization": customization_dict,  # Customization bilgisini de döndür
         }
