@@ -18,10 +18,12 @@ from .db.database import db
 from .db.schema import create_tables
 
 # Setup logging first, before anything else
+import mimetypes
 setup_logging(
     log_level=os.getenv("LOG_LEVEL", "INFO"),
     json_logs=settings.ENV == "prod"
 )
+mimetypes.add_type('.webp', 'image/webp')
 logger = logging.getLogger(__name__)
 
 # Initialize Sentry (Temporarily disabled to bypass FastAPI lifespan recursion bug)
