@@ -264,7 +264,6 @@ async def debug_media():
         "logos_dir": str(logos_dir),
         "logos_dir_exists": logos_dir.exists(),
         "files": [],
-        "current_user": os.getlogin() if hasattr(os, 'getlogin') else "unknown",
         "uid": os.getuid() if hasattr(os, 'getuid') else "n/a",
     }
     
