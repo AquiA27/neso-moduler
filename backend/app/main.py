@@ -6,6 +6,13 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi  # << Swagger özelleştirme için
+import mimetypes
+mimetypes.init()
+mimetypes.add_type('.webp', 'image/webp')
+mimetypes.add_type('.svg', 'image/svg+xml')
+mimetypes.add_type('.jpg', 'image/jpeg')
+mimetypes.add_type('.jpeg', 'image/jpeg')
+mimetypes.add_type('.png', 'image/png')
 
 from .core.config import settings
 from .core.middleware import ErrorMiddleware, DefaultSubeMiddleware
@@ -18,12 +25,10 @@ from .db.database import db
 from .db.schema import create_tables
 
 # Setup logging first, before anything else
-import mimetypes
 setup_logging(
     log_level=os.getenv("LOG_LEVEL", "INFO"),
     json_logs=settings.ENV == "prod"
 )
-mimetypes.add_type('.webp', 'image/webp')
 logger = logging.getLogger(__name__)
 
 # Initialize Sentry (Temporarily disabled to bypass FastAPI lifespan recursion bug)
