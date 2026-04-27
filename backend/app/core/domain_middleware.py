@@ -107,7 +107,7 @@ class DomainTenantMiddleware(BaseHTTPMiddleware):
         
         # Public endpoint'ler için bypass (auth/login vb.)
         path = request.url.path
-        if path.startswith(("/auth/", "/public/", "/health", "/docs", "/redoc", "/openapi.json", "/", "/ping")):
+        if path.startswith(("/auth/", "/public/", "/health", "/docs", "/redoc", "/openapi.json", "/", "/ping", "/media/")):
             return await call_next(request)
         
         # Host header'ından subdomain'i çıkar

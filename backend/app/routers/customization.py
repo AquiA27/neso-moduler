@@ -344,19 +344,16 @@ async def upload_logo(
     if user.get("role") != "super_admin":
         raise HTTPException(403, "Sadece super admin logo yükleyebilir")
     
-    # İşletme kontrolü
     # İşletme kontrolü (RLS-resilient check for super admin)
     try:
-        isletme = await db.fetch_one(
-            "SELECT id FROM isletmeler WHERE id = :id",
-            {"id": isletme_id},
-        )
+        isletme = await db.fetch_one("SELECT ad FROM isletmeler WHERE id = :id", {"id": isletme_id})
         if not isletme:
             logger.warning("isletme_not_found_in_check", isletme_id=isletme_id)
-            if isletme_id <= 0:
-                raise HTTPException(404, "Geçersiz işletme ID")
+            raise HTTPException(404, "Geçersiz işletme ID")
+        isletme_name = isletme['ad']
     except Exception as e:
         logger.warning("isletme_check_error", error=str(e), isletme_id=isletme_id)
+        raise HTTPException(status_code=500, detail="İşletme kontrolü başarısız")
     
     # Dosya tipi kontrolü
     allowed_types = {
@@ -436,8 +433,8 @@ async def upload_logo(
     try:
         await db.execute(
             """
-            INSERT INTO tenant_customizations (isletme_id, logo_url, created_at, updated_at)
-            VALUES (:id, :url, NOW(), NOW())
+            INSERT INTO tenant_customizations (isletme_id, logo_url, app_name, created_at, updated_at)
+            SELECT :id, :url, ad, NOW(), NOW() FROM isletmeler WHERE id = :id
             ON CONFLICT (isletme_id) DO UPDATE SET
                 logo_url = EXCLUDED.logo_url,
                 updated_at = NOW()

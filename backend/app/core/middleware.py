@@ -23,6 +23,7 @@ class DefaultSubeMiddleware(BaseHTTPMiddleware):
         "/openapi.json",
         "/",
         "/ping",
+        "/media/",
     ]
     
     async def dispatch(self, request: Request, call_next):
