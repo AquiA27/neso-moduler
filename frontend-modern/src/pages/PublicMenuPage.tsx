@@ -362,10 +362,6 @@ export default function PublicMenuPage() {
           </button>
         </div>
       )}
-      {/* DEBUG INFO - GEÇİCİ */}
-      <div className="mt-10 text-[8px] text-white/5 text-center break-all pb-10">
-        Debug: {API_BASE_URL} | Logo: {customization?.logo_url || 'Yok'}
-      </div>
     </div>
   );
 }

@@ -4,6 +4,8 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from pathlib import Path
 import secrets
+from PIL import Image
+import io
 from ..core.deps import require_roles, get_current_user
 from ..core.config import settings
 from ..db.database import db
@@ -401,21 +403,24 @@ async def upload_logo(
         # Hata olsa da devam etmeyi deneyebiliriz ama loglamak kritik
         existing = None
     
-    # Dosyayı kaydet
+    # Dosyayı kaydet (PNG'ye dönüştürerek)
     try:
         media_dir = Path(settings.MEDIA_ROOT) / "logos"
         media_dir.mkdir(parents=True, exist_ok=True)
         
-        filename = f"logo_{isletme_id}_{secrets.token_hex(8)}{extension}"
+        # Pillow ile görseli aç ve PNG olarak kaydet
+        img = Image.open(io.BytesIO(content))
+        
+        filename = f"logo_{isletme_id}_{secrets.token_hex(8)}.png"
         file_path = (media_dir / filename).resolve()
         
-        with open(file_path, "wb") as out_file:
-            out_file.write(content)
+        # PNG olarak kaydet (şeffaflık korunur)
+        img.save(file_path, "PNG")
             
-        logger.info("logo_saved_to_disk", path=str(file_path), isletme_id=isletme_id)
+        logger.info("logo_saved_to_disk_as_png", path=str(file_path), isletme_id=isletme_id)
     except Exception as exc:
         logger.error("logo_save_disk_error", error=str(exc), isletme_id=isletme_id)
-        raise HTTPException(status_code=500, detail=f"Logo disk'e kaydedilemedi: {exc}")
+        raise HTTPException(status_code=500, detail=f"Logo disk'e kaydedilemedi (PNG dönüşüm hatası): {exc}")
     
     # Eski logo'yu sil (Cleanup)
     if existing and existing.get("logo_url"):

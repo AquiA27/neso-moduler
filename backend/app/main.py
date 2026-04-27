@@ -6,13 +6,6 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi  # << Swagger özelleştirme için
-import mimetypes
-mimetypes.init()
-mimetypes.add_type('.webp', 'image/webp')
-mimetypes.add_type('.svg', 'image/svg+xml')
-mimetypes.add_type('.jpg', 'image/jpeg')
-mimetypes.add_type('.jpeg', 'image/jpeg')
-mimetypes.add_type('.png', 'image/png')
 
 from .core.config import settings
 from .core.middleware import ErrorMiddleware, DefaultSubeMiddleware
@@ -246,52 +239,6 @@ app.add_middleware(RequestIdAndRateLimitMiddleware)
 app.add_middleware(DefaultSubeMiddleware)
 
 # ---- Root kısa bilgi ----
-@app.get("/")
-async def root():
-    return {
-        "service": settings.APP_NAME,
-        "version": settings.VERSION,
-        "env": settings.ENV,
-        "docs": "/docs",
-        "health": "/health",
-    }
-
-@app.get("/debug/media-check")
-async def debug_media():
-    """Medya klasöründeki dosyaları ve izinleri kontrol et (Geçici)"""
-    import os
-    from pathlib import Path
-    
-    result = {"status": "ok", "checks": {}}
-    
-    try:
-        media_root = Path(settings.MEDIA_ROOT)
-        result["checks"]["media_root"] = {
-            "path": str(media_root),
-            "exists": media_root.exists(),
-            "is_dir": media_root.is_dir() if media_root.exists() else False
-        }
-        
-        logos_dir = media_root / "logos"
-        result["checks"]["logos_dir"] = {
-            "path": str(logos_dir),
-            "exists": logos_dir.exists(),
-            "is_dir": logos_dir.is_dir() if logos_dir.exists() else False
-        }
-        
-        if logos_dir.exists():
-            result["files"] = os.listdir(str(logos_dir))
-        else:
-            result["files"] = []
-            
-        result["uid"] = os.getuid() if hasattr(os, 'getuid') else -1
-        
-    except Exception as e:
-        result["status"] = "error"
-        result["error"] = str(e)
-        
-    return result
-
 # ==== Swagger/OpenAPI özelleştirme (RBAC + Çok Şube) ====
 # Amaç: Authorize penceresinde hem Bearer (JWT) hem de X-Sube-Id header'ını
 # tek seferde tanımlayıp UI’nin hatırlamasını sağlamak.
