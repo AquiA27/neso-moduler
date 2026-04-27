@@ -17,6 +17,7 @@ export default function CustomerLandingPage() {
   const [error, setError] = useState('');
   const [tableStatus, setTableStatus] = useState<string | null>(null);
   const [isBlocked, setIsBlocked] = useState(false);
+  const [customization, setCustomization] = useState<{app_name?: string; logo_url?: string} | null>(null);
 
   useEffect(() => {
     const loadMasaFromQR = async () => {
@@ -36,6 +37,9 @@ export default function CustomerLandingPage() {
         setMasa(data.masa_adi || initialMasa);
         if (data.sube_id) {
           setSubeId(String(data.sube_id));
+        }
+        if (data.customization) {
+          setCustomization(data.customization);
         }
 
         // Masa durumu kontrolü
@@ -88,10 +92,17 @@ export default function CustomerLandingPage() {
         {/* Brand Identity */}
         <div className="text-center space-y-4 animate-fade-in-down">
           <div className="inline-block px-4 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold uppercase tracking-[0.2em] mb-4">
-            Neso Intelligence
+            {customization?.app_name ? `${customization.app_name} Intelligence` : 'Neso Intelligence'}
           </div>
-          <h1 className="text-6xl font-black text-white tracking-tighter">
-            NESO<span className="text-emerald-500">.</span>
+          {customization?.logo_url && (
+            <img 
+              src={`${normalizeApiUrl(import.meta.env.VITE_API_URL as string).replace(/\/$/, '')}${customization.logo_url}`} 
+              alt={customization.app_name || "Logo"} 
+              className="w-24 h-24 mx-auto rounded-3xl object-cover mb-4 shadow-2xl border border-white/10" 
+            />
+          )}
+          <h1 className="text-5xl md:text-6xl font-black text-white tracking-tighter">
+            {customization?.app_name || 'NESO'}<span className="text-emerald-500">.</span>
           </h1>
           <p className="text-slate-400 font-medium text-lg tracking-wide uppercase">Dijital Sipariş Deneyimi</p>
         </div>
