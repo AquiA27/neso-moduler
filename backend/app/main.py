@@ -251,26 +251,7 @@ async def root():
 
 @app.get("/debug/media-check")
 async def debug_media():
-    """Medya klasöründeki dosyaları ve izinleri kontrol et (Geçici)"""
-    import os
-    from pathlib import Path
-    
-    media_root = Path(settings.MEDIA_ROOT)
-    logos_dir = media_root / "logos"
-    
-    result = {
-        "media_root": str(media_root),
-        "media_root_exists": media_root.exists(),
-        "logos_dir": str(logos_dir),
-        "logos_dir_exists": logos_dir.exists(),
-        "files": [],
-        "uid": os.getuid() if hasattr(os, 'getuid') else "n/a",
-    }
-    
-    if logos_dir.exists():
-        result["files"] = os.listdir(logos_dir)
-        
-    return result
+    return {"message": "Debug endpoint is active"}
 
 # ==== Swagger/OpenAPI özelleştirme (RBAC + Çok Şube) ====
 # Amaç: Authorize penceresinde hem Bearer (JWT) hem de X-Sube-Id header'ını
