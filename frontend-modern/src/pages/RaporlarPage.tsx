@@ -321,13 +321,22 @@ export default function RaporlarPage() {
   };
 
   const exportData = () => {
+    const escapeCsv = (str: any) => {
+      if (str === null || str === undefined) return '';
+      const stringified = String(str);
+      if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+        return `"${stringified.replace(/"/g, '""')}"`;
+      }
+      return stringified;
+    };
+
     const csv = [
-      ['Tarih Aralığı Raporu', dateRange.start, 'ile', dateRange.end].join(','),
-      ['Ürün', 'Satış Adedi', 'Toplam Tutar', 'Kategori'].join(','),
-      ...productData.map(p => [p.urun_adi, p.satis_adeti, p.toplam_tutar, p.kategori || ''].join(',')),
+      ['Tarih Aralığı Raporu', dateRange.start, 'ile', dateRange.end].map(escapeCsv).join(','),
+      ['Ürün', 'Satış Adedi', 'Toplam Tutar', 'Kategori'].map(escapeCsv).join(','),
+      ...productData.map(p => [p.urun_adi, p.satis_adeti, p.toplam_tutar, p.kategori || ''].map(escapeCsv).join(',')),
     ].join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -617,16 +626,16 @@ export default function RaporlarPage() {
               {productData.length > 0 && (
                 <div className="card">
                   <h3 className="text-xl font-semibold mb-4">Kategorilere Göre Satış Dağılımı</h3>
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={380}>
                     <PieChart>
                       <Pie
                         data={productData}
                         dataKey="toplam_tutar"
                         nameKey="urun_adi"
                         cx="50%"
-                        cy="50%"
+                        cy="45%"
                         outerRadius={100}
-                        label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                        label={({ name, percent }) => percent > 0.04 ? `${name.substring(0, 12)}${name.length > 12 ? '...' : ''} (${(percent * 100).toFixed(0)}%)` : ''}
                       >
                         {productData.map((_entry, index) => (
                           <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -642,7 +651,7 @@ export default function RaporlarPage() {
                         itemStyle={{ color: '#fff' }}
                         labelStyle={{ color: '#94a3b8' }}
                       />
-                      <Legend />
+                      <Legend wrapperStyle={{ paddingTop: '20px' }} />
                     </PieChart>
                   </ResponsiveContainer>
                 </div>
