@@ -1284,13 +1284,13 @@ export default function RaporlarPage() {
                     <tbody className="divide-y divide-white/5">
                       {category.data.categories?.map((cat: any, idx: number) => (
                         <tr key={idx} className="hover:bg-white/5 transition">
-                          <td className="px-4 py-3 text-sm font-medium">{cat.name}</td>
-                          <td className="px-4 py-3 text-sm text-right text-white/60">{cat.quantity_sold}</td>
+                          <td className="px-4 py-3 text-sm font-medium">{cat.category}</td>
+                          <td className="px-4 py-3 text-sm text-right text-white/60">{cat.total_sales}</td>
                           <td className="px-4 py-3 text-sm text-right">
                             ₺{cat.revenue?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                           </td>
                           <td className="px-4 py-3 text-sm text-right text-white/60">
-                            ₺{cat.avg_price?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
+                            {cat.product_count} Ürün
                           </td>
                           <td className="px-4 py-3 text-sm text-right">
                             <span className="inline-flex px-2 py-1 rounded-full text-xs font-medium bg-blue-500/20 text-blue-400">
@@ -1313,11 +1313,11 @@ export default function RaporlarPage() {
                       <Pie
                         data={category.data.categories}
                         dataKey="revenue"
-                        nameKey="name"
+                        nameKey="category"
                         cx="50%"
                         cy="50%"
                         outerRadius={100}
-                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        label={({ category, percent }) => `${category}: ${(percent * 100).toFixed(0)}%`}
                       >
                         {category.data.categories?.map((_entry: any, index: number) => (
                           <Cell key={`category-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -1366,16 +1366,16 @@ export default function RaporlarPage() {
           {!timeAnalysis.loading && !timeAnalysis.error && timeAnalysis.data && (
             <>
               {/* Time Summary */}
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="card">
                   <div className="flex items-center gap-3">
                     <div className="rounded-lg bg-blue-500/20 p-2">
                       <Clock className="h-5 w-5 text-blue-400" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/60">En Yoğun Saat</p>
+                      <p className="text-xs text-white/60">En Yoğun Dönem</p>
                       <p className="text-lg font-bold">
-                        {timeAnalysis.data.peak_hour || '-'}
+                        {timeAnalysis.data.peak_period || '-'}
                       </p>
                     </div>
                   </div>
@@ -1387,9 +1387,9 @@ export default function RaporlarPage() {
                       <TrendingUp className="h-5 w-5 text-green-400" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/60">Zirve Ciro Saati</p>
+                      <p className="text-xs text-white/60">Zirve Ciro Dönemi</p>
                       <p className="text-lg font-bold">
-                        {timeAnalysis.data.peak_revenue_hour || '-'}
+                        {timeAnalysis.data.peak_revenue_period || '-'}
                       </p>
                     </div>
                   </div>
@@ -1401,23 +1401,9 @@ export default function RaporlarPage() {
                       <Activity className="h-5 w-5 text-purple-400" />
                     </div>
                     <div>
-                      <p className="text-xs text-white/60">Ort. Sipariş/Saat</p>
+                      <p className="text-xs text-white/60">Ort. Sipariş/Periyot</p>
                       <p className="text-lg font-bold">
-                        {timeAnalysis.data.avg_orders_per_hour?.toFixed(1) || '0.0'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="card">
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-lg bg-orange-500/20 p-2">
-                      <BarChart3 className="h-5 w-5 text-orange-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs text-white/60">En Yoğun Gün</p>
-                      <p className="text-sm font-bold">
-                        {timeAnalysis.data.busiest_day || '-'}
+                        {timeAnalysis.data.avg_orders_per_period?.toFixed(1) || '0.0'}
                       </p>
                     </div>
                   </div>
@@ -1425,14 +1411,14 @@ export default function RaporlarPage() {
               </div>
 
               {/* Hourly Analysis Chart */}
-              {timeAnalysis.data.hourly?.length > 0 && (
+              {timeAnalysis.data.data?.length > 0 && (
                 <div className="card">
-                  <h3 className="text-lg font-semibold mb-3">Saatlik Sipariş Dağılımı</h3>
+                  <h3 className="text-lg font-semibold mb-3">Zaman Bazlı Sipariş Dağılımı</h3>
                   <ResponsiveContainer width="100%" height={300}>
-                    <LineChart data={timeAnalysis.data.hourly}>
+                    <LineChart data={timeAnalysis.data.data}>
                       <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
                       <XAxis
-                        dataKey="hour"
+                        dataKey="period"
                         stroke="rgba(255,255,255,0.5)"
                         tick={{ fill: 'rgba(255,255,255,0.7)' }}
                       />
@@ -1509,24 +1495,24 @@ export default function RaporlarPage() {
               )}
 
               {/* Time Slots Table */}
-              {timeAnalysis.data.hourly?.length > 0 && (
+              {timeAnalysis.data.data?.length > 0 && (
                 <div className="card overflow-hidden">
-                  <h3 className="text-lg font-semibold mb-3 px-4 pt-4">Saatlik Detaylar</h3>
+                  <h3 className="text-lg font-semibold mb-3 px-4 pt-4">Detaylı Zaman Analizi</h3>
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead className="bg-white/5 border-b border-white/10">
                         <tr>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-white/70">Saat Dilimi</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-white/70">Dönem</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-white/70">Sipariş</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-white/70">Ciro</th>
                           <th className="px-4 py-3 text-right text-xs font-medium text-white/70">Ort. Sipariş</th>
-                          <th className="px-4 py-3 text-right text-xs font-medium text-white/70">Yoğunluk</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-white/70">Durum</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {timeAnalysis.data.hourly?.map((slot: any, idx: number) => (
+                        {timeAnalysis.data.data?.map((slot: any, idx: number) => (
                           <tr key={idx} className="hover:bg-white/5 transition">
-                            <td className="px-4 py-3 text-sm font-medium">{slot.hour}:00</td>
+                            <td className="px-4 py-3 text-sm font-medium">{slot.period}</td>
                             <td className="px-4 py-3 text-sm text-right text-white/60">{slot.order_count}</td>
                             <td className="px-4 py-3 text-sm text-right">
                               ₺{slot.revenue?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
@@ -1535,11 +1521,11 @@ export default function RaporlarPage() {
                               ₺{slot.avg_order_value?.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                             </td>
                             <td className="px-4 py-3 text-sm text-right">
-                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${slot.order_count > timeAnalysis.data.avg_orders_per_hour ?
+                              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-medium ${slot.is_peak ?
                                   'bg-green-500/20 text-green-400' :
                                   'bg-slate-500/20 text-slate-400'
                                 }`}>
-                                {slot.order_count > timeAnalysis.data.avg_orders_per_hour ? 'Yoğun' : 'Normal'}
+                                {slot.is_peak ? 'Zirve' : 'Normal'}
                               </span>
                             </td>
                           </tr>
