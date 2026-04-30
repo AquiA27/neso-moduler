@@ -52,7 +52,6 @@ function Sidebar({
   const navItems = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, show: showAdmin && showTenantDataPages },
     { to: '/raporlar', label: 'Raporlar', icon: BarChart2, show: showAdmin && showTenantDataPages },
-    { to: '/analitik', label: 'Akıllı Analitik', icon: Sparkles, show: showAdmin && showTenantDataPages },
     { to: '/menu', label: 'Menü Yönetimi', icon: MenuIcon, show: showAdmin && showTenantDataPages },
     { to: '/stok', label: 'Stok Takibi', icon: Package, show: showAdmin && showTenantDataPages },
     { to: '/giderler', label: 'Giderler', icon: TrendingDown, show: showAdmin && showTenantDataPages },

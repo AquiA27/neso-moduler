@@ -118,17 +118,43 @@ async def get_demand_forecast(
             })
             total_7d += predicted
             
-        # Stok kontrolü (varsa)
+        # Stok kontrolü (reçete üzerinden)
         stock_status = "bilinmiyor"
-        stock_row = await db.fetch_one(
-            "SELECT mevcut, min FROM stok_kalemleri WHERE sube_id = :sid AND ad = :ad",
-            {"sid": sube_id, "ad": urun}
-        )
-        if stock_row:
-            current = float(stock_row["mevcut"])
-            if current < total_7d: stock_status = "yetersiz"
-            elif current < total_7d * 1.5: stock_status = "riskli"
+        # Bu ürünün reçetesindeki ana malzemeleri bul
+        recipe_query = """
+        SELECT sk.mevcut, sk.min, r.miktar
+        FROM receteler r
+        JOIN stok_kalemleri sk ON r.stok = sk.ad AND r.sube_id = sk.sube_id
+        WHERE r.urun = :urun AND r.sube_id = :sid
+        """
+        recipe_stocks = await db.fetch_all(recipe_query, {"urun": urun, "sid": sube_id})
+        
+        if recipe_stocks:
+            is_yetersiz = False
+            is_riskli = False
+            for rs in recipe_stocks:
+                mevcut = float(rs["mevcut"])
+                miktar_lazim = float(rs["miktar"]) * total_7d
+                if mevcut < miktar_lazim:
+                    is_yetersiz = True
+                    break
+                if mevcut < miktar_lazim * 1.5:
+                    is_riskli = True
+            
+            if is_yetersiz: stock_status = "yetersiz"
+            elif is_riskli: stock_status = "riskli"
             else: stock_status = "yeterli"
+        else:
+            # Reçete yoksa doğrudan isimle dene (eski mantık yedek olarak)
+            stock_row = await db.fetch_one(
+                "SELECT mevcut, min FROM stok_kalemleri WHERE sube_id = :sid AND ad = :ad",
+                {"sid": sube_id, "ad": urun}
+            )
+            if stock_row:
+                current = float(stock_row["mevcut"])
+                if current < total_7d: stock_status = "yetersiz"
+                elif current < total_7d * 1.5: stock_status = "riskli"
+                else: stock_status = "yeterli"
 
         predictions.append({
             "urun": urun,
