@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { biAssistantApi } from '../lib/api';
 import apiClient from '../lib/api';
 import { 
-  Send, Sparkles, Brain, TrendingUp, ShoppingBag, Target, Info, RefreshCw, Zap, MessageSquare 
+  Send, Sparkles, TrendingUp, ShoppingBag, Target, Info, RefreshCw, Zap, MessageSquare 
 } from 'lucide-react';
 import { useAuthStore } from '../store/authStore';
 import {

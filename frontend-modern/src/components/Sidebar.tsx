@@ -13,8 +13,7 @@ import {
   LayoutDashboard,
   UtensilsCrossed,
   Layers,
-  Bot,
-  Sparkles
+  Bot
 } from 'lucide-react';
 import { memo } from 'react';
 import logo from '../assets/neso-logo.jpg';
