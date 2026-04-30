@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
-  ShoppingCart, Plus, Minus, Trash2, ArrowRight, Home, X, 
-  Search, Utensils, Coffee, Pizza, LayoutGrid, CheckCircle2, ChevronRight,
-  User, Hash, Clock
+  ShoppingCart, Plus, Minus, ArrowRight, Home, X, 
+  Search, Utensils, Coffee, Pizza, LayoutGrid, ChevronRight,
+  User, Hash
 } from 'lucide-react';
 import { menuApi, siparisApi, masalarApi } from '../lib/api';
 import { useAuthStore } from '../store/authStore';
