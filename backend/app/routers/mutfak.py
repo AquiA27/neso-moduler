@@ -102,6 +102,8 @@ def _row_map(r: Mapping[str, Any]) -> Dict[str, Any]:
         "durum": r["durum"],
         "tutar": float(r["tutar"] or 0),
         "created_at": r["created_at"].isoformat() if r["created_at"] else "",
+        "started_at": r["started_at"].isoformat() if r.get("started_at") else None,
+        "hazir_at": r["hazir_at"].isoformat() if r.get("hazir_at") else None,
         "sepet": _normalize_sepet(r["sepet"]),
     }
 
@@ -122,7 +124,7 @@ async def kuyruk(
     """
     params = {"sid": sube_id, "limit": limit}
     base = """
-        SELECT id, masa, durum, tutar, sepet, created_at
+        SELECT id, masa, durum, tutar, sepet, created_at, started_at, hazir_at
         FROM siparisler
         WHERE sube_id = :sid
     """
@@ -153,7 +155,7 @@ async def poll(
     """
     params = {"sid": sube_id, "since": since_id, "limit": limit}
     base = """
-        SELECT id, masa, durum, tutar, sepet, created_at
+        SELECT id, masa, durum, tutar, sepet, created_at, started_at, hazir_at
         FROM siparisler
         WHERE sube_id = :sid AND id > :since
     """
@@ -193,13 +195,25 @@ async def durum_guncelle(
     # Stok sadece kasa'dan ödeme alınınca düşer (ödeme işlemi sırasında)
     # Bu sayede henüz ödenmemiş siparişler için stok rezerve edilmez
 
-    await db.execute(
-        "UPDATE siparisler SET durum = :d WHERE id = :id",
-        {"d": yeni_durum, "id": id},
-    )
+    # Zaman damgalarını güncelle
+    if yeni_durum == "hazirlaniyor":
+        await db.execute(
+            "UPDATE siparisler SET durum = :d, started_at = NOW() WHERE id = :id",
+            {"d": yeni_durum, "id": id},
+        )
+    elif yeni_durum == "hazir":
+        await db.execute(
+            "UPDATE siparisler SET durum = :d, hazir_at = NOW() WHERE id = :id",
+            {"d": yeni_durum, "id": id},
+        )
+    else:
+        await db.execute(
+            "UPDATE siparisler SET durum = :d WHERE id = :id",
+            {"d": yeni_durum, "id": id},
+        )
 
     row = await db.fetch_one(
-        "SELECT id, masa, durum, tutar, sepet, created_at, adisyon_id FROM siparisler WHERE id = :id",
+        "SELECT id, masa, durum, tutar, sepet, created_at, started_at, hazir_at, adisyon_id FROM siparisler WHERE id = :id",
         {"id": id},
     )
     
@@ -247,3 +261,25 @@ async def durum_guncelle(
     logging.info(f"Mutfak: Broadcast completed for order #{id}")
     
     return _row_map(row)
+    
+@router.get("/stats", dependencies=[Depends(require_roles({"admin", "super_admin", "mutfak"}))])
+async def kitchen_stats(sube_id: int = Depends(get_sube_id)):
+    """Mutfak performans metrikleri: ortalama hazırlama süresi vb."""
+    query = """
+    SELECT 
+        COUNT(*)::int as total_orders,
+        COUNT(CASE WHEN durum = 'hazir' THEN 1 END)::int as ready_orders,
+        COUNT(CASE WHEN durum = 'hazirlaniyor' THEN 1 END)::int as in_prep_orders,
+        COUNT(CASE WHEN durum = 'yeni' THEN 1 END)::int as new_orders,
+        AVG(EXTRACT(EPOCH FROM (hazir_at - started_at)) / 60)::float as avg_prep_time_minutes
+    FROM siparisler
+    WHERE sube_id = :sid AND created_at >= NOW() - INTERVAL '24 hours'
+    """
+    row = await db.fetch_one(query, {"sid": sube_id})
+    return dict(row) if row else {
+        "total_orders": 0,
+        "ready_orders": 0,
+        "in_prep_orders": 0,
+        "new_orders": 0,
+        "avg_prep_time_minutes": 0
+    }

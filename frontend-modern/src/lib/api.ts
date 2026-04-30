@@ -617,6 +617,9 @@ export const mutfakApi = {
   updateStatus: async (id: number, yeni_durum: string) => {
     return apiClient.patch(`/mutfak/durum/${id}?yeni_durum=${encodeURIComponent(yeni_durum)}`);
   },
+  stats: async () => {
+    return apiClient.get('/mutfak/stats');
+  },
 };
 
 export const kasaApi = {
