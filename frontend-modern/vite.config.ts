@@ -2,10 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
     port: 5173,
+    host: true, // Yerel ağdan (mobil cihazlardan) erişim için
     proxy: {
       '/api': {
         target: 'http://localhost:8000',
@@ -16,7 +17,7 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    sourcemap: process.env.NODE_ENV !== 'production',  // Production'da false
+    sourcemap: mode !== 'production',
     minify: 'terser',
     rollupOptions: {
       output: {
@@ -27,5 +28,5 @@ export default defineConfig({
       }
     }
   }
-})
+}))
 
