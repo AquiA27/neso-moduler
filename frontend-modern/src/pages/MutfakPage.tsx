@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { mutfakApi, normalizeApiUrl } from '../lib/api';
-import { Clock, CheckCircle, Wifi, WifiOff, AlertTriangle, Play, Check, BarChart3 } from 'lucide-react';
+import { Clock, CheckCircle, Wifi, WifiOff, AlertTriangle, Play, Check, BarChart3, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
 
 interface KitchenOrderItem {
