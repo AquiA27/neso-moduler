@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
-  BarChart, Bar, Cell
+  LineChart, Line, Tooltip, ResponsiveContainer
 } from 'recharts';
 import { 
-  Brain, TrendingUp, ShoppingBag, Target, Info, RefreshCw, 
-  ArrowUpRight, ArrowDownRight, Zap, Sparkles
+  Brain, TrendingUp, ShoppingBag, Target, Info, RefreshCw, Zap, Sparkles
 } from 'lucide-react';
 import apiClient from '../lib/api';
-
-const COLORS = ['#10b881', '#0ea5e9', '#f59e0b', '#8b5cf6', '#ec4899', '#ef4444'];
 
 export default function PredictiveAnalyticsPage() {
   const [loading, setLoading] = useState(true);
