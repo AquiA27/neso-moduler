@@ -24,6 +24,8 @@ class SiparisRow(BaseModel):
     durum: Literal["yeni", "hazirlaniyor", "hazir", "iptal", "odendi"]
     tutar: float
     created_at: str  # ISO string
+    started_at: Optional[str] = None
+    hazir_at: Optional[str] = None
     sepet: List[SepetItem] = Field(default_factory=list)
 
 
@@ -96,15 +98,16 @@ def _normalize_sepet(value: Any) -> List[Dict[str, Any]]:
 
 
 def _row_map(r: Mapping[str, Any]) -> Dict[str, Any]:
+    r_dict = dict(r)
     return {
-        "id": r["id"],
-        "masa": r["masa"],
-        "durum": r["durum"],
-        "tutar": float(r["tutar"] or 0),
-        "created_at": r["created_at"].isoformat() if r["created_at"] else "",
-        "started_at": r["started_at"].isoformat() if r.get("started_at") else None,
-        "hazir_at": r["hazir_at"].isoformat() if r.get("hazir_at") else None,
-        "sepet": _normalize_sepet(r["sepet"]),
+        "id": r_dict.get("id"),
+        "masa": r_dict.get("masa", ""),
+        "durum": r_dict.get("durum", "yeni"),
+        "tutar": float(r_dict.get("tutar") or 0),
+        "created_at": r_dict["created_at"].isoformat() if r_dict.get("created_at") else "",
+        "started_at": r_dict["started_at"].isoformat() if r_dict.get("started_at") else None,
+        "hazir_at": r_dict["hazir_at"].isoformat() if r_dict.get("hazir_at") else None,
+        "sepet": _normalize_sepet(r_dict.get("sepet", [])),
     }
 
 # ---- Uçlar ----

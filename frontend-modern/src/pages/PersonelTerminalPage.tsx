@@ -1,12 +1,7 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  ShoppingCart, Plus, Minus, ArrowRight, Home, X, 
-  Search, Utensils, Coffee, Pizza, LayoutGrid, ChevronRight,
-  User, Hash
-} from 'lucide-react';
+import { ShoppingCart, Plus, Minus, Trash2, ArrowRight, Home, X } from 'lucide-react';
 import { menuApi, siparisApi, masalarApi } from '../lib/api';
-import { useAuthStore } from '../store/authStore';
 
 interface Varyasyon {
   id: number;
@@ -21,7 +16,6 @@ interface MenuItem {
   fiyat: number;
   kategori: string;
   aktif: boolean;
-  gorsel_url?: string;
   varyasyonlar?: Varyasyon[];
 }
 
@@ -42,17 +36,13 @@ interface Masa {
 
 export default function PersonelTerminalPage() {
   const navigate = useNavigate();
-  const user = useAuthStore((state) => state.user);
-  
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [masalar, setMasalar] = useState<Masa[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
-  const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [selectedMasa, setSelectedMasa] = useState<string>('');
-  const [showCart, setShowCart] = useState(false);
-  
+  const [masa, setMasa] = useState<string>('');
+  const [masaError, setMasaError] = useState<string>('');
   const [variationModal, setVariationModal] = useState<MenuItem | null>(null);
   const [variationQuantity, setVariationQuantity] = useState<number>(1);
 
@@ -63,8 +53,9 @@ export default function PersonelTerminalPage() {
 
   const loadMenu = async () => {
     try {
-      const response = await menuApi.list({ limit: 500, sadece_aktif: true, varyasyonlar_dahil: true });
-      setMenuItems(response.data || []);
+      const response = await menuApi.list({ limit: 200, sadece_aktif: true, varyasyonlar_dahil: true });
+      const items = (response.data || []).filter((item: MenuItem) => item.aktif);
+      setMenuItems(items);
     } catch (err) {
       console.error('Menü yüklenemedi:', err);
     } finally {
@@ -81,26 +72,21 @@ export default function PersonelTerminalPage() {
     }
   };
 
-  const categories = useMemo(() => {
-    const cats = Array.from(new Set(menuItems.map(item => item.kategori).filter(Boolean)));
-    return ['Tümü', ...cats];
-  }, [menuItems]);
+  const categories = ['Tümü', ...Array.from(new Set(menuItems.map(item => item.kategori).filter(Boolean)))];
 
-  const filteredItems = useMemo(() => {
-    return menuItems.filter(item => {
-      const matchesCategory = selectedCategory === 'Tümü' || item.kategori === selectedCategory;
-      const matchesSearch = item.ad.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchesCategory && matchesSearch;
-    });
-  }, [menuItems, selectedCategory, searchQuery]);
+  const filteredItems = selectedCategory === 'Tümü'
+    ? menuItems
+    : menuItems.filter(item => item.kategori === selectedCategory);
 
   const addToCart = (item: MenuItem) => {
+    // Eğer varyasyon varsa, varyasyon seçimi modal'ını aç
     if (item.varyasyonlar && item.varyasyonlar.length > 0) {
       setVariationModal(item);
-      setVariationQuantity(1);
+      setVariationQuantity(1); // Reset quantity when opening modal
       return;
     }
 
+    // Varyasyon yoksa direkt sepete ekle
     setCart(prev => {
       const existing = prev.find(c => c.id === item.id && !c.varyasyon);
       if (existing) {
@@ -130,27 +116,39 @@ export default function PersonelTerminalPage() {
       }];
     });
     setVariationModal(null);
-    setVariationQuantity(1);
+    setVariationQuantity(1); // Reset quantity after adding
   };
 
-  const updateQuantity = (id: number, delta: number, variationId?: number) => {
+  const removeFromCart = (id: number, variationId?: number) => {
+    setCart(prev => prev.filter(c => 
+      !(c.id === id && (!variationId || c.varyasyon?.id === variationId))
+    ));
+  };
+
+  const updateCartQuantity = (id: number, delta: number, variationId?: number) => {
     setCart(prev => prev.map(c => {
       if (c.id === id && (!variationId || c.varyasyon?.id === variationId)) {
-        const newAdet = Math.max(0, c.adet + delta);
+        const newAdet = Math.max(1, c.adet + delta);
         return { ...c, adet: newAdet };
       }
       return c;
-    }).filter(c => c.adet > 0));
+    }));
   };
 
-  const cartTotal = cart.reduce((sum, item) => sum + (item.fiyat * item.adet), 0);
+  const getTotal = () => {
+    return cart.reduce((sum, item) => sum + (item.fiyat * item.adet), 0);
+  };
 
   const handleOrder = async () => {
-    if (!selectedMasa) {
-      alert('Lütfen bir masa seçin!');
+    if (!masa.trim()) {
+      setMasaError('Lütfen masa numarası girin');
       return;
     }
-    if (cart.length === 0) return;
+
+    if (cart.length === 0) {
+      alert('Sepetiniz boş');
+      return;
+    }
 
     try {
       const sepet = cart.map(item => ({
@@ -161,250 +159,286 @@ export default function PersonelTerminalPage() {
       }));
 
       await siparisApi.add({
-        masa: selectedMasa,
+        masa: masa.trim(),
         sepet: sepet,
-        tutar: cartTotal,
+        tutar: getTotal(),
       });
 
-      alert('✅ Sipariş başarıyla mutfağa iletildi!');
+      alert('✅ Sipariş başarıyla oluşturuldu!');
       setCart([]);
-      setSelectedMasa('');
-      setShowCart(false);
+      setMasa('');
+      setMasaError('');
     } catch (err: any) {
-      alert(`Hata: ${err.response?.data?.detail || 'Sipariş gönderilemedi'}`);
+      console.error('Sipariş oluşturulamadı:', err);
+      alert(`Hata: ${err.response?.data?.detail || 'Sipariş oluşturulamadı'}`);
     }
   };
 
   return (
-    <div className="flex flex-col h-screen bg-neso-dark overflow-hidden">
-      {/* Top Header */}
-      <div className="bg-slate-900/50 border-b border-white/5 p-4 flex items-center justify-between z-20">
-        <div className="flex items-center gap-4">
-          <button onClick={() => navigate('/dashboard')} className="p-2 bg-white/5 rounded-xl hover:bg-white/10 transition-all">
-            <Home size={20} className="text-neso-gold" />
-          </button>
-          <div>
-            <h1 className="text-lg font-black text-white italic tracking-tighter uppercase leading-none">Garson Terminali</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <User size={10} className="text-slate-500" />
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{user?.username}</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <select
-              value={selectedMasa}
-              onChange={(e) => setSelectedMasa(e.target.value)}
-              className="bg-neso-gold/10 border border-neso-gold/30 rounded-xl px-4 py-2 text-sm font-black text-neso-gold focus:outline-none appearance-none pr-8 min-w-[120px]"
+    <div className="min-h-screen">
+      {/* Header */}
+      <div className="glass-panel border-b border-emerald-500/20 p-4 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Ana Sayfa"
             >
-              <option value="" className="bg-slate-900">Masa Seç</option>
-              {masalar.map(m => (
-                <option key={m.id} value={m.masa_adi} className="bg-slate-900">Masa {m.masa_adi}</option>
-              ))}
-            </select>
-            <Hash size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-neso-gold pointer-events-none" />
+              <Home className="w-6 h-6 text-white" />
+            </button>
+            <h1 className="text-2xl font-bold text-gradient">
+              El Terminali
+            </h1>
           </div>
           
-          <button 
-            onClick={() => setShowCart(true)}
-            className="relative p-3 bg-neso-gold rounded-xl shadow-lg shadow-neso-gold/20"
-          >
-            <ShoppingCart size={20} className="text-neso-dark" />
-            {cart.length > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-neso-dark text-[10px] font-black rounded-full flex items-center justify-center">
-                {cart.length}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col overflow-hidden relative">
-        {/* Search & Categories */}
-        <div className="p-4 space-y-4 bg-neso-dark">
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Ürün Ara..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl px-12 py-3.5 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-neso-gold/50"
-            />
-            <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-          </div>
-
-          <div className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar">
-            {categories.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest whitespace-nowrap transition-all ${
-                  selectedCategory === cat 
-                    ? 'bg-neso-gold text-neso-dark' 
-                    : 'bg-white/5 text-slate-400 border border-white/5'
-                }`}
+          {/* Masa Seçimi */}
+          <div className="flex items-center gap-4">
+            <div>
+              <select
+                value={masa}
+                onChange={(e) => {
+                  setMasa(e.target.value);
+                  setMasaError('');
+                }}
+                className="w-48"
               >
-                {cat}
-              </button>
-            ))}
+                <option value="">Masa Seçin</option>
+                {masalar.map((m) => (
+                  <option key={m.id} value={m.masa_adi} className="bg-slate-900">{m.masa_adi}</option>
+                ))}
+              </select>
+              {masaError && <p className="text-red-400 text-xs mt-1">{masaError}</p>}
+            </div>
+            
+            <div className="flex items-center gap-2 px-6 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
+              <ShoppingCart className="w-5 h-5 text-emerald-400" />
+              <span className="text-xl font-bold text-emerald-400">{cart.length}</span>
+            </div>
           </div>
-        </div>
-
-        {/* Menu Grid */}
-        <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center h-full gap-4">
-              <div className="w-10 h-10 border-2 border-neso-gold border-t-transparent rounded-full animate-spin"></div>
-              <p className="text-xs font-bold text-slate-500 uppercase">Menü Yükleniyor...</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-              {filteredItems.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => addToCart(item)}
-                  className="group relative flex flex-col bg-slate-900/40 border border-white/5 rounded-3xl p-4 text-left hover:border-neso-gold/30 hover:bg-neso-gold/5 transition-all active:scale-95 overflow-hidden h-full"
-                >
-                  <div className="flex flex-col h-full">
-                    <div className="flex justify-between items-start mb-3">
-                       <div className="p-2 rounded-xl bg-white/5 text-slate-400 group-hover:text-neso-gold transition-colors">
-                          {item.kategori.toLowerCase().includes('kahve') ? <Coffee size={18} /> : 
-                           item.kategori.toLowerCase().includes('yemek') ? <Utensils size={18} /> :
-                           item.kategori.toLowerCase().includes('pizza') ? <Pizza size={18} /> : <LayoutGrid size={18} />}
-                       </div>
-                       {item.varyasyonlar && item.varyasyonlar.length > 0 && (
-                         <div className="px-2 py-0.5 rounded-lg bg-neso-gold/10 text-neso-gold text-[8px] font-black uppercase">Varyant</div>
-                       )}
-                    </div>
-                    
-                    <h4 className="font-bold text-white text-sm uppercase leading-tight mb-auto">{item.ad}</h4>
-                    
-                    <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
-                       <span className="text-lg font-black text-white">{item.fiyat}₺</span>
-                       <div className="p-1.5 rounded-lg bg-neso-gold text-neso-dark">
-                          <Plus size={14} />
-                       </div>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* Mobile Cart Summary Bar */}
-      {cart.length > 0 && !showCart && (
-        <button 
-          onClick={() => setShowCart(true)}
-          className="m-4 p-5 bg-neso-gold rounded-3xl flex items-center justify-between shadow-2xl shadow-neso-gold/40 animate-in slide-in-from-bottom-8 duration-500"
-        >
-          <div className="flex items-center gap-4 text-neso-dark">
-             <div className="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center font-black">
-                {cart.length}
-             </div>
-             <div>
-                <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Sipariş Toplamı</p>
-                <p className="text-xl font-black">{cartTotal.toFixed(2)}₺</p>
-             </div>
-          </div>
-          <div className="flex items-center gap-2 font-black text-sm uppercase tracking-widest text-neso-dark">
-             İNCELE <ChevronRight size={20} />
-          </div>
-        </button>
-      )}
-
-      {/* Cart Modal / Side Sheet */}
-      {showCart && (
-        <div className="fixed inset-0 z-50 flex flex-col md:items-end">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowCart(false)} />
-          <div className="relative w-full md:w-[450px] h-full bg-neso-dark border-l border-white/10 flex flex-col animate-in slide-in-from-right duration-300">
-            {/* Cart Header */}
-            <div className="p-6 border-b border-white/10 flex items-center justify-between bg-slate-900/50">
-               <div>
-                  <h2 className="text-2xl font-black text-white italic tracking-tighter uppercase">Sepetiniz</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                     <Hash size={12} className="text-neso-gold" />
-                     <span className="text-[10px] font-bold text-neso-gold uppercase">MASA: {selectedMasa || 'SEÇİLMEDİ'}</span>
-                  </div>
-               </div>
-               <button onClick={() => setShowCart(false)} className="p-2 bg-white/5 rounded-xl text-slate-400 hover:text-white">
-                  <X size={24} />
-               </button>
+      <div className="max-w-7xl mx-auto p-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Menü */}
+          <div className="lg:col-span-2">
+            <div className="premium-card rounded-2xl p-6 h-full">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <span className="w-8 h-1 bg-emerald-500 rounded-full"></span>
+                  Günün Menüsü
+                </h3>
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-semibold text-slate-500 uppercase tracking-widest">Kategori</span>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
+                    className="min-w-[140px]"
+                  >
+                    {categories.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              
+              {loading ? (
+                <div className="text-center py-8 text-white/50">Yükleniyor...</div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {filteredItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => addToCart(item)}
+                      className="group p-5 bg-white/5 border border-slate-700/50 rounded-2xl hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all duration-300 text-left relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Plus className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div className="flex justify-between items-start mb-2">
+                        <h4 className="font-semibold text-white group-hover:text-emerald-200 transition-colors">
+                          {item.ad}
+                        </h4>
+                        {item.varyasyonlar && item.varyasyonlar.length > 0 && (
+                          <span className="text-xs text-emerald-300 bg-emerald-500/20 px-2 py-1 rounded">
+                            Varyasyonlu
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/50 mb-3">{item.kategori}</p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-xl font-bold text-white group-hover:text-emerald-400 transition-colors">
+                          {item.fiyat.toFixed(2)} ₺
+                        </span>
+                        <Plus className="w-5 h-5 text-white/50 group-hover:text-emerald-300 transition-colors" />
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+          </div>
 
-            {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
-               {cart.map((item, idx) => (
-                  <div key={idx} className="p-4 bg-white/5 border border-white/5 rounded-3xl flex items-center gap-4 group">
-                     <div className="flex-1">
-                        <h5 className="font-bold text-white uppercase text-sm">{item.ad}</h5>
-                        {item.varyasyon && <p className="text-[10px] font-black text-neso-gold uppercase mt-0.5">{item.varyasyon.ad}</p>}
-                        <p className="text-lg font-black text-white mt-2">{item.fiyat}₺</p>
-                     </div>
-                     <div className="flex items-center bg-black/30 rounded-2xl p-1 gap-2 border border-white/5">
-                        <button onClick={() => updateQuantity(item.id, -1, item.varyasyon?.id)} className="p-2 text-slate-500 hover:text-white transition-colors"><Minus size={16} /></button>
-                        <span className="w-8 text-center font-black text-neso-gold">{item.adet}</span>
-                        <button onClick={() => updateQuantity(item.id, 1, item.varyasyon?.id)} className="p-2 text-neso-gold hover:text-white transition-colors"><Plus size={16} /></button>
-                     </div>
+          {/* Sepet */}
+          <div className="lg:col-span-1">
+            <div className="premium-card rounded-2xl p-6 sticky top-24">
+              <h3 className="text-xl font-bold mb-6 flex items-center justify-between">
+                <span>Sepet</span>
+                {cart.length > 0 && (
+                  <button
+                    onClick={() => setCart([])}
+                    className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    Temizle
+                  </button>
+                )}
+              </h3>
+              
+              {cart.length === 0 ? (
+                <div className="text-center py-8 text-white/50">
+                  Sepetiniz boş
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
+                    {cart.map((item, index) => (
+                        <div
+                          key={`${item.id}-${item.varyasyon?.id || 'none'}-${index}`}
+                          className="flex items-center gap-3 p-4 bg-slate-900/50 rounded-xl border border-slate-800"
+                        >
+                        <div className="flex-1">
+                          <p className="font-medium text-white">{item.ad}</p>
+                          {item.varyasyon && (
+                            <p className="text-xs text-emerald-300">Varyasyon: {item.varyasyon.ad}</p>
+                          )}
+                          <p className="text-sm text-emerald-300">
+                            {item.fiyat.toFixed(2)} ₺ x {item.adet}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => updateCartQuantity(item.id, -1, item.varyasyon?.id)}
+                            className="p-1 bg-white/10 hover:bg-white/20 rounded transition-colors"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="w-8 text-center font-bold">{item.adet}</span>
+                          <button
+                            onClick={() => updateCartQuantity(item.id, 1, item.varyasyon?.id)}
+                            className="p-1 bg-white/10 hover:bg-white/20 rounded transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => removeFromCart(item.id, item.varyasyon?.id)}
+                            className="p-1 bg-red-500/20 hover:bg-red-500/30 rounded transition-colors text-red-300 ml-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-               ))}
-            </div>
-
-            {/* Cart Footer */}
-            <div className="p-8 bg-slate-900/80 border-t border-white/10 rounded-t-[3rem]">
-               <div className="flex justify-between items-center mb-6">
-                  <span className="text-slate-500 font-black uppercase tracking-widest text-xs">Genel Toplam</span>
-                  <span className="text-3xl font-black text-white tracking-tighter">{cartTotal.toFixed(2)}₺</span>
-               </div>
-               <button 
-                onClick={handleOrder}
-                className="w-full flex items-center justify-center gap-4 py-5 bg-neso-gold text-neso-dark rounded-[2rem] font-black text-lg uppercase tracking-widest shadow-2xl shadow-neso-gold/30 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
-                disabled={cart.length === 0}
-               >
-                  MUTFAĞA GÖNDER <ArrowRight size={24} />
-               </button>
+                  
+                  <div className="mt-6 pt-6 border-t border-white/20">
+                    <div className="flex justify-between items-center mb-4">
+                      <span className="text-xl font-bold">Toplam:</span>
+                      <span className="text-2xl font-bold text-emerald-300">
+                        {getTotal().toFixed(2)} ₺
+                      </span>
+                    </div>
+                    <button
+                      onClick={handleOrder}
+                      className="glow-button w-full px-6 py-4 rounded-xl flex items-center justify-center gap-3 text-white font-bold text-lg"
+                    >
+                      <ArrowRight className="w-6 h-6" />
+                      Siparişi Tamamla
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Variation Modal */}
+      {/* Varyasyon Seçim Modal */}
       {variationModal && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setVariationModal(null)} />
-          <div className="relative w-full max-w-md bg-neso-dark border border-white/10 rounded-[3rem] overflow-hidden p-8 animate-in zoom-in-95 duration-300">
-             <div className="flex justify-between items-start mb-8">
-                <div>
-                   <h3 className="text-2xl font-black text-white italic uppercase tracking-tighter">{variationModal.ad}</h3>
-                   <p className="text-xs font-bold text-slate-500 uppercase mt-1">Lütfen Varyasyon Seçin</p>
-                </div>
-                <button onClick={() => setVariationModal(null)} className="p-2 bg-white/5 rounded-xl text-slate-400">
-                   <X size={20} />
-                </button>
-             </div>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-white/20 rounded-xl p-6 max-w-md w-full max-h-[80vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">{variationModal.ad} - Varyasyon Seçin</h3>
+              <button
+                onClick={() => {
+                  setVariationModal(null);
+                  setVariationQuantity(1);
+                }}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
 
-             <div className="space-y-3">
-                {variationModal.varyasyonlar?.map(v => (
-                   <button
-                    key={v.id}
-                    onClick={() => addToCartWithVariation(variationModal, v)}
-                    className="w-full p-6 bg-white/5 border border-white/5 rounded-3xl flex justify-between items-center hover:border-neso-gold/30 hover:bg-neso-gold/5 transition-all group"
-                   >
-                      <span className="font-bold text-white uppercase group-hover:text-neso-gold transition-colors">{v.ad}</span>
-                      <div className="flex flex-col items-end">
-                         <span className="text-lg font-black text-white">{variationModal.fiyat + v.ek_fiyat}₺</span>
-                         {v.ek_fiyat > 0 && <span className="text-[10px] font-black text-emerald-400 uppercase">+{v.ek_fiyat}₺ FARK</span>}
+            {/* Adet Seçimi */}
+            <div className="mb-4 p-4 bg-white/5 rounded-lg border border-white/10">
+              <label className="block text-sm font-medium text-white/70 mb-2">Adet</label>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setVariationQuantity(Math.max(1, variationQuantity - 1))}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <Minus className="w-5 h-5 text-white" />
+                </button>
+                <input
+                  type="number"
+                  min="1"
+                  value={variationQuantity}
+                  onChange={(e) => setVariationQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="flex-1 px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-center text-xl font-bold text-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <button
+                  onClick={() => setVariationQuantity(variationQuantity + 1)}
+                  className="p-2 bg-white/10 hover:bg-white/20 rounded-lg transition-colors"
+                >
+                  <Plus className="w-5 h-5 text-white" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {variationModal.varyasyonlar?.map((variation) => {
+                const finalPrice = variationModal.fiyat + variation.ek_fiyat;
+                const totalPrice = finalPrice * variationQuantity;
+                return (
+                  <button
+                    key={variation.id}
+                    onClick={() => addToCartWithVariation(variationModal, variation)}
+                    className="w-full p-4 bg-white/5 border border-white/10 rounded-lg hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all text-left"
+                  >
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold text-white">{variation.ad}</p>
+                        {variation.ek_fiyat > 0 && (
+                          <p className="text-xs text-white/50">+{variation.ek_fiyat.toFixed(2)} ₺</p>
+                        )}
+                        {variationQuantity > 1 && (
+                          <p className="text-xs text-emerald-300 mt-1">{finalPrice.toFixed(2)} ₺ x {variationQuantity}</p>
+                        )}
                       </div>
-                   </button>
-                ))}
-             </div>
+                      <div className="text-right">
+                        <p className="font-bold text-emerald-300">{totalPrice.toFixed(2)} ₺</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
+
