@@ -81,6 +81,7 @@ from .routers.audit import router as audit_router  # /audit/*
 from .routers.onboarding import router as onboarding_router # /onboarding/*
 from .routers.backup import router as backup_router  # /system/backup/*
 from .routers.analytics_advanced import router as analytics_advanced_router  # /analytics/advanced/*
+from .routers.analytics_predictive import router as analytics_predictive_router  # /analytics/predictive/*
 from .routers.cache import router as cache_router  # /cache/*
 from .routers.seed_demo import router as seed_demo_router  # /seed/* (geçici)
 
@@ -230,6 +231,7 @@ app.include_router(customization_router)  # /customization/*
 app.include_router(audit_router)       # /audit/*
 app.include_router(backup_router)      # /system/backup/*
 app.include_router(analytics_advanced_router)  # /analytics/advanced/*
+app.include_router(analytics_predictive_router)  # /analytics/predictive/*
 app.include_router(cache_router)       # /cache/*
 if settings.ENV != "prod":
     app.include_router(seed_demo_router)   # /seed/* (DEMO - sadece geliştirme aşamasında)

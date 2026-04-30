@@ -26,6 +26,7 @@ const PublicMenuPage = lazy(() => import('./pages/PublicMenuPage'));
 const SuperAdminPanel = lazy(() => import('./pages/SuperAdminPanel'));
 const SystemSettingsPage = lazy(() => import('./pages/SystemSettingsPage'));
 const LegalPage = lazy(() => import('./pages/LegalPage'));
+const PredictiveAnalyticsPage = lazy(() => import('./pages/PredictiveAnalyticsPage'));
 
 // Protected Route component
 function ProtectedRoute({ children }: { children: ReactNode }) {
@@ -105,6 +106,7 @@ function App() {
             {/* Veri sayfaları - tenant seçilmesi gerekiyor */}
             <Route path="dashboard" element={<TenantRequiredGuard><DashboardPage /></TenantRequiredGuard>} />
             <Route path="raporlar" element={<TenantRequiredGuard><RaporlarPage /></TenantRequiredGuard>} />
+            <Route path="analitik" element={<TenantRequiredGuard><PredictiveAnalyticsPage /></TenantRequiredGuard>} />
             <Route path="menu" element={<TenantRequiredGuard><MenuPage /></TenantRequiredGuard>} />
             <Route path="stok" element={<TenantRequiredGuard><StokPage /></TenantRequiredGuard>} />
             <Route path="giderler" element={<TenantRequiredGuard><GiderlerPage /></TenantRequiredGuard>} />
