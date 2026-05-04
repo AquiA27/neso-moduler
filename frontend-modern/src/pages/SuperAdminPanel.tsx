@@ -128,6 +128,12 @@ interface TenantDetail {
 export default function SuperAdminPanel() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'tenants' | 'subscriptions' | 'payments' | 'customizations' | 'quick-setup' | 'api-usage' | 'platform-settings'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, []);
   const [loading, setLoading] = useState(false);
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
@@ -205,8 +211,17 @@ export default function SuperAdminPanel() {
   return (
     <div className="flex h-screen bg-[#F8FAFC] font-sans overflow-hidden">
       
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className={`bg-[#0B3B24] text-white flex flex-col transition-all duration-300 ${isSidebarOpen ? 'w-64' : 'w-20'}`}>
+      <aside className={`fixed md:relative z-50 h-full bg-[#0B3B24] text-white flex flex-col transition-all duration-300 transform
+        ${isSidebarOpen ? 'translate-x-0 w-64' : '-translate-x-full w-64 md:translate-x-0 md:w-20'}`}>
         <div className="h-20 flex items-center justify-between px-6 border-b border-white/10">
           {isSidebarOpen ? (
             <div className="flex items-center gap-3">
