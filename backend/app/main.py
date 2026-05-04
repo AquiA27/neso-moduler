@@ -60,9 +60,6 @@ from .routers.rapor import router as rapor_router
 from .routers.isletme import router as isletme_router
 from .routers.sube import router as sube_router
 from .routers.assistant import router as assistant_router  # /assistant/*
-# Debug router - sadece development'ta
-if settings.ENV != "prod":
-    from .routers.auth_debug import router as debug_router
 from .routers.stok import router as stok_router        # /stok/*
 from .routers.recete import router as recete_router    # /recete/*
 from .routers.analytics import router as analytics_router  # /analytics/*
@@ -81,9 +78,7 @@ from .routers.audit import router as audit_router  # /audit/*
 from .routers.onboarding import router as onboarding_router # /onboarding/*
 from .routers.backup import router as backup_router  # /system/backup/*
 from .routers.analytics_advanced import router as analytics_advanced_router  # /analytics/advanced/*
-from .routers.analytics_predictive import router as analytics_predictive_router  # /analytics/predictive/*
 from .routers.cache import router as cache_router  # /cache/*
-from .routers.seed_demo import router as seed_demo_router  # /seed/* (geçici)
 
 from pathlib import Path
 
@@ -211,8 +206,6 @@ app.include_router(admin_router)       # /admin/*
 app.include_router(isletme_router)
 app.include_router(sube_router)
 app.include_router(assistant_router)   # /assistant/*
-if settings.ENV != "prod":
-    app.include_router(debug_router)       # /debug/* - sadece development'ta
 app.include_router(stok_router)        # /stok/*
 app.include_router(recete_router)      # /recete/*
 app.include_router(analytics_router)   # /analytics/*
@@ -231,10 +224,7 @@ app.include_router(customization_router)  # /customization/*
 app.include_router(audit_router)       # /audit/*
 app.include_router(backup_router)      # /system/backup/*
 app.include_router(analytics_advanced_router)  # /analytics/advanced/*
-app.include_router(analytics_predictive_router)  # /analytics/predictive/*
 app.include_router(cache_router)       # /cache/*
-if settings.ENV != "prod":
-    app.include_router(seed_demo_router)   # /seed/* (DEMO - sadece geliştirme aşamasında)
 
 # ---- Observability & Varsayılan Şube ----
 app.add_middleware(RequestIdAndRateLimitMiddleware)

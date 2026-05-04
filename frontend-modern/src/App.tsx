@@ -20,7 +20,6 @@ const AssistantPage = lazy(() => import('./pages/AssistantPage'));
 const BIAssistantPage = lazy(() => import('./pages/BIAssistantPage'));
 const PersonellerPage = lazy(() => import('./pages/PersonellerPage'));
 const PersonelTerminalPage = lazy(() => import('./pages/PersonelTerminalPage'));
-const CustomerLandingPage = lazy(() => import('./pages/CustomerLandingPage'));
 const CustomerChatPage = lazy(() => import('./pages/CustomerChatPage'));
 const PublicMenuPage = lazy(() => import('./pages/PublicMenuPage'));
 const SuperAdminPanel = lazy(() => import('./pages/SuperAdminPanel'));
@@ -84,7 +83,6 @@ function App() {
       >
         <Routes>
           {/* Public routes - no authentication required */}
-          <Route path="/musteri" element={<CustomerLandingPage />} />
           <Route path="/musteri/chat" element={<CustomerChatPage />} />
           <Route path="/musteri/menu" element={<PublicMenuPage />} />
           <Route path="/legal" element={<LegalPage />} />
