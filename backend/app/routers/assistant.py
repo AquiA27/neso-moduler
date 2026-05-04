@@ -101,7 +101,7 @@ def _extract_candidates(text: str) -> list:
         "teşekkürler", "tesekkurler", "sağol", "sagol", "teşekkür", "tesekkur", 
         "lutfen", "please", "alayim", "istiyorum", "alabilir", "miyiz", "misin",
         "ver", "verebilir", "getir", "olsun", "istiyoruz", "ederiz", "rica",
-        "bitir", "tamamla", "tamam"
+        "bitir", "tamamla", "tamam", "bana", "bi", "şu", "su", "şundan", "sundan"
     }
     filtered = [tok for tok in tokens if tok not in skip_words]
     pairs = []
@@ -1860,9 +1860,9 @@ async def chat_smart(payload: ChatRequest):
 
         skip_structured_for_milky = _is_milky_coffee_query(text) or hunger_signal or sensitive_business_signal
         intent_result = intent_classifier.predict(text, sube_id=sube_id, masa=masa)
-        structured_response = None
+        structured_data = None
         if not skip_structured_for_milky:
-            structured_response = await _handle_structured_intent(
+            structured_data = await _handle_structured_intent(
                 intent_result=intent_result,
                 conversation_id=conversation_id,
                 sube_id=sube_id,
@@ -1871,8 +1871,14 @@ async def chat_smart(payload: ChatRequest):
                 original_text=text,
                 tenant_id=tenant_id,
             )
-        if structured_response:
-            return structured_response
+        
+        if structured_data:
+            reply_override = structured_data.get("reply")
+            suggestions_override = structured_data.get("suggestions")
+            if reply_override:
+                context_lines.append(f"STRUCTURED INTENT DATA: {reply_override}")
+            if suggestions_override:
+                suggestions = suggestions_override
         if text_clean_pure in simple_greetings_exact and not hunger_signal:
             business_profile = await _load_business_profile(sube_id)
             menu_items = await _load_menu_details(sube_id)
@@ -1880,26 +1886,9 @@ async def chat_smart(payload: ChatRequest):
                 sample = _pick_menu_samples(menu_items, 4)
                 isletme_ad = business_profile.get("isletme_ad") if business_profile else None
                 sube_ad = business_profile.get("sube_ad") if business_profile else None
-                reply = "Merhaba"
-                if isletme_ad:
-                    reply += f", {isletme_ad}'ye hoş geldiniz"
-                elif sube_ad:
-                    reply += f", {sube_ad} şubemize hoş geldiniz"
-                else:
-                    reply += "! Hoş geldiniz"
-                if sample and len(sample) > 0:
-                    reply += f"! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Örneğin: {', '.join(sample)}. Ne istersiniz?"
-                else:
-                    reply += "! Ben Neso, sipariş asistanınız. Menümüzden bir şey önerebilirim. Ne istersiniz?"
-                _append_session(conversation_id, "user", text)
-                _append_session(conversation_id, "assistant", reply)
-                return await _build_chat_response(
-                    reply=reply,
-                    conversation_id=conversation_id,
-                    suggestions=sample if sample else None,
-                    detected_language=detected_lang,
-                    tenant_id=tenant_id,
-                )
+                greeting_context = f"Kullanıcı selam verdi. İşletme: {isletme_ad or sube_ad or 'Neso'}. Örnek ürünler: {', '.join(sample)}."
+                context_lines.append(greeting_context)
+                suggestions = sample
 
         business_profile = await _load_business_profile(sube_id)
         menu_items = await _load_menu_details(sube_id)
@@ -2044,9 +2033,10 @@ async def chat_smart(payload: ChatRequest):
         is_likely_order = True
         
         # Eğer mesaj bir soru, öneri veya matematik işlemiyse, doğrudan LLM'e git (parse yapma)
-        if asks_math or asks_sore_throat or asks_recommendation or asks_question or asks_availability:
+        # ANCAK: Eğer mesajda sayı+ürün kombinasyonu varsa, parse yapmayı tercih et
+        if (asks_math or asks_sore_throat or asks_recommendation or asks_question or asks_availability) and not has_number_product:
             is_likely_order = False
-        elif asks_dairy or asks_milky_coffee or asks_caffeine or asks_gluten or asks_cold or asks_hot:
+        elif (asks_dairy or asks_milky_coffee or asks_caffeine or asks_gluten or asks_cold or asks_hot) and not has_number_product:
             is_likely_order = False
         
         # Geçmiş mesajlarda cevaplanmamış bir varyasyon sorusu varsa, parse yapmaya zorla
@@ -2058,7 +2048,7 @@ async def chat_smart(payload: ChatRequest):
                         is_likely_order = True
                         break
         
-            logging.info(f"[ORDER_CHECK] is_likely_order={is_likely_order}")
+        logging.info(f"[ORDER_CHECK] Final is_likely_order={is_likely_order}")
     
         stock_map_db, has_db_key = await _load_stock_map(sube_id)
         fallback = _ensure_fallback_stock(sube_id, [it["key"] for it in menu_items])
@@ -3024,26 +3014,6 @@ async def chat_smart(payload: ChatRequest):
                     default_reply = "Tatlı listemiz için menüyü kontrol etmem gerekiyor ama istersen sıcak içecek önerebilirim."
                 context_lines.append("Kullanıcı tatlı/pasta istiyor. Menüden tatlıları seçip kısa açıklamalarla öner.")
                 force_default_reply = True
-            elif asks_cold:
-                cold_items = _select_temp_recommendations(menu_items, COLD_DRINK_KEYWORDS)
-                cold_names = [item["ad"] for item in cold_items]
-                suggestions = cold_names
-                default_reply = (
-                    f"Buz gibi ferahlamak istersen {', '.join(cold_names)} çok iyi gider. "
-                    "Hangisini hazırlayayım?"
-                )
-                context_lines.append("Kullanıcı soğuk bir şey istiyor. Menüdeki soğuk içecekleri öner.")
-                force_default_reply = True
-            elif asks_hot:
-                hot_items = _select_temp_recommendations(menu_items, HOT_DRINK_KEYWORDS)
-                hot_names = [item["ad"] for item in hot_items]
-                suggestions = hot_names
-                default_reply = (
-                    f"İçinizi ısıtacak {', '.join(hot_names)} seçeneklerimiz var. "
-                    "Yanına taze bir tatlı da önerebilirim!"
-                )
-                context_lines.append("Kullanıcı sıcak bir şey istiyor. Menüdeki sıcak içecekleri öner.")
-                force_default_reply = True
             elif asks_sore_throat:
                 # Bitki çaylarını menüden bul
                 soothing_items = [
@@ -3559,7 +3529,7 @@ async def _handle_structured_intent(
     detected_language: str,
     original_text: str,
     tenant_id: Optional[int] = None,
-) -> Optional[ChatResponse]:
+) -> Optional[Dict[str, Any]]:
     intent = intent_result.intent
     if not intent:
         return None
@@ -3597,16 +3567,7 @@ async def _handle_structured_intent(
                     product_name = match[0]
                     break
             if not product_name:
-                reply = "Hangi ürünün stok durumunu kontrol etmemi istersiniz?"
-                _append_session(conversation_id, "user", original_text)
-                _append_session(conversation_id, "assistant", reply)
-                await context_manager.set_last_intent(conversation_id, intent)
-                return await _build_chat_response(
-                    reply=reply,
-                    conversation_id=conversation_id,
-                    detected_language=detected_language,
-                    tenant_id=tenant_id,
-                )
+                return {"reply": "Hangi ürünün stok durumunu kontrol etmemi istersiniz?"}
 
             request = DataQueryRequest(
                 intent="stok_durumu",
@@ -3626,15 +3587,7 @@ async def _handle_structured_intent(
                 warnings = evaluate_rules(intent, rows)
                 if warnings:
                     reply += " " + " ".join(warnings)
-            _append_session(conversation_id, "user", original_text)
-            _append_session(conversation_id, "assistant", reply)
-            await context_manager.set_last_intent(conversation_id, intent)
-            return await _build_chat_response(
-                reply=reply,
-                conversation_id=conversation_id,
-                detected_language=detected_language,
-                tenant_id=tenant_id,
-            )
+            return {"reply": reply}
 
         if intent == "menu_liste":
             request = DataQueryRequest(
@@ -3716,32 +3669,14 @@ async def _handle_structured_intent(
                 ]
                 suggestions = target_names[:5] if target_names else fallback_names[:5]
                 if dessert_rows:
-                    reply = "Tatlı vitrinimizde " + ", ".join(suggestions) + " var. Hangisini denemek istersiniz?"
+                    reply = "Tatlı vitrinimizde " + ", ".join(suggestions) + " var."
                 else:
                     reply = "Menümüzde şu ürünler öne çıkıyor: " + ", ".join(suggestions) + "."
-            _append_session(conversation_id, "user", original_text)
-            _append_session(conversation_id, "assistant", reply)
-            await context_manager.set_last_intent(conversation_id, intent)
-            return await _build_chat_response(
-                reply=reply,
-                conversation_id=conversation_id,
-                suggestions=suggestions,
-                detected_language=detected_language,
-                tenant_id=tenant_id,
-            )
+            return {"reply": reply, "suggestions": suggestions}
 
         if intent == "aktif_adisyonlar":
             if not masa:
-                reply = "Hangi masanın hesabını kontrol etmemi istersiniz?"
-                _append_session(conversation_id, "user", original_text)
-                _append_session(conversation_id, "assistant", reply)
-                await context_manager.set_last_intent(conversation_id, intent)
-                return await _build_chat_response(
-                    reply=reply,
-                    conversation_id=conversation_id,
-                    detected_language=detected_language,
-                    tenant_id=tenant_id,
-                )
+                return {"reply": "Hangi masanın hesabını kontrol etmemi istersiniz?"}
 
             request = DataQueryRequest(
                 intent="aktif_adisyonlar",
@@ -3761,15 +3696,7 @@ async def _handle_structured_intent(
                 warnings = evaluate_rules(intent, rows)
                 if warnings:
                     reply += " " + " ".join(warnings)
-            _append_session(conversation_id, "user", original_text)
-            _append_session(conversation_id, "assistant", reply)
-            await context_manager.set_last_intent(conversation_id, intent)
-            return await _build_chat_response(
-                reply=reply,
-                conversation_id=conversation_id,
-                detected_language=detected_language,
-                tenant_id=tenant_id,
-            )
+            return {"reply": reply}
 
         if intent == "satis_ozet":
             request = DataQueryRequest(
@@ -3785,15 +3712,7 @@ async def _handle_structured_intent(
                 toplam = sum(float(row.get("toplam_ciro", 0) or 0) for row in rows)
                 toplam_siparis = sum(int(row.get("siparis_adedi", 0) or 0) for row in rows)
                 reply = f"Son günlerde toplam {toplam_siparis} sipariş ile {toplam:.2f} ₺ ciro oluşmuş."
-            _append_session(conversation_id, "user", original_text)
-            _append_session(conversation_id, "assistant", reply)
-            await context_manager.set_last_intent(conversation_id, intent)
-            return await _build_chat_response(
-                reply=reply,
-                conversation_id=conversation_id,
-                detected_language=detected_language,
-                tenant_id=tenant_id,
-            )
+            return {"reply": reply}
 
     except DataAccessError as exc:
         logger.warning("Structured intent data erişimi başarısız: %s", exc)
@@ -3801,6 +3720,8 @@ async def _handle_structured_intent(
         logger.exception("Structured intent işlenirken hata oluştu")
 
     return None
+
+
 
 
 async def _load_recipe_map(sube_id: int) -> Tuple[Dict[str, List[str]], Dict[str, List[Dict[str, Any]]]]:
