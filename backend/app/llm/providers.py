@@ -419,9 +419,9 @@ class GeminiProvider(LLMProvider):
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
     """
     Tenant-specific veya global API key ile LLM provider döndürür.
-    Hem OpenAI hem de Gemini (Google) desteği sağlar.
     """
     import logging
+    logging.info("[LLM_PROVIDER] Version 2.1 - Fallback Logic Active")
     from ..db.database import db
     
     api_key = None

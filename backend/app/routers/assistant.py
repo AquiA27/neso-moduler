@@ -1799,6 +1799,7 @@ async def handle_voice_command(
 
 @router.post("/chat", response_model=ChatResponse)
 async def chat_smart(payload: ChatRequest):
+    logging.info("[CHAT] Version 2.1 - Smart Intelligence Active")
     try:
         text = (payload.text or "").strip()
         if not text:
