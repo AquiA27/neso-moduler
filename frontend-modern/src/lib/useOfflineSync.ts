@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { offlineManager, OfflineAction } from './offlineManager';
-import { kasaApi, adisyonApi, siparisApi } from './api';
+import { offlineManager } from './offlineManager';
+import { kasaApi, siparisApi } from './api';
 
 export function useOfflineSync() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);

@@ -124,6 +124,50 @@ export default function KasaPage() {
     }
   }, [adisyonFilter, isOnline]);
 
+  const loadSummary = useCallback(async (masa: string) => {
+    if (!masa) return;
+    setLoading(true);
+    try {
+      let responseData;
+      if (!isOnline) {
+        responseData = offlineManager.getFromCache('summary_' + masa);
+        if (!responseData) {
+           responseData = offlineManager.getFromCache('summary_ozet_' + masa);
+        }
+      } else {
+        try {
+          const response = await kasaApi.hesapDetay(masa);
+          responseData = response.data;
+          offlineManager.saveToCache('summary_' + masa, responseData);
+        } catch (detailErr) {
+           const fallbackResponse = await kasaApi.hesapOzet(masa);
+           responseData = fallbackResponse.data;
+           offlineManager.saveToCache('summary_ozet_' + masa, responseData);
+        }
+      }
+
+      if (responseData) {
+        setSummary(responseData);
+        setSelectedMasa(masa);
+        setSelectedItems(new Set());
+        const incomingBalance = responseData?.ozet?.bakiye ?? responseData?.bakiye ?? 0;
+        setPaymentData(prev => ({ 
+          ...prev, 
+          iskonto_orani: '',
+          tutar: incomingBalance > 0 ? incomingBalance.toFixed(2) : '',
+        }));
+        setPaymentFeedback(null);
+      } else {
+         if (!isOnline) alert('Çevrimdışı modda bu masanın detayı bulunamadı.');
+      }
+    } catch (err) {
+      console.error('Hesap detayı yüklenemedi:', err);
+      alert('Hesap bilgisi alınamadı');
+    } finally {
+      setLoading(false);
+    }
+  }, [isOnline]);
+
   useEffect(() => {
     loadTables();
     loadAdisyons();
@@ -232,49 +276,7 @@ export default function KasaPage() {
     selectedMasaRef.current = selectedMasa;
   }, [selectedMasa]);
 
-  const loadSummary = useCallback(async (masa: string) => {
-    if (!masa) return;
-    setLoading(true);
-    try {
-      let responseData;
-      if (!isOnline) {
-        responseData = offlineManager.getFromCache('summary_' + masa);
-        if (!responseData) {
-           responseData = offlineManager.getFromCache('summary_ozet_' + masa);
-        }
-      } else {
-        try {
-          const response = await kasaApi.hesapDetay(masa);
-          responseData = response.data;
-          offlineManager.saveToCache('summary_' + masa, responseData);
-        } catch (detailErr) {
-           const fallbackResponse = await kasaApi.hesapOzet(masa);
-           responseData = fallbackResponse.data;
-           offlineManager.saveToCache('summary_ozet_' + masa, responseData);
-        }
-      }
 
-      if (responseData) {
-        setSummary(responseData);
-        setSelectedMasa(masa);
-        setSelectedItems(new Set());
-        const incomingBalance = responseData?.ozet?.bakiye ?? responseData?.bakiye ?? 0;
-        setPaymentData(prev => ({ 
-          ...prev, 
-          iskonto_orani: '',
-          tutar: incomingBalance > 0 ? incomingBalance.toFixed(2) : '',
-        }));
-        setPaymentFeedback(null);
-      } else {
-         if (!isOnline) alert('Çevrimdışı modda bu masanın detayı bulunamadı.');
-      }
-    } catch (err) {
-      console.error('Hesap detayı yüklenemedi:', err);
-      alert('Hesap bilgisi alınamadı');
-    } finally {
-      setLoading(false);
-    }
-  }, [isOnline]);
 
   const toggleItemSelection = (siparisId: number, itemIndex: number) => {
     const key = `${siparisId}-${itemIndex}`;
