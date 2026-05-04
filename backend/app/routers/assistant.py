@@ -3196,7 +3196,8 @@ Cevap vermeden önce içinden şu adımları izle:
             reply_text = ""
 
         if not reply_text or len(reply_text.strip()) == 0:
-            reply_text = default_reply or "Size yardimci olmaya hazirim. Menuden bir sey onerebilirim!"
+            reply_text = default_reply or "Ben Neso Asistan (v2.2)! Yapay zeka servisime şu an ulaşamıyorum, ancak menümüzden sipariş almak için buradayım. Ne istersiniz?"
+
 
         # Eğer reply'de greeting varsa ve not_matched sadece greeting kelimeleri içeriyorsa, temizle
         reply_lower = reply_text.lower()
