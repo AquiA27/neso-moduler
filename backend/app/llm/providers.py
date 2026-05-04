@@ -362,7 +362,7 @@ class GeminiProvider(LLMProvider):
             try:
                 async with httpx.AsyncClient(timeout=60) as client:
                     resp = await client.post(attempt_url, json=payload)
-                    if resp.status_code in (404, 400, 403):
+                    if resp.status_code in (404, 400, 403, 500, 502, 503, 504):
                         err_body = ""
                         try:
                             err_body = resp.json().get("error", {}).get("message", "")
@@ -407,7 +407,8 @@ class GeminiProvider(LLMProvider):
                 }
             except Exception as e:
                 last_error = e
-                if not any(code in str(e) for code in ("404", "400", "403")):
+                err_str = str(e)
+                if not any(code in err_str for code in ("404", "400", "403", "500", "502", "503", "504")):
                     break  # Ağ/timeout hatası → retry etme
 
         # Tüm denemeler başarısız
