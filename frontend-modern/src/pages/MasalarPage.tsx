@@ -206,7 +206,7 @@ export default function MasalarPage() {
   const getQRCodeURL = (qr_code: string | null) => {
     if (!qr_code) return null;
     const baseURL = window.location.origin;
-    return `${baseURL}/musteri?qr=${qr_code}`;
+    return `${baseURL}/musteri/menu?qr=${qr_code}`;
   };
 
   const copyQRCodeURL = (qr_code: string | null) => {
