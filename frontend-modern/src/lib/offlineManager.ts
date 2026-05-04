@@ -1,6 +1,6 @@
 export interface OfflineAction {
   id: string;
-  type: 'PAYMENT' | 'CLOSE_ACCOUNT' | 'CHANGE_TABLE' | 'IKRAM';
+  type: 'PAYMENT' | 'CLOSE_ACCOUNT' | 'CHANGE_TABLE' | 'IKRAM' | 'NEW_ORDER';
   payload: any;
   timestamp: number;
 }

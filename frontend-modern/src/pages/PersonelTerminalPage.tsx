@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ShoppingCart, Plus, Minus, Trash2, ArrowRight, Home, X } from 'lucide-react';
 import { menuApi, siparisApi, masalarApi } from '../lib/api';
+import { offlineManager } from '../lib/offlineManager';
+import { useOfflineSync } from '../lib/useOfflineSync';
 
 interface Varyasyon {
   id: number;
@@ -46,18 +48,29 @@ export default function PersonelTerminalPage() {
   const [variationModal, setVariationModal] = useState<MenuItem | null>(null);
   const [variationQuantity, setVariationQuantity] = useState<number>(1);
 
+  const { isOnline, syncing, queueCount } = useOfflineSync();
+
   useEffect(() => {
     loadMenu();
     loadMasalar();
-  }, []);
+  }, [isOnline]);
 
   const loadMenu = async () => {
     try {
-      const response = await menuApi.list({ limit: 200, sadece_aktif: true, varyasyonlar_dahil: true });
-      const items = (response.data || []).filter((item: MenuItem) => item.aktif);
+      let items;
+      if (!isOnline) {
+         const cached = offlineManager.getFromCache('terminal_menu');
+         items = cached || [];
+      } else {
+         const response = await menuApi.list({ limit: 200, sadece_aktif: true, varyasyonlar_dahil: true });
+         items = (response.data || []).filter((item: MenuItem) => item.aktif);
+         offlineManager.saveToCache('terminal_menu', items);
+      }
       setMenuItems(items);
     } catch (err) {
       console.error('Menü yüklenemedi:', err);
+      const cached = offlineManager.getFromCache('terminal_menu');
+      if (cached) setMenuItems(cached);
     } finally {
       setLoading(false);
     }
@@ -65,10 +78,19 @@ export default function PersonelTerminalPage() {
 
   const loadMasalar = async () => {
     try {
-      const response = await masalarApi.list();
-      setMasalar(response.data || []);
+      let data;
+      if (!isOnline) {
+        data = offlineManager.getFromCache('terminal_masalar') || [];
+      } else {
+        const response = await masalarApi.list();
+        data = response.data || [];
+        offlineManager.saveToCache('terminal_masalar', data);
+      }
+      setMasalar(data);
     } catch (err) {
       console.error('Masalar yüklenemedi:', err);
+      const cached = offlineManager.getFromCache('terminal_masalar');
+      if (cached) setMasalar(cached);
     }
   };
 
@@ -158,11 +180,22 @@ export default function PersonelTerminalPage() {
         ...(item.varyasyon && { varyasyon: item.varyasyon.ad }),
       }));
 
-      await siparisApi.add({
+      const payload = {
         masa: masa.trim(),
         sepet: sepet,
         tutar: getTotal(),
-      });
+      };
+
+      if (!isOnline) {
+        offlineManager.addAction('NEW_ORDER', payload);
+        alert('✅ Sipariş kaydedildi (Çevrimdışı). İnternet geldiğinde mutfağa iletilecek!');
+        setCart([]);
+        setMasa('');
+        setMasaError('');
+        return;
+      }
+
+      await siparisApi.add(payload);
 
       alert('✅ Sipariş başarıyla oluşturuldu!');
       setCart([]);
@@ -187,8 +220,18 @@ export default function PersonelTerminalPage() {
             >
               <Home className="w-6 h-6 text-white" />
             </button>
-            <h1 className="text-2xl font-bold text-gradient">
+            <h1 className="text-2xl font-bold text-gradient flex items-center gap-2">
               El Terminali
+              {!isOnline && (
+                <span className="bg-rose-500/20 text-rose-400 text-xs px-2 py-0.5 rounded-full border border-rose-500/30 animate-pulse font-medium">
+                  Çevrimdışı
+                </span>
+              )}
+              {isOnline && syncing && (
+                <span className="bg-amber-500/20 text-amber-400 text-xs px-2 py-0.5 rounded-full border border-amber-500/30 animate-pulse font-medium">
+                  Senkronize ({queueCount})
+                </span>
+              )}
             </h1>
           </div>
           

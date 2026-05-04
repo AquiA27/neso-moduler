@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { offlineManager, OfflineAction } from './offlineManager';
-import { kasaApi, adisyonApi } from './api';
+import { kasaApi, adisyonApi, siparisApi } from './api';
 
 export function useOfflineSync() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -53,6 +53,8 @@ export function useOfflineSync() {
           await kasaApi.itemMasaDegistir(action.payload);
         } else if (action.type === 'IKRAM') {
           await kasaApi.itemIkram(action.payload);
+        } else if (action.type === 'NEW_ORDER') {
+          await siparisApi.add(action.payload);
         }
         offlineManager.removeAction(action.id);
         successCount++;
