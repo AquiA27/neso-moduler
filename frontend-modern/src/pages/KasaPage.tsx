@@ -1,6 +1,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { kasaApi, adisyonApi, normalizeApiUrl } from '../lib/api';
 import { useWebSocket } from '../hooks/useWebSocket';
+import { offlineManager } from '../lib/offlineManager';
+import { useOfflineSync } from '../lib/useOfflineSync';
 
 interface Table {
   masa: string;
@@ -66,55 +68,85 @@ export default function KasaPage() {
   const [activeTab, setActiveTab] = useState<'masalar' | 'hesaplar'>('masalar');
   const [adisyonFilter, setAdisyonFilter] = useState<'acik' | 'kapali' | 'tumu'>('acik');
   const [paymentFeedback, setPaymentFeedback] = useState<string | null>(null);
+  const { isOnline, syncing, queueCount } = useOfflineSync();
   const [showAdisyonDetay, setShowAdisyonDetay] = useState(false);
   const [selectedAdisyonDetay, setSelectedAdisyonDetay] = useState<any>(null);
 
   const loadTables = useCallback(async () => {
     try {
       console.log('Kasa: Masalar yükleniyor...', new Date().toISOString());
-      const response = await kasaApi.masalar({ limit: 200 });
-      console.log('Kasa: Masalar yüklendi, response:', response.data);
-      console.log('Kasa: Response data length:', response.data?.length || 0);
-      // Backend'den gelen masalar zaten bakiye > 0 olanlar (hazir durumda)
-      // Response'da 'bakiye' veya 'tutar' olabilir
-      const tablesWithBalance = (response.data || []).map((table: any) => ({
+      
+      let responseData;
+      if (!isOnline) {
+        responseData = offlineManager.getFromCache('masalar');
+        console.log('Kasa: Çevrimdışı mod, masalar önbellekten yüklendi');
+      } else {
+        const response = await kasaApi.masalar({ limit: 200 });
+        responseData = response.data;
+        offlineManager.saveToCache('masalar', responseData);
+      }
+      
+      const tablesWithBalance = (responseData || []).map((table: any) => ({
         masa: table.masa,
-        tutar: table.bakiye || table.tutar || 0, // bakiye varsa onu kullan
+        tutar: table.bakiye || table.tutar || 0,
         bakiye: table.bakiye || table.tutar || 0,
         siparis_toplam: table.siparis_toplam || 0,
         odeme_toplam: table.odeme_toplam || 0,
         adisyon_id: table.adisyon_id,
         hazir_count: table.hazir_count || 0,
       }));
-      console.log('Kasa: Masalar işlendi, toplam masa sayısı:', tablesWithBalance.length);
-      if (tablesWithBalance.length > 0) {
-        console.log('Kasa: Masalar listesi:', tablesWithBalance.map((t: any) => ({ masa: t.masa, bakiye: t.bakiye })));
-      }
       setTables(tablesWithBalance);
     } catch (err) {
       console.error('Masalar yüklenemedi:', err);
+      const cached = offlineManager.getFromCache('masalar');
+      if (cached) {
+        setTables(cached.map((t: any) => ({ ...t, bakiye: t.bakiye || t.tutar || 0 })));
+      }
     }
-  }, []);
+  }, [isOnline]);
 
   const loadAdisyons = useCallback(async () => {
     try {
       const params = adisyonFilter === 'tumu' ? undefined : adisyonFilter;
-      const response = await adisyonApi.acik(200, params);
-      setAdisyons(response.data || []);
+      let responseData;
+      if (!isOnline) {
+        responseData = offlineManager.getFromCache('adisyons_' + adisyonFilter);
+      } else {
+        const response = await adisyonApi.acik(200, params);
+        responseData = response.data;
+        offlineManager.saveToCache('adisyons_' + adisyonFilter, responseData);
+      }
+      setAdisyons(responseData || []);
     } catch (err) {
       console.error('Adisyonlar yüklenemedi:', err);
+      const cached = offlineManager.getFromCache('adisyons_' + adisyonFilter);
+      if (cached) setAdisyons(cached);
     }
-  }, [adisyonFilter]);
+  }, [adisyonFilter, isOnline]);
 
   useEffect(() => {
     loadTables();
     loadAdisyons();
     const interval = setInterval(() => {
-      loadTables();
-      loadAdisyons();
+      if (isOnline) {
+        loadTables();
+        loadAdisyons();
+      }
     }, 10000);
     return () => clearInterval(interval);
-  }, [loadTables, loadAdisyons]);
+  }, [loadTables, loadAdisyons, isOnline]);
+  
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      loadTables();
+      loadAdisyons();
+      if (selectedMasaRef.current) {
+        loadSummary(selectedMasaRef.current);
+      }
+    };
+    window.addEventListener('offline-sync-complete', handleSyncComplete);
+    return () => window.removeEventListener('offline-sync-complete', handleSyncComplete);
+  }, [loadTables, loadAdisyons, loadSummary]);
   
   // Adisyon filtresi değiştiğinde adisyonları yeniden yükle
   useEffect(() => {
@@ -204,50 +236,45 @@ export default function KasaPage() {
     if (!masa) return;
     setLoading(true);
     try {
-      // Detaylı bilgi için hesap/detay endpoint'ini kullan
-      const response = await kasaApi.hesapDetay(masa);
-      console.log('Hesap detay response:', response);
-      console.log('Response data:', response.data);
-      console.log('Response data.siparisler:', response.data?.siparisler);
-      if (response.data?.siparisler) {
-        response.data.siparisler.forEach((siparis: any, idx: number) => {
-          console.log(`Siparis #${siparis.id} (index ${idx}):`, {
-            id: siparis.id,
-            durum: siparis.durum,
-            tutar: siparis.tutar,
-            sepet: siparis.sepet,
-            sepet_tip: typeof siparis.sepet,
-            sepet_length: Array.isArray(siparis.sepet) ? siparis.sepet.length : 'N/A',
-            tüm_alanlar: Object.keys(siparis),
-          });
-        });
+      let responseData;
+      if (!isOnline) {
+        responseData = offlineManager.getFromCache('summary_' + masa);
+        if (!responseData) {
+           responseData = offlineManager.getFromCache('summary_ozet_' + masa);
+        }
+      } else {
+        try {
+          const response = await kasaApi.hesapDetay(masa);
+          responseData = response.data;
+          offlineManager.saveToCache('summary_' + masa, responseData);
+        } catch (detailErr) {
+           const fallbackResponse = await kasaApi.hesapOzet(masa);
+           responseData = fallbackResponse.data;
+           offlineManager.saveToCache('summary_ozet_' + masa, responseData);
+        }
       }
-      setSummary(response.data);
-      setSelectedMasa(masa);
-      // Yeni masa seçildiğinde önceki seçimleri temizle
-      setSelectedItems(new Set());
-      // İskonto oranını sıfırla, tutar useEffect tarafından otomatik güncellenecek
-      const incomingBalance = response.data?.ozet?.bakiye ?? response.data?.bakiye ?? 0;
-      setPaymentData(prev => ({ 
-        ...prev, 
-        iskonto_orani: '',
-        tutar: incomingBalance > 0 ? incomingBalance.toFixed(2) : '',
-      }));
-      setPaymentFeedback(null);
+
+      if (responseData) {
+        setSummary(responseData);
+        setSelectedMasa(masa);
+        setSelectedItems(new Set());
+        const incomingBalance = responseData?.ozet?.bakiye ?? responseData?.bakiye ?? 0;
+        setPaymentData(prev => ({ 
+          ...prev, 
+          iskonto_orani: '',
+          tutar: incomingBalance > 0 ? incomingBalance.toFixed(2) : '',
+        }));
+        setPaymentFeedback(null);
+      } else {
+         if (!isOnline) alert('Çevrimdışı modda bu masanın detayı bulunamadı.');
+      }
     } catch (err) {
       console.error('Hesap detayı yüklenemedi:', err);
-      // Fallback olarak basit özeti kullan
-      try {
-        const fallbackResponse = await kasaApi.hesapOzet(masa);
-        setSummary(fallbackResponse.data);
-        setSelectedMasa(masa);
-      } catch (fallbackErr) {
-        alert('Hesap bilgisi alınamadı');
-      }
+      alert('Hesap bilgisi alınamadı');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isOnline]);
 
   const toggleItemSelection = (siparisId: number, itemIndex: number) => {
     const key = `${siparisId}-${itemIndex}`;
@@ -340,6 +367,22 @@ export default function KasaPage() {
     }
     try {
       setLoading(true);
+      if (!isOnline) {
+        for (const key of selectedItems) {
+          const [siparisId, itemIndex] = key.split('-').map(Number);
+          offlineManager.addAction('CHANGE_TABLE', {
+            siparis_id: siparisId,
+            item_index: itemIndex,
+            yeni_masa: newMasa.trim(),
+          });
+        }
+        setSelectedItems(new Set());
+        setShowMasaModal(false);
+        setNewMasa('');
+        alert('Masa değiştirme kaydedildi (Çevrimdışı). İnternet geldiğinde senkronize edilecek.');
+        return;
+      }
+
       for (const key of selectedItems) {
         const [siparisId, itemIndex] = key.split('-').map(Number);
         await kasaApi.itemMasaDegistir({
@@ -352,7 +395,6 @@ export default function KasaPage() {
       setShowMasaModal(false);
       setNewMasa('');
 
-      // Biraz bekleyip tabloları yenile (database transaction tamamlansın)
       setTimeout(() => {
         loadTables();
         if (selectedMasa) {
@@ -374,6 +416,19 @@ export default function KasaPage() {
     }
     try {
       setLoading(true);
+      if (!isOnline) {
+        for (const key of selectedItems) {
+          const [siparisId, itemIndex] = key.split('-').map(Number);
+          offlineManager.addAction('IKRAM', {
+            siparis_id: siparisId,
+            item_index: itemIndex,
+          });
+        }
+        setSelectedItems(new Set());
+        alert('İkram işlemi kaydedildi (Çevrimdışı). İnternet geldiğinde senkronize edilecek.');
+        return;
+      }
+
       for (const key of selectedItems) {
         const [siparisId, itemIndex] = key.split('-').map(Number);
         await kasaApi.itemIkram({
@@ -402,12 +457,22 @@ export default function KasaPage() {
     try {
       setLoading(true);
       const iskonto_orani = paymentData.iskonto_orani ? parseFloat(paymentData.iskonto_orani) : 0;
-      const response = await kasaApi.odemeEkle({
+      const payload = {
         masa: selectedMasa,
         tutar: parseFloat(paymentData.tutar),
         yontem: paymentData.yontem,
         iskonto_orani,
-      });
+      };
+
+      if (!isOnline) {
+        offlineManager.addAction('PAYMENT', payload);
+        setSelectedItems(new Set());
+        setPaymentData({ tutar: '', yontem: 'nakit', iskonto_orani: '' });
+        setPaymentFeedback('Ödeme kaydedildi (Çevrimdışı). İnternet geldiğinde senkronize edilecek.');
+        return;
+      }
+
+      const response = await kasaApi.odemeEkle(payload);
       const paymentResult = response.data as {
         remaining_balance?: number;
         auto_closed?: boolean;
@@ -456,6 +521,13 @@ export default function KasaPage() {
     if (!selectedMasa) return;
     if (!confirm('Hesabı kapatmak istediğinizden emin misiniz?')) return;
     try {
+      if (!isOnline) {
+        offlineManager.addAction('CLOSE_ACCOUNT', { masa: selectedMasa });
+        setSelectedMasa('');
+        setSummary(null);
+        alert('Hesap kapatma işlemi kaydedildi (Çevrimdışı). İnternet geldiğinde senkronize edilecek.');
+        return;
+      }
       await kasaApi.hesapKapat(selectedMasa);
       setSelectedMasa('');
       setSummary(null);
@@ -498,7 +570,21 @@ export default function KasaPage() {
 
   return (
     <div className="space-y-6 sm:space-y-8">
-      <h2 className="text-3xl font-bold">Kasa Yönetimi</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-3xl font-bold flex items-center gap-4">
+          Kasa Yönetimi
+          {!isOnline && (
+            <span className="bg-rose-500/20 text-rose-400 text-sm px-3 py-1 rounded-full border border-rose-500/30 animate-pulse font-medium">
+              Çevrimdışı (Offline)
+            </span>
+          )}
+          {isOnline && syncing && (
+             <span className="bg-amber-500/20 text-amber-400 text-sm px-3 py-1 rounded-full border border-amber-500/30 animate-pulse font-medium">
+               Senkronize Ediliyor... ({queueCount})
+             </span>
+          )}
+        </h2>
+      </div>
 
       {/* Tab Sistemi */}
       <div className="flex flex-wrap gap-2 border-b border-white/10 pb-1">
