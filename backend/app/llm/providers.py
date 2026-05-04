@@ -413,7 +413,7 @@ class GeminiProvider(LLMProvider):
         # Tüm denemeler başarısız
         safe_err = str(last_error).replace(self.api_key, "***") if last_error else "bilinmeyen hata"
         logging.error(f"[Gemini] All attempts failed: {safe_err}")
-        raise ValueError("Gemini API connection failed")
+        return f"Gemini API hatası: Lütfen API anahtarınızı kontrol edin. ({safe_err[:120]})", None
 
 
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
