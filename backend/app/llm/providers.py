@@ -337,19 +337,12 @@ class GeminiProvider(LLMProvider):
         # SADECE v1beta kullan, çünkü v1 systemInstruction desteklemiyor ve şematik olarak farklı
         # Google bazen ana isimleri (gemini-1.5-flash) v1beta'da 404 verebiliyor, bu yüzden -latest ekli versiyonları zorunlu deniyoruz.
         candidates = []
-        
         fallback_models = [
             (self.model, "v1beta"),
             ("gemini-2.5-flash", "v1beta"),
-            ("gemini-2.0-flash-exp", "v1beta"),
-            ("gemini-1.5-flash-latest", "v1beta"),
-            ("gemini-1.5-flash-002", "v1beta"),
             ("gemini-1.5-flash-8b", "v1beta"),
             ("gemini-1.5-flash", "v1beta"),
-            ("gemini-1.5-flash-002", "v1"),
-            ("gemini-1.5-flash", "v1"),
-            ("gemini-1.5-pro", "v1beta"),
-            ("gemini-1.5-pro", "v1")
+            ("gemini-1.5-pro", "v1beta")
         ]
         
         seen = set()
@@ -374,15 +367,11 @@ class GeminiProvider(LLMProvider):
                 }
             }
 
-            if api_ver == "v1":
-                attempt_url = f"https://generativelanguage.googleapis.com/v1/models/{attempt_model}:generateContent?key={self.api_key}"
-                # v1'de systemInstruction alanını kullanma, bunun yerine ilk mesaja göm
-                if system_instruction and len(attempt_contents) > 0:
-                    attempt_contents[0]["parts"][0]["text"] = f"System Instruction:\n{system_instruction}\n\nUser:\n{attempt_contents[0]['parts'][0]['text']}"
-            else:
-                # v1beta'da systemInstruction desteklenir
-                if system_instruction:
-                    attempt_payload["systemInstruction"] = {"role": "system", "parts": [{"text": system_instruction}]}
+            # v1beta'da systemInstruction desteklenir (role olmadan!)
+            if system_instruction:
+                attempt_payload["systemInstruction"] = {
+                    "parts": [{"text": system_instruction}]
+                }
 
             try:
                 async with httpx.AsyncClient(timeout=60) as client:
