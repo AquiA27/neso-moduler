@@ -143,12 +143,13 @@ async def get_product_profitability(
             m.kategori,
             SUM(ps.adet) AS toplam_satis_adedi,
             SUM(ps.adet * ps.fiyat) AS toplam_ciro,
-            COALESCE(SUM(ps.adet * pc.maliyet_per_unit), 0) AS maliyet_toplam,
+            COALESCE(SUM(ps.adet * COALESCE(pc.maliyet_per_unit, direct_sk.alis_fiyat)), 0) AS maliyet_toplam,
             AVG(ps.fiyat) AS ortalama_satis_fiyati,
-            COALESCE(AVG(pc.maliyet_per_unit), 0) AS ortalama_maliyet
+            COALESCE(AVG(COALESCE(pc.maliyet_per_unit, direct_sk.alis_fiyat)), 0) AS ortalama_maliyet
         FROM product_sales ps
         LEFT JOIN menu m ON LOWER(TRIM(m.ad)) = LOWER(TRIM(ps.urun_adi)) AND m.sube_id = :sube_id
         LEFT JOIN product_costs pc ON LOWER(TRIM(pc.urun)) = LOWER(TRIM(ps.urun_adi))
+        LEFT JOIN stok_kalemleri direct_sk ON LOWER(TRIM(direct_sk.ad)) = LOWER(TRIM(ps.urun_adi)) AND direct_sk.sube_id = :sube_id
         GROUP BY ps.urun_adi, m.kategori
         HAVING SUM(ps.adet) >= :min_sales
     )
