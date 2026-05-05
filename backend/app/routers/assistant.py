@@ -1972,7 +1972,7 @@ async def chat_smart(payload: ChatRequest):
         asks_hot = any(token in lower_text for token in ["sicak", "sıcak", "hot", "steamed"])
         asks_dessert = any(keyword in plain_ascii for keyword in DESSERT_KEYWORDS)
         asks_recommendation = any(token in lower_text for token in ["oner", "öner", "onerebilir", "öner", "tavsiye", "recommend", "suggest"])
-        asks_question = text.strip().endswith("?") or any(token in lower_text_tokens for token in ["nedir", "ne", "nasil", "hangi", "what", "how", "which"])
+        asks_question = text.strip().endswith("?") or any(token in lower_text_tokens for token in ["nedir", "ne", "nasil", "nasıl", "hangi", "mı", "mi", "mu", "mü", "what", "how", "which"])
         menu_token_hit = any(tok in menu_token_keywords for tok in lower_text_tokens)
         availability_phrases = ["var mı", "varmi", "var mı?", "stokta var mı", "stokta varmi", "mevcut mu", "bulunuyor mu"]
         asks_availability = any(phrase in plain_lower for phrase in availability_phrases)
