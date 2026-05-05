@@ -124,7 +124,14 @@ async def get_product_profitability(
     product_costs AS (
         SELECT
             r.urun,
-            SUM(r.miktar * sk.alis_fiyat) AS maliyet_per_unit
+            SUM(
+                CASE 
+                    WHEN (LOWER(TRIM(r.birim)) IN ('gr', 'gram') AND LOWER(TRIM(sk.birim)) IN ('kg', 'kilo', 'kilogram'))
+                      OR (LOWER(TRIM(r.birim)) IN ('ml', 'mililitre') AND LOWER(TRIM(sk.birim)) IN ('lt', 'litre', 'liter'))
+                    THEN (r.miktar / 1000.0) * sk.alis_fiyat
+                    ELSE r.miktar * sk.alis_fiyat
+                END
+            ) AS maliyet_per_unit
         FROM receteler r
         JOIN stok_kalemleri sk ON sk.ad = r.stok AND sk.sube_id = r.sube_id
         WHERE r.sube_id = :sube_id
@@ -176,9 +183,7 @@ async def get_product_profitability(
         revenue = float(product.get("toplam_ciro") or 0)
         cost = float(product.get("maliyet_toplam") or 0)
 
-        # Maliyet toplamı, ciroyu aşmamalı (veri anomalisini engelle)
-        if cost > revenue and revenue > 0:
-            cost = revenue
+        # Veri anomalisini engelle (negatif maliyet olmaz)
         if cost < 0:
             cost = 0
 
