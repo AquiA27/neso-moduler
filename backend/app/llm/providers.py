@@ -358,11 +358,31 @@ class GeminiProvider(LLMProvider):
         last_error = None
         for attempt_model, api_ver in candidates:
             attempt_url = f"https://generativelanguage.googleapis.com/v1beta/models/{attempt_model}:generateContent?key={self.api_key}"
+            
+            # Her deneme için temiz bir payload oluştur
+            attempt_contents = json.loads(json.dumps(gemini_history))
+            attempt_payload = {
+                "contents": attempt_contents,
+                "generationConfig": {
+                    "temperature": 0.4 if task_type == "bi_analysis" else 0.8,
+                    "topP": 0.95,
+                    "maxOutputTokens": 4096,
+                }
+            }
+
             if api_ver == "v1":
                 attempt_url = f"https://generativelanguage.googleapis.com/v1/models/{attempt_model}:generateContent?key={self.api_key}"
+                # v1'de systemInstruction alanını kullanma, bunun yerine ilk mesaja göm
+                if system_instruction and len(attempt_contents) > 0:
+                    attempt_contents[0]["parts"][0]["text"] = f"System Instruction:\n{system_instruction}\n\nUser:\n{attempt_contents[0]['parts'][0]['text']}"
+            else:
+                # v1beta'da systemInstruction desteklenir
+                if system_instruction:
+                    attempt_payload["systemInstruction"] = {"role": "system", "parts": [{"text": system_instruction}]}
+
             try:
                 async with httpx.AsyncClient(timeout=60) as client:
-                    resp = await client.post(attempt_url, json=payload)
+                    resp = await client.post(attempt_url, json=attempt_payload)
                     if resp.status_code in (404, 400, 403, 500, 502, 503, 504):
                         err_body = ""
                         try:
