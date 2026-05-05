@@ -207,6 +207,27 @@ export default function PersonelTerminalPage() {
     }
   };
 
+  const getDurumTheme = (durum: string) => {
+    switch (durum) {
+      case 'dolu':
+        return { 
+          bg: 'bg-rose-500/20', border: 'border-rose-500/40', text: 'text-rose-300', shadow: 'shadow-[0_0_15px_rgba(244,63,94,0.3)]', indicator: 'bg-rose-500' 
+        };
+      case 'rezerve':
+        return { 
+          bg: 'bg-amber-500/20', border: 'border-amber-500/40', text: 'text-amber-300', shadow: 'shadow-[0_0_15px_rgba(245,158,11,0.3)]', indicator: 'bg-amber-500' 
+        };
+      case 'temizlik':
+        return { 
+          bg: 'bg-cyan-500/20', border: 'border-cyan-500/40', text: 'text-cyan-300', shadow: 'shadow-[0_0_15px_rgba(6,182,212,0.3)]', indicator: 'bg-cyan-500' 
+        };
+      default: // bos
+        return { 
+          bg: 'bg-emerald-500/10', border: 'border-emerald-500/30', text: 'text-emerald-300', shadow: 'hover:shadow-[0_0_15px_rgba(16,185,129,0.2)]', indicator: 'bg-emerald-500' 
+        };
+    }
+  };
+
   return (
     <div className="min-h-screen">
       {/* Header */}
@@ -237,22 +258,19 @@ export default function PersonelTerminalPage() {
           
           {/* Masa Seçimi */}
           <div className="flex items-center gap-4">
-            <div>
-              <select
-                value={masa}
-                onChange={(e) => {
-                  setMasa(e.target.value);
-                  setMasaError('');
-                }}
-                className="w-48"
-              >
-                <option value="">Masa Seçin</option>
-                {masalar.map((m) => (
-                  <option key={m.id} value={m.masa_adi} className="bg-slate-900">{m.masa_adi}</option>
-                ))}
-              </select>
-              {masaError && <p className="text-red-400 text-xs mt-1">{masaError}</p>}
-            </div>
+            {masa ? (
+              <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-emerald-500/30">
+                <span className="text-white font-bold tracking-wider">{masa}</span>
+                <button 
+                  onClick={() => { setMasa(''); setMasaError(''); setCart([]); }}
+                  className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+                >
+                  Değiştir
+                </button>
+              </div>
+            ) : (
+              <div className="text-amber-400 font-semibold animate-pulse">Lütfen Masa Seçin</div>
+            )}
             
             <div className="flex items-center gap-2 px-6 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl">
               <ShoppingCart className="w-5 h-5 text-emerald-400" />
@@ -263,9 +281,53 @@ export default function PersonelTerminalPage() {
       </div>
 
       <div className="max-w-7xl mx-auto p-4">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Menü */}
-          <div className="lg:col-span-2">
+        {!masa ? (
+          <div className="premium-card rounded-2xl p-6">
+            <h2 className="text-2xl font-bold text-white mb-6">Masa Seçimi</h2>
+            <div 
+              className="relative bg-[#0b0f19] border border-white/10 rounded-2xl shadow-2xl overflow-hidden touch-none"
+              style={{ height: '700px', backgroundImage: 'radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px)', backgroundSize: '30px 30px' }}
+            >
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3/4 h-3/4 bg-primary-500/5 blur-[120px] rounded-full pointer-events-none"></div>
+
+              {masalar.map((m) => {
+                const theme = getDurumTheme(m.durum);
+                return (
+                  <div
+                    key={m.id}
+                    onClick={() => {
+                      setMasa(m.masa_adi);
+                      setMasaError('');
+                    }}
+                    className={`absolute select-none cursor-pointer hover:-translate-y-1 z-10 transition-transform duration-300`}
+                    style={{
+                      left: `${m.pozisyon_x ?? 10}%`,
+                      top: `${m.pozisyon_y ?? 10}%`,
+                    }}
+                  >
+                    <div className={`relative flex flex-col w-28 sm:w-32 bg-black/40 backdrop-blur-xl border rounded-2xl overflow-hidden ${theme.border} ${theme.shadow}`}>
+                      <div className={`h-1 w-full ${theme.indicator}`}></div>
+                      <div className="p-3 pb-4 text-center">
+                        <h4 className="font-extrabold text-white text-lg tracking-tight truncate drop-shadow-md">
+                          {m.masa_adi}
+                        </h4>
+                        <div className={`mt-1 text-xs font-semibold px-2 py-0.5 rounded-full inline-block ${theme.bg} ${theme.text}`}>
+                          {m.durum.toUpperCase()}
+                        </div>
+                        <div className="absolute bottom-1 right-2 text-[10px] font-bold text-white/30">
+                          {m.kapasite}P
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Menü */}
+            <div className="lg:col-span-2">
             <div className="premium-card rounded-2xl p-6 h-full">
               <div className="flex items-center justify-between mb-8">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -404,7 +466,7 @@ export default function PersonelTerminalPage() {
               )}
             </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Varyasyon Seçim Modal */}

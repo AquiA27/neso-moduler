@@ -225,6 +225,29 @@ async def siparis_ekle(
         await _update_adisyon_totals(adisyon_id, sube_id)
     except Exception as e:
         logging.warning(f"Adisyon toplamları güncellenirken hata: {e}", exc_info=True)
+    # Masa durumunu 'dolu' olarak güncelle (eğer boş veya rezerve ise)
+    try:
+        await db.execute(
+            """
+            UPDATE masalar 
+            SET durum = 'dolu' 
+            WHERE masa_adi = :masa 
+              AND sube_id = :sid 
+              AND durum IN ('bos', 'rezerve')
+            """,
+            {"masa": siparis.masa, "sid": sube_id}
+        )
+        
+        # Masa güncellendiyse WebSocket üzerinden bildir
+        from ..websocket.manager import manager, Topics
+        await manager.broadcast({
+            "type": "table_update",
+            "masa": siparis.masa,
+            "durum": "dolu",
+            "sube_id": sube_id
+        }, topic=Topics.TABLES)
+    except Exception as e:
+        logging.warning(f"Masa durumu güncellenirken hata: {e}", exc_info=True)
     
     # WebSocket broadcast for new order
     from ..websocket.manager import manager, Topics
