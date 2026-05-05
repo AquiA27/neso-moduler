@@ -340,9 +340,13 @@ class GeminiProvider(LLMProvider):
         
         fallback_models = [
             (self.model, "v1beta"),
+            ("gemini-2.5-flash", "v1beta"),
             ("gemini-2.0-flash-exp", "v1beta"),
             ("gemini-1.5-flash-latest", "v1beta"),
+            ("gemini-1.5-flash-002", "v1beta"),
+            ("gemini-1.5-flash-8b", "v1beta"),
             ("gemini-1.5-flash", "v1beta"),
+            ("gemini-1.5-flash-002", "v1"),
             ("gemini-1.5-flash", "v1"),
             ("gemini-1.5-pro", "v1beta"),
             ("gemini-1.5-pro", "v1")
