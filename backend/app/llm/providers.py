@@ -339,20 +339,21 @@ class GeminiProvider(LLMProvider):
         candidates = []
         
         fallback_models = [
-            self.model,
-            "gemini-1.5-flash-latest",
-            "gemini-1.5-pro-latest",
-            "gemini-2.0-flash-exp",
-            "gemini-2.5-flash",
-            "gemini-1.5-flash",
+            (self.model, "v1beta"),
+            ("gemini-2.0-flash-exp", "v1beta"),
+            ("gemini-1.5-flash-latest", "v1beta"),
+            ("gemini-1.5-flash", "v1beta"),
+            ("gemini-1.5-flash", "v1"),
+            ("gemini-1.5-pro", "v1beta"),
+            ("gemini-1.5-pro", "v1")
         ]
         
-        # Sadece eşsiz (unique) modelleri aynı sırayla ekle
         seen = set()
-        for m in fallback_models:
-            if m not in seen:
-                candidates.append((m, "v1beta"))
-                seen.add(m)
+        for m_name, m_ver in fallback_models:
+            key = f"{m_name}_{m_ver}"
+            if key not in seen:
+                candidates.append((m_name, m_ver))
+                seen.add(key)
 
         last_error = None
         for attempt_model, api_ver in candidates:
