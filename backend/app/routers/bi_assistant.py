@@ -1471,7 +1471,23 @@ async def get_morning_brief(
         target_sube_id = sube_id if (sube_id and user.get("role") == "super_admin") else user_sube_id
         
         # 1. Verileri topla (Dün)
-        yesterday_revenue = await get_revenue_data(target_sube_id, days=1)
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        yesterday_start = (now - timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        yesterday_end = (now - timedelta(days=1)).replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        rev_row = await db.fetch_one(
+            """
+            SELECT 
+                COALESCE(SUM(tutar), 0)::float AS total_revenue,
+                COUNT(*)::int AS total_orders
+            FROM siparisler
+            WHERE sube_id = :sid AND durum = 'odendi' AND created_at BETWEEN :start AND :end;
+            """,
+            {"sid": target_sube_id, "start": yesterday_start, "end": yesterday_end}
+        )
+        yesterday_revenue = dict(rev_row) if rev_row else {"total_revenue": 0.0, "total_orders": 0}
+        
         critical_stocks = await get_inventory_status(target_sube_id)
         
         # 2. LLM Prompt'u hazırla
