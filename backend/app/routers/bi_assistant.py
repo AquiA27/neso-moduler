@@ -44,7 +44,10 @@ def parse_sepet(sepet_value) -> List[Dict[str, Any]]:
 
 async def get_revenue_data(sube_id: int, days: int = 30) -> Dict[str, Any]:
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
+    if days == 1:
+        start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_date = end_date - timedelta(days=days)
     
     rows = await db.fetch_all(
         """
@@ -83,7 +86,10 @@ async def get_expense_data(sube_id: int, days: int = 30) -> Dict[str, Any]:
     """
     try:
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
+        if days == 1:
+            start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            start_date = end_date - timedelta(days=days)
         
         # Kategori bazında toplam giderler
         category_rows = await db.fetch_all(
@@ -208,7 +214,10 @@ async def get_inventory_status(sube_id: int) -> List[Dict[str, Any]]:
 
 async def get_personnel_performance(sube_id: int, days: int = 30) -> List[Dict[str, Any]]:
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
+    if days == 1:
+        start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_date = end_date - timedelta(days=days)
     
     try:
         rows = await db.fetch_all(
@@ -234,7 +243,10 @@ async def get_personnel_performance(sube_id: int, days: int = 30) -> List[Dict[s
 
 async def get_top_products(sube_id: int, days: int = 30) -> List[Dict[str, Any]]:
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
+    if days == 1:
+        start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_date = end_date - timedelta(days=days)
     
     try:
         popular_rows = await db.fetch_all(
@@ -266,7 +278,10 @@ async def get_category_sales(sube_id: int, days: int = 30) -> List[Dict[str, Any
     Satışları kategori bazında özetle.
     """
     end_date = datetime.now()
-    start_date = end_date - timedelta(days=days)
+    if days == 1:
+        start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:
+        start_date = end_date - timedelta(days=days)
 
     try:
         menu_rows = await db.fetch_all(
@@ -629,7 +644,10 @@ async def get_recent_orders(sube_id: int, days: int = 7) -> Dict[str, Any]:
     """Son siparişler özeti"""
     try:
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=days)
+        if days == 1:
+            start_date = end_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        else:
+            start_date = end_date - timedelta(days=days)
         
         rows = await db.fetch_all(
             """
