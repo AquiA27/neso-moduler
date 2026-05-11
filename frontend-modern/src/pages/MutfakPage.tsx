@@ -49,7 +49,7 @@ export default function MutfakPage() {
   const loadOrders = useCallback(async () => {
     try {
       const durum = filter === 'tumu' ? 'tumu' : filter;
-      const response = await mutfakApi.kuyruk({ limit: 50, durum });
+      const response = await mutfakApi.kuyruk({ limit: 150, durum });
       setOrders(response.data || []);
     } catch (err) {
       console.error('Mutfak kuyruğu yüklenemedi:', err);

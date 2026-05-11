@@ -129,7 +129,7 @@ async def kuyruk(
     base = """
         SELECT id, masa, durum, tutar, sepet, created_at, started_at, hazir_at
         FROM siparisler
-        WHERE sube_id = :sid
+        WHERE sube_id = :sid AND created_at >= NOW() - INTERVAL '24 hours'
     """
     if durum == "aktif":
         base += " AND durum IN ('yeni','hazirlaniyor')"
@@ -140,7 +140,7 @@ async def kuyruk(
         base += " AND durum = :durum"
         params["durum"] = durum
 
-    base += " ORDER BY created_at DESC, id DESC LIMIT :limit"
+    base += " ORDER BY created_at ASC, id ASC LIMIT :limit"
     rows = await db.fetch_all(base, params)
     return [_row_map(r) for r in rows]
 
