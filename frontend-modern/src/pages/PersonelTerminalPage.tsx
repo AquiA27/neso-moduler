@@ -34,6 +34,8 @@ interface Masa {
   masa_adi: string;
   durum: string;
   kapasite: number;
+  pozisyon_x?: number;
+  pozisyon_y?: number;
 }
 
 export default function PersonelTerminalPage() {
@@ -44,7 +46,6 @@ export default function PersonelTerminalPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('Tümü');
   const [cart, setCart] = useState<CartItem[]>([]);
   const [masa, setMasa] = useState<string>('');
-  const [masaError, setMasaError] = useState<string>('');
   const [variationModal, setVariationModal] = useState<MenuItem | null>(null);
   const [variationQuantity, setVariationQuantity] = useState<number>(1);
 
@@ -163,7 +164,7 @@ export default function PersonelTerminalPage() {
 
   const handleOrder = async () => {
     if (!masa.trim()) {
-      setMasaError('Lütfen masa numarası girin');
+      alert('Lütfen masa numarası girin');
       return;
     }
 
@@ -191,7 +192,6 @@ export default function PersonelTerminalPage() {
         alert('✅ Sipariş kaydedildi (Çevrimdışı). İnternet geldiğinde mutfağa iletilecek!');
         setCart([]);
         setMasa('');
-        setMasaError('');
         return;
       }
 
@@ -200,7 +200,6 @@ export default function PersonelTerminalPage() {
       alert('✅ Sipariş başarıyla oluşturuldu!');
       setCart([]);
       setMasa('');
-      setMasaError('');
     } catch (err: any) {
       console.error('Sipariş oluşturulamadı:', err);
       alert(`Hata: ${err.response?.data?.detail || 'Sipariş oluşturulamadı'}`);
@@ -262,7 +261,7 @@ export default function PersonelTerminalPage() {
               <div className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-emerald-500/30">
                 <span className="text-white font-bold tracking-wider">{masa}</span>
                 <button 
-                  onClick={() => { setMasa(''); setMasaError(''); setCart([]); }}
+                  onClick={() => { setMasa(''); setCart([]); }}
                   className="text-xs text-emerald-400 hover:text-emerald-300 underline"
                 >
                   Değiştir
@@ -297,7 +296,6 @@ export default function PersonelTerminalPage() {
                     key={m.id}
                     onClick={() => {
                       setMasa(m.masa_adi);
-                      setMasaError('');
                     }}
                     className={`absolute select-none cursor-pointer hover:-translate-y-1 z-10 transition-transform duration-300`}
                     style={{
@@ -465,6 +463,7 @@ export default function PersonelTerminalPage() {
                 </>
               )}
             </div>
+          </div>
           </div>
         )}
       </div>
