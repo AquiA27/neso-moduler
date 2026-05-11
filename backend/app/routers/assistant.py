@@ -113,42 +113,52 @@ def _extract_candidates(text: str) -> list:
     }
     for word, number in NUMBER_WORDS.items():
         t = re.sub(r"\b" + word + r"\b", str(number), t)
-    tokens = t.split()
+        
     skip_words = {
-        "tane", "adet", "ve", "de", "da", "ile", 
+        "tane", "adet", "de", "da", 
         "merhaba", "selam", "selamlar", "hey", "hello", "hi", 
         "hosgeldin", "hos", "geldin", "günaydın", "gunaydin",
         "iyi", "günler", "gunler", "akşamlar", "aksamlar",
         "teşekkürler", "tesekkurler", "sağol", "sagol", "teşekkür", "tesekkur", 
         "lutfen", "please", "alayim", "istiyorum", "alabilir", "miyiz", "misin",
         "ver", "verebilir", "getir", "olsun", "istiyoruz", "ederiz", "rica",
-        "bitir", "tamamla", "tamam", "bana", "bi", "şu", "su", "şundan", "sundan"
+        "bitir", "tamamla", "tamam", "bana", "bi", "şu", "su", "şundan", "sundan",
+        "önce", "sonra"
     }
-    filtered = [tok for tok in tokens if tok not in skip_words]
+    
+    parts = re.split(r'\b(?:ve|ile|ayrıca|ayrica|ileti|ayriyeten)\b', t)
     pairs = []
-    i = 0
-    while i < len(filtered):
-        tok = filtered[i]
-        if tok.isdigit():
-            count = int(tok)
-            i += 1
-            words = []
-            while i < len(filtered) and not filtered[i].isdigit():
-                words.append(filtered[i])
+    
+    for part in parts:
+        tokens = part.split()
+        filtered = [tok for tok in tokens if tok not in skip_words]
+        if not filtered:
+            continue
+            
+        i = 0
+        while i < len(filtered):
+            tok = filtered[i]
+            if tok.isdigit():
+                count = int(tok)
                 i += 1
-            if words:
-                pairs.append([" ".join(words), count])
-        else:
-            words = []
-            while i < len(filtered) and not filtered[i].isdigit():
-                words.append(filtered[i])
-                i += 1
-            count = 1
-            if i < len(filtered):
-                count = int(filtered[i])
-                i += 1
-            if words:
-                pairs.append([" ".join(words), count])
+                words = []
+                while i < len(filtered) and not filtered[i].isdigit():
+                    words.append(filtered[i])
+                    i += 1
+                if words:
+                    pairs.append([" ".join(words), count])
+            else:
+                words = []
+                while i < len(filtered) and not filtered[i].isdigit():
+                    words.append(filtered[i])
+                    i += 1
+                count = 1
+                if i < len(filtered):
+                    count = int(filtered[i])
+                    i += 1
+                if words:
+                    pairs.append([" ".join(words), count])
+                    
     return pairs
 
 
