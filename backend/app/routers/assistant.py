@@ -15,15 +15,16 @@ try:
 except ImportError as e:
     # Python 3.13+ doesn't have 'aifc' module which speech_recognition depends on
     logging.warning(f"speech_recognition not available: {e}. STT features will be disabled.")
-    sr = None
+    sr: Any = None  # type: ignore
     SPEECH_RECOGNITION_AVAILABLE = False
 
 try:
     from pydub import AudioSegment
     PYDUB_AVAILABLE = True
 except ImportError:
-    AudioSegment = None
+    AudioSegment: Any = None  # type: ignore
     PYDUB_AVAILABLE = False
+
 
 import io
 
@@ -40,6 +41,8 @@ from ..services.tts_presets import (
 )
 from .siparis import normalize_name  # mevcut yardımcıları kullan
 import json
+import asyncio
+import re
 
 from ..services.data_access import resolve_data_query, DataQueryRequest
 from ..services.data_access.exceptions import DataAccessError
@@ -50,6 +53,24 @@ from ..utils.text_matching import closest_match
 
 logger = logging.getLogger(__name__)
 
+# --- GLOBAL CONSTANTS (Moved to top for IDE visibility) ---
+NUMBER_WORDS: Dict[str, int] = {
+    "bir": 1, "iki": 2, "üç": 3, "uc": 3, "dört": 4, "dort": 4,
+    "beş": 5, "bes": 5, "altı": 6, "alti": 6, "yedi": 7, "sekiz": 8,
+    "dokuz": 9, "on": 10
+}
+
+MILK_KEYWORDS = {
+    "latte", "milk", "sut", "süt", "cream", "kaymak", "peynir", "cheese",
+    "mozzarella", "krem", "mocha", "cappuccino", "milkshake", "milk tea", "panna", "pizza",
+}
+
+COFFEE_KEYWORDS = {
+    "kahve", "kahvesi", "coffee", "espresso", "americano", "latte",
+    "cappuccino", "macchiato", "mocha", "flat white", "filtre",
+}
+
+# --- Router Setup ---
 router = APIRouter(prefix="/assistant", tags=["Assistant"])
 
 
@@ -656,44 +677,6 @@ _pending_aggregated: Dict[str, Dict[str, int]] = {}  # conversation_id -> aggreg
 _pending_variations: Dict[str, List[Dict[str, Any]]] = {}  # conversation_id -> varyasyon bekleyen ürünler listesi
 SESSION_MAX_MESSAGES = 20
 
-NUMBER_WORDS: Dict[str, int] = {
-    "bir": 1, "iki": 2, "üç": 3, "uc": 3, "dört": 4, "dort": 4,
-    "beş": 5, "bes": 5, "altı": 6, "alti": 6, "yedi": 7, "sekiz": 8,
-    "dokuz": 9, "on": 10
-}
-
-MILK_KEYWORDS = {
-    "latte",
-    "milk",
-    "sut",
-    "süt",
-    "cream",
-    "kaymak",
-    "peynir",
-    "cheese",
-    "mozzarella",
-    "krem",
-    "mocha",
-    "cappuccino",
-    "milkshake",
-    "milk tea",
-    "panna",
-    "pizza",
-}
-
-COFFEE_KEYWORDS = {
-    "kahve",
-    "kahvesi",
-    "coffee",
-    "espresso",
-    "americano",
-    "latte",
-    "cappuccino",
-    "macchiato",
-    "mocha",
-    "flat white",
-    "filtre",
-}
 
 HUNGER_HINTS = {
     "aciktim",
@@ -2527,19 +2510,21 @@ async def chat_smart(payload: ChatRequest):
                         {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
                     )
                     try:
-                        from ..websocket.manager import manager as _ws_mgr
-                        import asyncio
-                        asyncio.create_task(_ws_mgr.broadcast({
-                            "type": "masa_status_change",
-                            "masa_adi": masa,
-                            "durum": "dolu"
-                        }, topic="orders"))
+                        from ..websocket.manager import manager, Topics
+                        # Masa durumunu 'dolu' yap
                         await db.execute(
                             "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
                             {"masa": masa, "sid": sube_id}
                         )
+                        # WebSocket üzerinden bildir (Kroki için)
+                        asyncio.create_task(manager.broadcast({
+                            "type": "table_update",
+                            "masa": masa,
+                            "durum": "dolu",
+                            "sube_id": sube_id
+                        }, topic=Topics.TABLES))
                     except Exception as _ws_e:
-                        logging.error(f"WebSocket event error: {_ws_e}")
+                        logging.error(f"Masa durum güncelleme/WS hatası: {_ws_e}")
 
                     logging.info(f"[ORDER] Created partial order #{row['id']} with items without variation: {json_dumps(sepet)}")
                     
@@ -2687,19 +2672,21 @@ async def chat_smart(payload: ChatRequest):
                     {"sid": sube_id, "masa": masa, "adisyon_id": adisyon_id, "sepet": json_dumps(sepet), "tutar": tutar},
                 )
                 try:
-                    from ..websocket.manager import manager as _ws_mgr2
-                    import asyncio
-                    asyncio.create_task(_ws_mgr2.broadcast({
-                        "type": "masa_status_change",
-                        "masa_adi": masa,
-                        "durum": "dolu"
-                    }, topic="orders"))
+                    from ..websocket.manager import manager, Topics
+                    # Masa durumunu 'dolu' yap
                     await db.execute(
                         "UPDATE masalar SET durum = 'dolu' WHERE masa_adi = :masa AND sube_id = :sid AND durum IN ('bos', 'rezerve')",
                         {"masa": masa, "sid": sube_id}
                     )
+                    # WebSocket üzerinden bildir (Kroki için)
+                    asyncio.create_task(manager.broadcast({
+                        "type": "table_update",
+                        "masa": masa,
+                        "durum": "dolu",
+                        "sube_id": sube_id
+                    }, topic=Topics.TABLES))
                 except Exception as _ws_e2:
-                    logging.error(f"WebSocket event error: {_ws_e2}")
+                    logging.error(f"Masa durum güncelleme/WS hatası: {_ws_e2}")
 
                 logging.info(f"[ORDER] Created order #{row['id']} with sepet: {json_dumps(sepet)}")
 

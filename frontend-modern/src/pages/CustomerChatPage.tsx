@@ -22,13 +22,37 @@ export default function CustomerChatPage() {
   const [subeId, setSubeId] = useState<number>(parseInt(searchParams.get('sube_id') || '1', 10));
   const qrCode = searchParams.get('qr');
   
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      type: 'assistant',
-      text: 'Merhaba! Ben Neso, sipariş asistanınız! 👋\n\nMenümüzden dilediğinizi seçebilirsiniz. Az sonra günün favorilerini paylaşacağım.',
-      timestamp: new Date(),
-    },
-  ]);
+  const CHAT_STORAGE_KEY = 'neso-customer-chat-messages';
+  
+  const [messages, setMessages] = useState<Message[]>(() => {
+    const saved = sessionStorage.getItem(CHAT_STORAGE_KEY);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed.map((m: any) => ({
+          ...m,
+          timestamp: new Date(m.timestamp)
+        }));
+      } catch (e) {
+        console.warn('Chat history could not be parsed');
+      }
+    }
+    return [
+      {
+        type: 'assistant',
+        text: 'Merhaba! Ben Neso, sipariş asistanınız! 👋\n\nMenümüzden dilediğinizi seçebilirsiniz. Az sonra günün favorilerini paylaşacağım.',
+        timestamp: new Date(),
+      },
+    ];
+  });
+
+  useEffect(() => {
+    const toSave = messages.map(m => {
+      const { audioBase64, ...rest } = m; // Don't save large audio data
+      return rest;
+    });
+    sessionStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(toSave));
+  }, [messages]);
   const [inputText, setInputText] = useState('');
   const [loading, setLoading] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
