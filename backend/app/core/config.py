@@ -107,7 +107,7 @@ class Settings(BaseSettings):
 
     # Sesli asistan altyapısı için bayraklar
     ASSISTANT_ENABLE_LLM: bool = True
-    ASSISTANT_ENABLE_TTS: bool = True   # Client-side tarayıcı SpeechSynthesis; sunucu TTS için ileride
+    ASSISTANT_ENABLE_TTS: bool = False  # Sunucu TTS kapalı (arayüzde kullanılmıyor); gerekirse env ile True yapılabilir
     ASSISTANT_ENABLE_STT: bool = True   # Client-side tarayıcı SpeechRecognition; sunucu STT için ileride
      
     # ---------- TTS (Text-to-Speech) API Ayarları ----------
