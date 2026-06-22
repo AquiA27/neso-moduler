@@ -792,7 +792,7 @@ export const assistantApi = {
 };
 
 export const customerAssistantApi = {
-  chat: async (data: { text: string; masa?: string; conversation_id?: string }) => {
+  chat: async (data: { text: string; masa?: string; sube_id?: number; conversation_id?: string }) => {
     // sube_id is handled by publicApiClient interceptor or can be passed
     return publicApiClient.post('/customer-assistant/chat', data);
   },
