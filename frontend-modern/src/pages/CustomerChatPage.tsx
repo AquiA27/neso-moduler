@@ -166,8 +166,12 @@ export default function CustomerChatPage() {
             console.log('[QR] Masa bilgisi yüklendi:', data);
             setMasa(data.masa_adi);
             if (data.sube_id) {
-              setSubeId(parseInt(data.sube_id, 10));
-              console.log('[QR] sube_id güncellendi:', data.sube_id);
+              const qrSubeId = parseInt(data.sube_id, 10);
+              setSubeId(qrSubeId);
+              // Interceptor ve confirm-order sessionStorage'dan okuduğu için senkronize et
+              sessionStorage.setItem('neso.subeId', String(qrSubeId));
+              localStorage.setItem('neso.subeId', String(qrSubeId));
+              console.log('[QR] sube_id güncellendi:', qrSubeId);
             }
             
             // Masa durumu kontrolü
@@ -213,6 +217,7 @@ export default function CustomerChatPage() {
       const response = await customerAssistantApi.chat({
         text: currentInput,
         masa: masa || undefined,
+        sube_id: subeId,
         conversation_id: conversationId || undefined,
       });
 

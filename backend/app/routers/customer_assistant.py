@@ -8,7 +8,7 @@ This router handles:
 - Confirmation workflows
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import logging
@@ -35,6 +35,7 @@ class CustomerChatRequest(BaseModel):
     text: str = Field(min_length=1, description="Customer message")
     conversation_id: Optional[str] = Field(default=None, description="Conversation ID for context")
     masa: Optional[str] = Field(default=None, description="Table number")
+    sube_id: Optional[int] = Field(default=None, description="Branch (şube) ID")
 
 
 class ProductMatch(BaseModel):
@@ -77,13 +78,19 @@ class CustomerChatResponse(BaseModel):
 @router.post("/chat", response_model=CustomerChatResponse)
 async def customer_chat(
     payload: CustomerChatRequest,
+    request: Request,
 ):
     """Thin wrapper that delegates to the intelligent assistant pipeline."""
     try:
-        # sube_id payload icinde gelmeli veya varsayilan olmali
-        sube_id = 1 # Varsayilan sube_id (gercekte frontend header veya payload icinde gonderir)
-        # Varsa public header'dan alinabilir ama simdilik payload.sube_id yoksa 1
-        
+        # sube_id önceliği: payload > X-Sube-Id header > 1 (varsayılan)
+        sube_id = payload.sube_id
+        if not sube_id:
+            header_sube = request.headers.get("X-Sube-Id")
+            if header_sube and header_sube.isdigit():
+                sube_id = int(header_sube)
+        if not sube_id:
+            sube_id = 1
+
         conversation_id = payload.conversation_id or f"conv_customer_{sube_id}"
         ctx = await context_manager.get(conversation_id)
 

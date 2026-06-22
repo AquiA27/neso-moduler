@@ -1844,6 +1844,11 @@ async def chat_smart(payload: ChatRequest):
             masa = ctx.masa
         await context_manager.update(conversation_id, sube_id=sube_id, masa=masa)
 
+        # LLM bağlamı ve öneriler — fonksiyonun başında bir kez tanımlanır,
+        # böylece aşağıdaki erken kullanımlarda (structured intent, selamlama) UnboundLocalError olmaz.
+        suggestions: Optional[List[str]] = None
+        context_lines: List[str] = []
+
         hunger_signal = _detect_hunger_signal(text)
         sensitive_business_signal = _has_sensitive_business_query(text)
 
@@ -2371,8 +2376,7 @@ async def chat_smart(payload: ChatRequest):
             if all(norm in ignore_tokens for norm in not_matched_normalized) and any(g in text_lower_check for g in ["merhaba", "selam", "hello", "hi", "hey"]):
                 not_matched = []
     
-        suggestions: Optional[List[str]] = None
-        context_lines: List[str] = []
+        # suggestions ve context_lines fonksiyonun başında tanımlandı (yukarı bakınız)
         default_reply = ""
         force_default_reply = False
         order_summary: Optional[Dict[str, Any]] = None
