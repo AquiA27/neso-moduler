@@ -360,13 +360,20 @@ class GeminiProvider(LLMProvider):
             
             # Her deneme için temiz bir payload oluştur
             attempt_contents = json.loads(json.dumps(gemini_history))
+            is_bi = task_type == "bi_analysis"
+            gen_config = {
+                "temperature": 0.4 if is_bi else 0.8,
+                "topP": 0.95,
+                "maxOutputTokens": 2048 if is_bi else 1024,
+            }
+            # Gemini 2.5-flash varsayılan olarak "thinking" modunda çalışır ve yanıtı
+            # ciddi yavaşlatır. Müşteri sohbetinde düşünmeyi kapatıp hız kazanıyoruz;
+            # BI analizinde muhakeme faydalı olduğu için açık bırakıyoruz.
+            if not is_bi:
+                gen_config["thinkingConfig"] = {"thinkingBudget": 0}
             attempt_payload = {
                 "contents": attempt_contents,
-                "generationConfig": {
-                    "temperature": 0.4 if task_type == "bi_analysis" else 0.8,
-                    "topP": 0.95,
-                    "maxOutputTokens": 4096,
-                }
+                "generationConfig": gen_config,
             }
 
             # v1beta'da systemInstruction desteklenir (role olmadan!)
