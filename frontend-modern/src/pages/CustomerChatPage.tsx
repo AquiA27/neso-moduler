@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Send, ArrowLeft, Mic, Volume2 } from 'lucide-react';
-import { assistantApi, normalizeApiUrl } from '../lib/api';
+import { assistantApi, customerAssistantApi, normalizeApiUrl } from '../lib/api';
 
 interface Message {
   type: 'user' | 'assistant';
@@ -210,10 +210,9 @@ export default function CustomerChatPage() {
 
     try {
       console.log('[SEND] Sipariş gönderiliyor - masa:', masa, 'text:', currentInput);
-      const response = await assistantApi.chat({
+      const response = await customerAssistantApi.chat({
         text: currentInput,
         masa: masa || undefined,
-        sube_id: subeId,
         conversation_id: conversationId || undefined,
       });
 

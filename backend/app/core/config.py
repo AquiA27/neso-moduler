@@ -103,7 +103,7 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     
     GOOGLE_API_KEY: Optional[str] = None
-    GEMINI_MODEL: Optional[str] = "gemini-2.0-flash"
+    GEMINI_MODEL: Optional[str] = "gemini-2.5-flash"
 
     # Sesli asistan altyapısı için bayraklar
     ASSISTANT_ENABLE_LLM: bool = True

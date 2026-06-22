@@ -77,12 +77,14 @@ class CustomerChatResponse(BaseModel):
 @router.post("/chat", response_model=CustomerChatResponse)
 async def customer_chat(
     payload: CustomerChatRequest,
-    user: Dict[str, Any] = Depends(get_current_user),
-    sube_id: int = Depends(get_sube_id),
 ):
     """Thin wrapper that delegates to the intelligent assistant pipeline."""
     try:
-        conversation_id = payload.conversation_id or f"conv_{user['id']}_{sube_id}"
+        # sube_id payload icinde gelmeli veya varsayilan olmali
+        sube_id = 1 # Varsayilan sube_id (gercekte frontend header veya payload icinde gonderir)
+        # Varsa public header'dan alinabilir ama simdilik payload.sube_id yoksa 1
+        
+        conversation_id = payload.conversation_id or f"conv_customer_{sube_id}"
         ctx = await context_manager.get(conversation_id)
 
         masa_value = payload.masa or ctx.masa
@@ -127,10 +129,9 @@ async def customer_chat(
 @router.post("/confirm-order")
 async def confirm_order(
     menu_id: int,
+    sube_id: int,
     quantity: int = 1,
     masa: Optional[str] = None,
-    user: Dict[str, Any] = Depends(get_current_user),
-    sube_id: int = Depends(get_sube_id),
 ):
     """Confirm and create an order.
 

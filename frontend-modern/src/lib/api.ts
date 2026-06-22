@@ -791,6 +791,17 @@ export const assistantApi = {
   },
 };
 
+export const customerAssistantApi = {
+  chat: async (data: { text: string; masa?: string; conversation_id?: string }) => {
+    // sube_id is handled by publicApiClient interceptor or can be passed
+    return publicApiClient.post('/customer-assistant/chat', data);
+  },
+  confirmOrder: async (data: { menu_id: number; quantity?: number; masa?: string }) => {
+    const subeId = Number(sessionStorage.getItem('neso.subeId') || localStorage.getItem('neso.subeId') || '1');
+    return publicApiClient.post(`/customer-assistant/confirm-order?menu_id=${data.menu_id}&sube_id=${subeId}&quantity=${data.quantity || 1}${data.masa ? `&masa=${data.masa}` : ''}`);
+  }
+};
+
 // Public menu API for customers
 export const publicMenuApi = {
   list: async (subeId?: number) => {

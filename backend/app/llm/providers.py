@@ -222,18 +222,21 @@ class OpenAIProvider(LLMProvider):
         except Exception as e:
             safe_err = str(e).replace(self.api_key, "***") if self.api_key in str(e) else str(e)
             logging.error(f"[OpenAI] Error: {safe_err}")
-            return f"OpenAI hatası: {safe_err[:120]}", None
+            raise RuntimeError(f"LLM Provider Error: {safe_err[:120]}")
 
 
 class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
         self.api_key = api_key
         # Harita eski model isimlerini yenilerine yönlendiriyor
+        # Kullanımdan kalkan model isimlerini güncel sürümlere yönlendir
         model_map = {
-            "gemini-1.5-pro": "gemini-1.5-pro-latest"
+            "gemini-1.5-pro": "gemini-2.5-pro",
+            "gemini-1.5-flash": "gemini-2.5-flash",
+            "gemini-1.5-flash-8b": "gemini-2.5-flash",
+            "gemini-2.0-flash": "gemini-2.5-flash",
         }
-        # GEMINI 2.0-flash bazı hesaplarda (404 no longer available) engelli olduğu için ana fallback 1.5-flash
-        raw_model = model or "gemini-1.5-flash"
+        raw_model = model or "gemini-2.5-flash"
         self.model = model_map.get(raw_model, raw_model)
 
     async def stream(self, messages: List[Dict[str, str]], temperature: float = 0.7, max_tokens: int = 2048) -> AsyncIterator[str]:
@@ -340,9 +343,8 @@ class GeminiProvider(LLMProvider):
         fallback_models = [
             (self.model, "v1beta"),
             ("gemini-2.5-flash", "v1beta"),
-            ("gemini-1.5-flash-8b", "v1beta"),
-            ("gemini-1.5-flash", "v1beta"),
-            ("gemini-1.5-pro", "v1beta")
+            ("gemini-flash-latest", "v1beta"),
+            ("gemini-2.5-pro", "v1beta"),
         ]
         
         seen = set()
@@ -428,7 +430,7 @@ class GeminiProvider(LLMProvider):
         # Tüm denemeler başarısız
         safe_err = str(last_error).replace(self.api_key, "***") if last_error else "bilinmeyen hata"
         logging.error(f"[Gemini] All attempts failed: {safe_err}")
-        return f"Gemini API hatası: Lütfen API anahtarınızı kontrol edin. ({safe_err[:120]})", None
+        raise RuntimeError(f"LLM Provider Error: {safe_err[:120]}")
 
 
 async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Optional[str] = None) -> LLMProvider:
@@ -569,10 +571,11 @@ async def get_llm_provider(tenant_id: Optional[int] = None, assistant_type: Opti
             if not model or "gemini" in model.lower():
                 model = "gpt-4o-mini"
         # 2. Eğer açıkça Gemini istenmişse
-        elif provider_type == "gemini" or api_key_str.startswith("AIza") or (model and "gemini" in model.lower()):
+        #    Google API anahtarları "AIza" ile başlar; yeni AI Studio anahtarları ise "AQ." ile başlar.
+        elif provider_type == "gemini" or api_key_str.startswith("AIza") or api_key_str.startswith("AQ.") or (model and "gemini" in model.lower()):
             provider_type = "gemini"
             if not model or "gpt" in model.lower():  # Model ismi hatalıysa düzelt
-                model = "gemini-1.5-flash"
+                model = "gemini-2.5-flash"
         
         if provider_type == "gemini":
             logging.info(f"[LLM_PROVIDER] ♊ Using Gemini ({model}) via {key_source}")
