@@ -85,7 +85,7 @@ export default function TenantSwitcher() {
       {open && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <div className="absolute right-0 top-full mt-3 z-50 w-72 glass-panel rounded-3xl overflow-hidden shadow-2xl animate-in fade-in zoom-in slide-in-from-top-4 duration-300">
+          <div className="absolute right-0 top-full mt-3 z-50 w-72 bg-slate-900 border border-white/10 rounded-3xl overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] animate-in fade-in zoom-in slide-in-from-top duration-300">
             <div className="p-4 border-b border-white/5 bg-white/5">
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-emerald-400 transition-colors" size={16} />

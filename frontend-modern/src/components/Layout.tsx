@@ -211,7 +211,7 @@ function Layout() {
       <div className={`flex-1 flex flex-col transition-all duration-500 min-w-0 ${sidebarOpen ? 'md:pl-72' : 'md:pl-20'}`}>
 
         {/* Top Header */}
-        <header className="sticky top-0 z-30 h-16 md:h-20 flex items-center justify-between px-4 md:px-8 border-b border-white/5 bg-slate-950/20 backdrop-blur-3xl">
+        <header className="sticky top-0 z-30 h-16 md:h-20 flex items-center justify-between px-4 md:px-8 border-b border-white/5 bg-slate-950/80 backdrop-blur-3xl">
           <div className="flex items-center gap-4">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
