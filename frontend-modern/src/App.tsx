@@ -76,8 +76,15 @@ function App() {
       <SubdomainDetector />
       <Suspense
         fallback={
-          <div className="flex h-screen items-center justify-center text-sm text-slate-500">
-            Uygulama yükleniyor...
+          <div className="flex h-screen flex-col items-center justify-center gap-6 animate-in fade-in duration-500">
+            <div className="relative">
+              <div className="w-14 h-14 rounded-full border-2 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+              <div className="absolute inset-0 rounded-full bg-emerald-500/10 blur-xl" />
+            </div>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-lg font-bold tracking-tight text-white">Neso Modüler</span>
+              <span className="text-xs font-medium uppercase tracking-[0.2em] text-slate-500">Yükleniyor</span>
+            </div>
           </div>
         }
       >

@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { customizationApi, subscriptionApi, normalizeApiUrl } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
-import { Settings, AlertTriangle, X, Menu, Bell } from 'lucide-react';
+import { Settings, AlertTriangle, X, Menu, Clock } from 'lucide-react';
 import logo from '../assets/neso-logo.jpg';
 import TenantSwitcher from './TenantSwitcher';
 import Sidebar from './Sidebar';
@@ -15,6 +15,19 @@ function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [showSubscriptionAlert, setShowSubscriptionAlert] = useState(true);
+  const [now, setNow] = useState(() => new Date());
+
+  // Üst bardaki canlı saat
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const clock = now.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+  const dateLabel = useMemo(
+    () => now.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', weekday: 'long' }),
+    [now.toDateString()]
+  );
 
   // Close sidebar by default on mobile
   useEffect(() => {
@@ -147,10 +160,14 @@ function Layout() {
     if (path.includes('giderler')) return 'Giderler';
     if (path.includes('masalar')) return 'Masa Düzeni';
     if (path.includes('recete')) return 'Reçeteler';
-    if (path.includes('asistan')) return 'Yapay Zeka Asistanı';
+    if (path.includes('isletme-asistani')) return 'İşletme Asistanı';
+    if (path.includes('asistan')) return 'Müşteri Asistanı';
     if (path.includes('personeller')) return 'Personel Yönetimi';
     if (path.includes('kasa')) return 'Kasa Paneli';
+    if (path.includes('mutfak')) return 'Mutfak Ekranı';
+    if (path.includes('terminal')) return 'El Terminali';
     if (path.includes('superadmin')) return 'Sistem Yönetimi';
+    if (path.includes('system')) return 'Sistem Ayarları';
     return 'Neso Modüler';
   }, [location]);
 
@@ -195,9 +212,10 @@ function Layout() {
 
           <div className="flex items-center gap-2 md:gap-4">
             <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/5 text-slate-400">
-              <Bell size={16} />
+              <Clock size={14} className="text-emerald-500/80" />
+              <span className="text-xs font-semibold tabular-nums text-slate-300">{clock}</span>
               <div className="w-[1px] h-3 bg-white/10 mx-1" />
-              <span className="text-xs font-medium">0 Bildirim</span>
+              <span className="text-xs font-medium capitalize">{dateLabel}</span>
             </div>
 
             {showSuperAdmin && (
@@ -231,7 +249,7 @@ function Layout() {
 
         {/* Main Content Area */}
         <main className="flex-1 p-4 md:p-8 relative">
-          <div className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom duration-700">
+          <div key={location.pathname} className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom duration-700">
             <Outlet />
           </div>
         </main>

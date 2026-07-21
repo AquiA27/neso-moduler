@@ -35,6 +35,12 @@
   h2 { @apply text-3xl md:text-4xl; }
   h3 { @apply text-2xl md:text-3xl; }
 
+  /* Klavye ile gezinirken görünür odak halkası */
+  button:focus-visible,
+  a:focus-visible {
+    @apply outline-none ring-2 ring-emerald-500/60 ring-offset-2 ring-offset-slate-950 rounded-lg;
+  }
+
   /* Refined Scrollbar */
   ::-webkit-scrollbar {
     width: 5px;
@@ -103,6 +109,70 @@
     background-position: right 1.25rem center;
     background-size: 1.25rem;
     padding-right: 3rem;
+  }
+}
+
+/* Enter Animations (tailwindcss-animate uyumlu — plugin kurulu olmadığı için elle tanımlı) */
+@keyframes enter {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0)
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1));
+  }
+}
+
+.animate-in {
+  animation: enter 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.fade-in { --tw-enter-opacity: 0; }
+.zoom-in { --tw-enter-scale: 0.96; }
+.slide-in-from-top { --tw-enter-translate-y: -1.25rem; }
+.slide-in-from-bottom { --tw-enter-translate-y: 1.25rem; }
+.slide-in-from-left { --tw-enter-translate-x: -1.25rem; }
+.slide-in-from-right { --tw-enter-translate-x: 1.25rem; }
+
+.animate-in.duration-300 { animation-duration: 0.3s; }
+.animate-in.duration-500 { animation-duration: 0.5s; }
+.animate-in.duration-700 { animation-duration: 0.7s; }
+.animate-in.duration-1000 { animation-duration: 1s; }
+
+/* Hata mesajları için sarsma animasyonu */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.animate-shake {
+  animation: shake 0.4s ease-in-out;
+}
+
+/* Yüklenme iskeleti için parlama efekti */
+@keyframes shimmer {
+  from { background-position: -200% 0; }
+  to { background-position: 200% 0; }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    100deg,
+    rgba(148, 163, 184, 0.06) 40%,
+    rgba(148, 163, 184, 0.14) 50%,
+    rgba(148, 163, 184, 0.06) 60%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .animate-shake,
+  .animate-float,
+  .skeleton-shimmer {
+    animation: none;
   }
 }
 

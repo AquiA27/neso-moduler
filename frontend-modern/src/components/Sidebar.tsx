@@ -13,7 +13,10 @@ import {
   LayoutDashboard,
   UtensilsCrossed,
   Layers,
-  Bot
+  Bot,
+  Sparkles,
+  Smartphone,
+  ChefHat
 } from 'lucide-react';
 import { memo } from 'react';
 import logo from '../assets/neso-logo.jpg';
@@ -57,12 +60,12 @@ function Sidebar({
     { to: '/masalar', label: 'Masa Düzeni', icon: Layers, show: showAdmin && showTenantDataPages },
     { to: '/recete', label: 'Reçeteler', icon: UtensilsCrossed, show: showAdmin && showTenantDataPages },
     { to: '/asistan', label: 'Müşteri Asistanı', icon: Bot, show: showAdmin && showTenantDataPages },
-    { to: '/isletme-asistani', label: 'İşletme Asistanı', icon: TrendingDown, show: showAdmin && showTenantDataPages },
+    { to: '/isletme-asistani', label: 'İşletme Asistanı', icon: Sparkles, show: showAdmin && showTenantDataPages },
     { to: '/personeller', label: 'Personeller', icon: Users, show: showPersoneller && showTenantDataPages },
     { to: '/superadmin', label: 'Sistem Yönetimi', icon: Settings, show: showSuperAdmin },
     { to: '/kasa', label: 'Kasa Ekranı', icon: CreditCard, show: showKasa && showTenantDataPages },
-    { to: '/mutfak', label: 'Mutfak Ekranı', icon: UtensilsCrossed, show: showMutfak && showTenantDataPages },
-    { to: '/terminal', label: 'El Terminali', icon: LayoutDashboard, show: showTerminal && showTenantDataPages },
+    { to: '/mutfak', label: 'Mutfak Ekranı', icon: ChefHat, show: showMutfak && showTenantDataPages },
+    { to: '/terminal', label: 'El Terminali', icon: Smartphone, show: showTerminal && showTenantDataPages },
   ];
 
   return (
@@ -108,7 +111,7 @@ function Sidebar({
 
         {/* Navigation */}
         <div className="px-4 mb-4">
-          {isOpen && <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2">Main Navigation</p>}
+          {isOpen && <p className="text-[10px] font-bold text-slate-600 uppercase tracking-widest px-4 mb-2">Ana Menü</p>}
         </div>
         <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto custom-scrollbar">
           {navItems.filter(item => item.show).map((item) => (
@@ -150,6 +153,7 @@ function Sidebar({
                   <p className="text-sm font-bold text-white truncate group-hover:text-emerald-400 transition-colors uppercase tracking-tight">{user?.username || 'Kullanıcı'}</p>
                   <div className="flex items-center gap-2">
                     <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest truncate">{user?.role?.replace('_', ' ') || 'Aktif'}</span>
                   </div>
                 </div>
               </div>
@@ -161,7 +165,7 @@ function Sidebar({
             className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl text-slate-400 hover:bg-rose-500/10 hover:text-rose-400 transition-all duration-300 group ${!isOpen && 'justify-center'}`}
           >
             <LogOut size={20} className="shrink-0 transition-transform duration-300 group-hover:rotate-12" />
-            {isOpen && <span className="font-bold text-sm tracking-widest uppercase">Sign Out</span>}
+            {isOpen && <span className="font-bold text-sm tracking-widest uppercase">Çıkış Yap</span>}
           </button>
         </div>
       </aside>
