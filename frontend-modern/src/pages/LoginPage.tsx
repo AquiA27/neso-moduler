@@ -55,15 +55,21 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-6 overflow-hidden bg-slate-950">
-      {/* Background with Image and Gradients */}
+      {/* Background — harici görsel bağımlılığı olmadan katmanlı gradyan + ince ızgara deseni */}
       <div className="absolute inset-0 z-0">
-        <img
-          src="https://images.unsplash.com/photo-1620121692029-d088224ddc74?q=80&w=2064&auto=format&fit=crop"
-          className="w-full h-full object-cover opacity-20 scale-110"
-          alt="Background"
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950 to-emerald-950/40" />
+        <div
+          className="absolute inset-0 opacity-20"
+          style={{
+            backgroundImage:
+              'linear-gradient(rgba(148,163,184,0.08) 1px, transparent 1px), linear-gradient(90deg, rgba(148,163,184,0.08) 1px, transparent 1px)',
+            backgroundSize: '44px 44px',
+            maskImage: 'radial-gradient(ellipse at center, black 25%, transparent 75%)',
+            WebkitMaskImage: 'radial-gradient(ellipse at center, black 25%, transparent 75%)',
+          }}
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-950 via-slate-950/90 to-emerald-950/30" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 blur-[120px] rounded-full" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-emerald-500/10 blur-[120px] rounded-full animate-float" />
+        <div className="absolute -top-32 -right-32 w-[400px] h-[400px] bg-cyan-500/[0.07] blur-[100px] rounded-full" />
       </div>
 
       {/* Main Container */}

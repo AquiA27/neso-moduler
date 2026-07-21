@@ -28,6 +28,8 @@
   h1, h2, h3, h4, h5, h6 {
     font-family: 'Outfit', sans-serif;
     @apply tracking-tight font-semibold;
+    /* Rakamlar eşit genişlikte hizalansın — istatistik kartları ve tutarlar titremesin */
+    font-variant-numeric: tabular-nums;
   }
 
   /* Corporate Typography Hierarchy */
@@ -65,9 +67,16 @@
   }
 
   .premium-card {
-    @apply relative overflow-hidden bg-slate-900/40 backdrop-blur-xl border border-white/[0.06] 
+    @apply relative overflow-hidden bg-slate-900/40 backdrop-blur-xl border border-white/[0.06]
            transition-all duration-500 hover:border-emerald-500/40 hover:bg-slate-800/50 hover:-translate-y-1.5;
     box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.4);
+  }
+
+  /* Kart üst kenarında ince ışık çizgisi — cam yüzeye vuran ışık hissi */
+  .premium-card::before {
+    content: '';
+    @apply absolute inset-x-0 top-0 h-px pointer-events-none;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12) 30%, rgba(255, 255, 255, 0.12) 70%, transparent);
   }
 
   .text-gradient {

@@ -184,6 +184,8 @@ function Layout() {
     return 'Neso Modüler';
   }, [location]);
 
+  const isFullBleedPage = location.pathname.startsWith('/superadmin');
+
   // Sekme başlığını aktif sayfayla senkronla
   useEffect(() => {
     document.title = pageTitle === 'Neso Modüler' ? 'Neso Modüler - Yönetim Paneli' : `${pageTitle} — Neso Modüler`;
@@ -273,14 +275,22 @@ function Layout() {
           </div>
         )}
 
-        {/* Main Content Area */}
-        <main className="flex-1 p-4 md:p-8 relative">
-          <div key={location.pathname} className="max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom duration-700">
+        {/* Main Content Area — Süper Admin paneli kendi arayüz kabuğunu taşıdığı için kenardan kenara dolar */}
+        <main className={`flex-1 relative ${isFullBleedPage ? 'p-0 flex flex-col' : 'p-4 md:p-8'}`}>
+          <div
+            key={location.pathname}
+            className={
+              isFullBleedPage
+                ? 'flex-1 flex flex-col min-h-0 animate-in fade-in duration-500'
+                : 'max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom duration-700'
+            }
+          >
             <Outlet />
           </div>
         </main>
 
         {/* Minimal Footer */}
+        {!isFullBleedPage && (
         <footer className="px-8 py-6 border-t border-white/5 flex flex-col md:flex-row items-center justify-between gap-6 text-[10px] font-bold uppercase tracking-[0.1em] text-slate-600">
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <p className="text-slate-500 normal-case font-medium tracking-normal">© 2026 Neso Modüler Dashboard. Premium Edition.</p>
@@ -298,6 +308,7 @@ function Layout() {
             <span className="text-slate-700 tracking-widest">v0.3.5</span>
           </div>
         </footer>
+        )}
       </div>
     </div>
   );
