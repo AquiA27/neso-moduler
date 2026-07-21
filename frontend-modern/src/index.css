@@ -119,6 +119,19 @@
     background-size: 1.25rem;
     padding-right: 3rem;
   }
+
+  /* Açık temalı bölgeler (Süper Admin paneli): global koyu form stili burada geçersiz.
+     Koyu kabuk için yazılmış input/select/textarea renkleri beyaz zeminde okunmuyordu. */
+  .light-theme input,
+  .light-theme select,
+  .light-theme textarea {
+    @apply bg-white border-gray-200 text-gray-900 placeholder:text-gray-400 backdrop-blur-none shadow-sm
+           focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500;
+  }
+
+  .light-theme select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='rgba(75,85,99,0.7)'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
+  }
 }
 
 /* Enter Animations (tailwindcss-animate uyumlu — plugin kurulu olmadığı için elle tanımlı) */

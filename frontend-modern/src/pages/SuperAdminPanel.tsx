@@ -209,7 +209,7 @@ export default function SuperAdminPanel() {
   };
 
   return (
-    <div className="flex h-screen bg-[#F8FAFC] font-sans overflow-hidden">
+    <div className="light-theme flex h-screen bg-[#F8FAFC] font-sans overflow-hidden">
       
       {/* Mobile Overlay */}
       {isSidebarOpen && (
