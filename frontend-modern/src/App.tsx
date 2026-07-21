@@ -1,5 +1,7 @@
 import { Suspense, lazy, type ReactNode, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import ErrorBoundary from './components/ErrorBoundary';
 import { useAuthStore } from './store/authStore';
 import LoginPage from './pages/LoginPage';
 import Layout from './components/Layout';
@@ -74,6 +76,26 @@ function App() {
   return (
     <BrowserRouter>
       <SubdomainDetector />
+      <Toaster
+        position="top-right"
+        gutter={12}
+        toastOptions={{
+          duration: 3500,
+          style: {
+            background: 'rgba(15, 23, 42, 0.95)',
+            color: '#e2e8f0',
+            border: '1px solid rgba(255, 255, 255, 0.08)',
+            borderRadius: '16px',
+            padding: '14px 18px',
+            fontSize: '14px',
+            fontWeight: 600,
+            backdropFilter: 'blur(12px)',
+            boxShadow: '0 20px 40px -12px rgba(0, 0, 0, 0.6)',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: '#020617' } },
+          error: { iconTheme: { primary: '#f43f5e', secondary: '#020617' } },
+        }}
+      />
       <Suspense
         fallback={
           <div className="flex h-screen flex-col items-center justify-center gap-6 animate-in fade-in duration-500">
@@ -88,6 +110,7 @@ function App() {
           </div>
         }
       >
+        <ErrorBoundary>
         <Routes>
           {/* Public routes - no authentication required */}
           <Route path="/musteri/chat" element={<CustomerChatPage />} />
@@ -128,6 +151,7 @@ function App() {
 
           <Route path="*" element={<IndexRedirect />} />
         </Routes>
+        </ErrorBoundary>
       </Suspense>
     </BrowserRouter>
   );

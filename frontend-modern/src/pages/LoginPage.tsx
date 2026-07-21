@@ -4,6 +4,7 @@ import { useAuthStore } from '../store/authStore';
 import { authApi } from '../lib/api';
 import logo from '../assets/neso-logo.jpg';
 import { Lock, User, ArrowRight, ShieldCheck } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -42,6 +43,7 @@ export default function LoginPage() {
       });
       setSubeId(Number(localStorage.getItem('neso.subeId') || '1'));
       const targetPath = resolvePanel(userData.username || username, userData.role || 'operator');
+      toast.success(`Hoş geldiniz, ${userData.username || username}!`);
       navigate(targetPath);
     } catch (err: any) {
       const errorMessage = err.response?.data?.detail || err.response?.data?.message || err.message || 'Giriş başarısız';

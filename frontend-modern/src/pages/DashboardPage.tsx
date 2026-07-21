@@ -148,11 +148,11 @@ export default function DashboardPage() {
     const topPersonnel = summary.top_personeller?.[0]?.display_name || 'Veri yok';
 
     return [
-      { key: 'revenue', label: 'Toplam Ciro', value: `${formatCurrency(summary.toplam_ciro)} ₺`, helper: `${currentPeriodLabel} brüt gelir`, icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10', trend: '+12.4%' },
-      { key: 'orders', label: 'Sipariş Hacmi', value: summary.siparis_sayisi.toLocaleString('tr-TR'), helper: `${currentPeriodLabel} işlem adeti`, icon: ShoppingCart, color: 'text-blue-400', bg: 'bg-blue-500/10', trend: '+5.2%' },
-      { key: 'avg_table', label: 'Sepet Ortalaması', value: `${formatCurrency(summary.ortalama_masa_tutari ?? summary.ortalama_sepet)} ₺`, helper: 'Masa başı harcama', icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/10', trend: '+2.1%' },
-      { key: 'discount', label: 'Uygulanan İskonto', value: `${formatCurrency(summary.toplam_iskonto)} ₺`, helper: 'Müşteri indirimleri', icon: BadgePercent, color: 'text-orange-400', bg: 'bg-orange-500/10', trend: '-1.5%' },
-      { key: 'complimentary', label: 'İkram Tutarı', value: `${formatCurrency(summary.toplam_ikram)} ₺`, helper: 'Mutfak maliyetleri', icon: Gift, color: 'text-pink-400', bg: 'bg-pink-500/10', trend: '+0.8%' },
+      { key: 'revenue', label: 'Toplam Ciro', value: `${formatCurrency(summary.toplam_ciro)} ₺`, helper: `${currentPeriodLabel} brüt gelir`, icon: DollarSign, color: 'text-emerald-400', bg: 'bg-emerald-500/10', trend: currentPeriodLabel },
+      { key: 'orders', label: 'Sipariş Hacmi', value: summary.siparis_sayisi.toLocaleString('tr-TR'), helper: `${currentPeriodLabel} işlem adeti`, icon: ShoppingCart, color: 'text-blue-400', bg: 'bg-blue-500/10', trend: currentPeriodLabel },
+      { key: 'avg_table', label: 'Sepet Ortalaması', value: `${formatCurrency(summary.ortalama_masa_tutari ?? summary.ortalama_sepet)} ₺`, helper: 'Masa başı harcama', icon: TrendingUp, color: 'text-purple-400', bg: 'bg-purple-500/10', trend: currentPeriodLabel },
+      { key: 'discount', label: 'Uygulanan İskonto', value: `${formatCurrency(summary.toplam_iskonto)} ₺`, helper: 'Müşteri indirimleri', icon: BadgePercent, color: 'text-orange-400', bg: 'bg-orange-500/10', trend: currentPeriodLabel },
+      { key: 'complimentary', label: 'İkram Tutarı', value: `${formatCurrency(summary.toplam_ikram)} ₺`, helper: 'Mutfak maliyetleri', icon: Gift, color: 'text-pink-400', bg: 'bg-pink-500/10', trend: currentPeriodLabel },
       { key: 'top_product', label: 'Yıldız Ürün', value: summary.en_populer_urun ?? 'Veri yok', helper: 'En çok satan kalem', icon: Package, color: 'text-amber-400', bg: 'bg-amber-500/10', trend: 'Lider' },
       { key: 'top_staff', label: 'Ayın Personeli', value: topPersonnel, helper: 'Satış lideri', icon: Users, color: 'text-indigo-400', bg: 'bg-indigo-500/10', trend: 'Zirve' },
     ];
@@ -209,10 +209,18 @@ export default function DashboardPage() {
                 </button>
               ))}
             </div>
-            <button onClick={handleRefresh} className="glow-button group shrink-0">
-              <Zap className="w-5 h-5 group-hover:scale-125 transition-transform group-hover:rotate-12" />
-              YENİLE
-            </button>
+            <div className="flex flex-col items-center sm:items-end gap-2">
+              <button onClick={handleRefresh} className="glow-button group shrink-0">
+                <Zap className="w-5 h-5 group-hover:scale-125 transition-transform group-hover:rotate-12" />
+                YENİLE
+              </button>
+              {summaryQuery.dataUpdatedAt > 0 && (
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-600">
+                  Son güncelleme:{' '}
+                  {new Date(summaryQuery.dataUpdatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </section>
@@ -227,10 +235,10 @@ export default function DashboardPage() {
                 <s.icon size={26} strokeWidth={2.5} />
               </div>
               <div className="flex flex-col items-end">
-                <span className={`text-xs font-black px-3 py-1 rounded-full ${s.trend.startsWith('+') ? 'bg-emerald-500/10 text-emerald-400' : s.trend.startsWith('-') ? 'bg-rose-500/10 text-rose-400' : 'bg-slate-800 text-slate-400'} border border-white/5`}>
+                <span className="text-xs font-black px-3 py-1 rounded-full bg-slate-800 text-slate-400 border border-white/5 uppercase">
                   {s.trend}
                 </span>
-                <span className="text-[10px] text-slate-600 font-bold mt-1 uppercase tracking-widest">Trend</span>
+                <span className="text-[10px] text-slate-600 font-bold mt-1 uppercase tracking-widest">Dönem</span>
               </div>
             </div>
             <div className="space-y-2">

@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore';
 import { customizationApi, subscriptionApi, normalizeApiUrl } from '../lib/api';
 import { getCurrentSubdomain, loadTenantByDomain } from '../lib/domain';
-import { Settings, AlertTriangle, X, Menu, Clock } from 'lucide-react';
+import { Settings, AlertTriangle, X, Menu, Clock, WifiOff } from 'lucide-react';
 import logo from '../assets/neso-logo.jpg';
 import TenantSwitcher from './TenantSwitcher';
 import Sidebar from './Sidebar';
@@ -16,6 +16,19 @@ function Layout() {
   const [subscriptionStatus, setSubscriptionStatus] = useState<any>(null);
   const [showSubscriptionAlert, setShowSubscriptionAlert] = useState(true);
   const [now, setNow] = useState(() => new Date());
+  const [isOnline, setIsOnline] = useState(() => navigator.onLine);
+
+  // Bağlantı durumu takibi
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true);
+    const goOffline = () => setIsOnline(false);
+    window.addEventListener('online', goOnline);
+    window.addEventListener('offline', goOffline);
+    return () => {
+      window.removeEventListener('online', goOnline);
+      window.removeEventListener('offline', goOffline);
+    };
+  }, []);
 
   // Üst bardaki canlı saat
   useEffect(() => {
@@ -171,6 +184,11 @@ function Layout() {
     return 'Neso Modüler';
   }, [location]);
 
+  // Sekme başlığını aktif sayfayla senkronla
+  useEffect(() => {
+    document.title = pageTitle === 'Neso Modüler' ? 'Neso Modüler - Yönetim Paneli' : `${pageTitle} — Neso Modüler`;
+  }, [pageTitle]);
+
   return (
     <div className="min-h-screen flex flex-row">
       {/* Sidebar Component */}
@@ -234,6 +252,14 @@ function Layout() {
           </div>
         </header>
 
+        {/* Offline Banner */}
+        {!isOnline && (
+          <div className="bg-rose-500/15 text-rose-300 border-b border-rose-500/20 px-8 py-2.5 flex items-center justify-center gap-3 animate-in fade-in slide-in-from-top duration-300">
+            <WifiOff className="w-4 h-4" />
+            <span className="text-sm font-semibold">İnternet bağlantısı koptu — yeniden bağlanılıyor…</span>
+          </div>
+        )}
+
         {/* Subscription Alert */}
         {subscriptionAlertMessage && (
           <div className={`${subscriptionAlertMessage.type === 'error' ? 'bg-red-500/20 text-red-400 border-red-500/20' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/20'} border-b px-8 py-3 flex items-center justify-between animate-in fade-in slide-in-from-top duration-500`}>
@@ -265,8 +291,8 @@ function Layout() {
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-              <span className="text-emerald-500/80">Sistem Aktif</span>
+              <div className={`w-1.5 h-1.5 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]'}`} />
+              <span className={isOnline ? 'text-emerald-500/80' : 'text-rose-400/80'}>{isOnline ? 'Sistem Aktif' : 'Bağlantı Yok'}</span>
             </div>
             <span className="text-slate-800">|</span>
             <span className="text-slate-700 tracking-widest">v0.3.5</span>

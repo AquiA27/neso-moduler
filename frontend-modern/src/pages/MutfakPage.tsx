@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import toast from 'react-hot-toast';
 import { mutfakApi, normalizeApiUrl } from '../lib/api';
 import { Clock, CheckCircle, Wifi, WifiOff, AlertTriangle, Play, Check, BarChart3, RefreshCw } from 'lucide-react';
 import { useWebSocket } from '../hooks/useWebSocket';
@@ -70,17 +71,47 @@ export default function MutfakPage() {
   const API_BASE_URL = normalizeApiUrl(import.meta.env.VITE_API_URL as string);
   const WS_URL = API_BASE_URL.replace('http://', 'ws://').replace('https://', 'wss://') + '/ws/connect/auth';
   
+  // Yeni sipariş geldiğinde kısa bir uyarı sesi çal (harici ses dosyası gerekmez)
+  const playChime = useCallback(() => {
+    try {
+      const ctx = new AudioContext();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.15);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.7);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.7);
+    } catch {
+      // Tarayıcı otomatik oynatmayı engellediyse sessizce geç
+    }
+  }, []);
+
   const ws = useWebSocket({
     url: WS_URL,
     topics: ['kitchen', 'orders'],
     auth: true,
     onMessage: (data) => {
       if (['new_order', 'order_added', 'order_update', 'status_change'].includes(data.type)) {
+        if (data.type === 'new_order' || data.type === 'order_added') {
+          playChime();
+          toast.success('Yeni sipariş geldi!', { icon: '🔔' });
+        }
         loadOrders();
         loadStats();
       }
     },
   });
+
+  // Sekme başlığında bekleyen sipariş sayısı — kasiyer başka sekmedeyken de görünür
+  useEffect(() => {
+    const pending = (stats?.new_orders || 0) + (stats?.in_prep_orders || 0);
+    document.title = pending > 0 ? `(${pending}) Mutfak — Neso Modüler` : 'Mutfak Ekranı — Neso Modüler';
+  }, [stats]);
 
   useEffect(() => {
     loadOrders();
